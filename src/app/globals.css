@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body { height: 100%; }
+body {
+  @apply bg-bg-0 text-ink antialiased;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Inter', 'DM Sans', sans-serif;
+}
+
+.mono { font-family: 'DM Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace; }
+.tabnum { font-variant-numeric: tabular-nums; }
+
+input, select, textarea, button {
+  font: inherit;
+}
+
+input[type="text"], input[type="number"], input[type="date"], input[type="search"], select, textarea {
+  @apply bg-bg-2 border border-line rounded-md px-2.5 py-1.5 text-sm text-ink outline-none;
+}
+input:focus, select:focus, textarea:focus {
+  @apply border-entity-bytes ring-1 ring-entity-bytes/40;
+}
+
+.btn {
+  @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-line bg-bg-2 hover:bg-bg-3 transition text-sm;
+}
+.btn-primary {
+  @apply bg-entity-bytes text-bg-0 border-entity-bytes hover:opacity-90;
+}
+.btn-ghost { @apply bg-transparent; }
+
+.card {
+  @apply bg-bg-1 border border-line rounded-xl shadow-soft;
+}
+
+.pill {
+  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #0f0f13; }
+::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 6px; }

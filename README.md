@@ -1,90 +1,77 @@
-# Amari Banking
+# Amari Banking — Reconciliation Tool
 
-A small full-stack banking app built with security as a first-class concern.
-Express + SQLite (better-sqlite3) on the back, vanilla HTML/CSS/JS on the front.
+A multi-entity financial reconciliation and audit-trail tool for Amari Ventures LLC. Imports Chase CSV exports, auto-categorizes every transaction, tags entities, flags audit risk, and generates a CPA-ready Excel package.
 
-## Features
-
-- User registration and sign-in with strong password policy
-- Multiple accounts per user with unique 12-digit account numbers
-- Deposit, withdraw, and transfer between accounts
-- Per-account transaction history with running balance
-- Audit log of sensitive actions (login, transfers, account creation)
-
-## Security model
-
-- **Passwords**: bcrypt (`bcryptjs`) with cost 12 by default; min 12 chars and
-  must include at least 3 of {lowercase, uppercase, digit, symbol}.
-- **Sessions**: `express-session` backed by SQLite. Cookies are `httpOnly`,
-  `SameSite=strict`, and `Secure` in production. Sessions regenerate on
-  login/register to prevent fixation, have a 15-minute idle timeout, and an
-  8-hour absolute lifetime.
-- **CSRF**: synchronizer-token pattern. Clients fetch `/api/auth/csrf-token`
-  and send it as `X-CSRF-Token` on state-changing requests. Tokens are bound to
-  the session and compared with `crypto.timingSafeEqual`.
-- **Rate limiting**: `express-rate-limit` on login (20/15min), register
-  (10/hour), and money movement (30/min).
-- **Account lockout**: 5 failed logins lock the account for 15 minutes.
-- **Headers**: `helmet` with a strict CSP (`default-src 'none'`,
-  no inline scripts/styles), HSTS in production, `X-Content-Type-Options`,
-  `Referrer-Policy: no-referrer`, no `X-Powered-By`.
-- **SQL**: every query uses prepared statements (no string interpolation).
-  Foreign keys are enforced; balances have `CHECK (balance_cents >= 0)`.
-- **Money**: stored as integer cents to avoid floating-point errors. Parsed
-  via a strict regex; transfers are atomic SQL transactions and check for
-  `Number.isSafeInteger` overflow.
-- **Authorization**: every account/transaction query is scoped by `user_id`,
-  so users cannot read or mutate other users' data.
-- **Generic errors**: login failures and missing destinations return generic
-  responses to avoid user/account enumeration.
-- **Audit log**: writes for register, login (success/failure/lock), logout,
-  account create, deposit, withdraw, transfer — with IP and user-agent.
-- **Constant-time login**: a dummy bcrypt hash is verified when the user
-  doesn't exist, evening out timing between known and unknown usernames.
-
-## Getting started
+## Quick start
 
 ```bash
-cp .env.example .env
-# Generate a real session secret for production:
-# node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
-
 npm install
-npm start
-# open http://127.0.0.1:3000
+npm run dev
+# open http://localhost:3000
 ```
 
-The SQLite database is created at `./data/bank.db` on first run.
+On first run the SQLite DB is created at `./data/amari.db` and seeded with all 15 Chase accounts.
 
-## Production checklist
+## Workflow
 
-- Set `NODE_ENV=production` and a strong `SESSION_SECRET`.
-- Serve behind HTTPS. If you terminate TLS at a proxy, set `TRUST_PROXY=true`
-  so secure cookies and client IPs work correctly.
-- Back up `./data/bank.db` regularly. Treat the file as sensitive.
-- Consider adding TOTP-based 2FA and email-verified account recovery before
-  any real use. This codebase intentionally does not pretend to be a
-  regulated financial system.
+1. **Import** (`/import`) — drag in one or many `Chase####_Activity_*.CSV` files. Account number is auto-detected from the filename. Each row is parsed, categorized, entity-tagged, audit-scored, and de-duplicated by `(account, date, amount, description)`. Internal transfers are matched automatically after every import.
+2. **Audit review** (`/audit`) — work through flagged transactions sorted by audit score. Confirm entity, business purpose, doc reference, then mark **Confirm / Needs receipt / Personal / Skip**.
+3. **Transactions** (`/transactions`) — full ledger view with filters (account, entity, status, search, flags only, hide/show internal).
+4. **Zelle / 1099** (`/zelle`) — every Zelle recipient with totals, last paid, classification, 1099 status.
+5. **Entity P&L** (`/pl`) — rolled-up P&L per business entity.
+6. **Income tracker** (`/income`) — income by source with a Spacetel timeline showing same-day outflows.
+7. **CPA Export** (`/cpa`) — one-click Excel workbook for your accountant.
 
-## Project layout
+## Categorization engine
+
+The brain of the app: `src/lib/parsers/categorizer.ts`.
+
+- Internal transfers are detected first (`ACCT_XFER`, `ODP TRANSFER`, `Online Transfer …`) and excluded from P&L.
+- Income rules detect Spacetel, Omar Alghazali (Spacetel?), TCETRA, Vidapay, Stripe, DoorDash, Grubhub, Uber Eats, Gusto refunds, and generic wires.
+- Expense rules cover the full Bytes AI software stack (LiveKit, Upstash, Twilio, Telnyx, VAPI, Anthropic, OpenAI, Cursor, Linear, …), business-shared tools (AWS, Google Workspace, Zoom), payroll (Gusto), processing fees (TransFirst/TSYS), food vendors (NYC Apple Deli, Mr Pizza Man, KitchenHub, Food Hub UK), and personal categories.
+- Zelle recipient names are extracted and matched against the known-person list (`src/constants/zelle-persons.ts`), driving 1099 detection.
+- High-risk wires (Abu Dhabi Islamic Bank, Remitly, Wise) get audit score 100/68.
+
+## Tech
+
+- **Next.js 14** App Router + React Server Components
+- **TypeScript** strict mode
+- **Tailwind CSS** with dark theme
+- **better-sqlite3** (local, synchronous, fast)
+- **Papa Parse** for CSV
+- **SheetJS (xlsx)** for the Excel export
+- **react-dropzone** for upload UX
+
+## Data privacy
+
+Everything runs locally. The SQLite database, your raw CSVs, and the categorized ledger never leave your machine. No external API calls.
+
+## Layout
 
 ```
 src/
-  server.js              Express app, middleware wiring, static files
-  config.js              Env-driven configuration with safe defaults
-  db.js                  SQLite connection and schema
+  app/
+    layout.tsx, page.tsx                    Sidebar + dashboard
+    import/                                 CSV drag-and-drop
+    transactions/                           Filterable ledger
+    audit/                                  Flagged review cards
+    accounts/, income/, zelle/, pl/         Other views
+    cpa/                                    Export preview
+    api/cpa/                                Excel download endpoint
+    reconcile/                              Internal transfer status
+  components/                               EntityBadge, FlagBadge, Money, Sidebar
   lib/
-    money.js             Cents parsing/formatting
-    password.js          Policy + bcrypt
-    audit.js             Audit log writer
-  middleware/
-    auth.js              Session presence + idle/absolute timeouts
-    csrf.js              Synchronizer-token CSRF
-    errorHandler.js      404 + final error handler
-  routes/
-    auth.js              register, login, logout, me, csrf-token
-    accounts.js          list, create, get
-    transactions.js      deposit, withdraw, transfer, history
-public/
-  index.html, css/, js/  Vanilla SPA — no inline JS/CSS, CSP-friendly
+    db/                                     better-sqlite3 schema + queries
+    parsers/                                csv, categorizer, reconciler
+    exporters/                              cpa-excel
+  constants/                                accounts, merchants, zelle-persons
+  types/                                    TS interfaces
 ```
+
+## Next iterations
+
+- Bulk-tag operations in `/transactions`
+- Recharts time-series in `/income`
+- Keyboard shortcuts in `/audit` (1/2/3/4 + arrow keys)
+- Receipt photo upload
+- Plaid sync to replace CSV imports

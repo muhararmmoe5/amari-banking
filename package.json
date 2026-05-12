@@ -2,24 +2,36 @@
   "name": "amari-banking",
   "version": "0.1.0",
   "private": true,
-  "description": "Secure full-stack banking application (Express + SQLite + vanilla JS)",
-  "main": "src/server.js",
+  "description": "Amari Ventures — Banking Reconciliation Tool",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18.18"
   },
   "dependencies": {
-    "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.3.0",
-    "connect-sqlite3": "^0.9.15",
-    "dotenv": "^16.4.5",
-    "express": "^4.21.1",
-    "express-rate-limit": "^7.4.1",
-    "express-session": "^1.18.1",
-    "express-validator": "^7.2.0",
-    "helmet": "^7.2.0"
+    "clsx": "^2.1.1",
+    "next": "14.2.15",
+    "papaparse": "^5.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-dropzone": "^14.2.9",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^20.16.10",
+    "@types/papaparse": "^5.3.14",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.6.3"
   }
 }

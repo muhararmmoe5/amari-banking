@@ -1,4 +1,7 @@
 node_modules/
+.next/
+out/
+build/
 data/
 *.db
 *.db-journal
@@ -6,9 +9,12 @@ data/
 *.db-shm
 .env
 .env.local
-sessions.sqlite*
+.env*.local
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 .DS_Store
-coverage/
 .idea/
 .vscode/
+*.tsbuildinfo
+next-env.d.ts
