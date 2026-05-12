@@ -7,12 +7,19 @@ const state = {
   selectedHistoryAccount: null,
 };
 
+const ACCOUNT_GRADIENTS = [
+  'linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)',
+  'linear-gradient(135deg, #f43f5e 0%, #f59e0b 100%)',
+  'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+  'linear-gradient(135deg, #ec4899 0%, #7c3aed 100%)',
+  'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
+  'linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%)',
+];
+
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-function setText(el, text) {
-  if (el) el.textContent = text == null ? '' : String(text);
-}
+const setText = (el, t) => { if (el) el.textContent = t == null ? '' : String(t); };
 
 function fmtCents(cents) {
   const n = Number(cents) | 0;
@@ -23,22 +30,59 @@ function fmtCents(cents) {
   return `${sign}$${whole}.${frac}`;
 }
 
-function fmtDate(ms) {
-  return new Date(ms).toLocaleString();
+function fmtAccountNumber(num) {
+  return String(num).replace(/(\d{4})(?=\d)/g, '$1 ').trim();
 }
 
+function fmtDate(ms) {
+  const d = new Date(ms);
+  const today = new Date();
+  const sameDay = d.toDateString() === today.toDateString();
+  if (sameDay) {
+    return `Today, ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function gradientFor(account) {
+  const idx = (account.id - 1) % ACCOUNT_GRADIENTS.length;
+  return ACCOUNT_GRADIENTS[idx];
+}
+
+function initial(text) {
+  if (!text) return '?';
+  return text.charAt(0).toUpperCase();
+}
+
+// ===== Toasts =====
+function toast(msg, kind = 'ok', title) {
+  const root = $('#toasts');
+  const el = document.createElement('div');
+  el.className = `toast ${kind}`;
+  const titleEl = document.createElement('div');
+  titleEl.className = 't-title';
+  titleEl.textContent = title || (kind === 'err' ? 'Something went wrong' : 'Success');
+  const bodyEl = document.createElement('div');
+  bodyEl.className = 't-body';
+  bodyEl.textContent = msg;
+  el.appendChild(titleEl);
+  el.appendChild(bodyEl);
+  root.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(8px)'; }, 3200);
+  setTimeout(() => el.remove(), 3600);
+}
+
+// ===== API =====
 async function api(method, path, body) {
-  const headers = { 'Accept': 'application/json' };
+  const headers = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (method !== 'GET' && state.csrfToken) headers['X-CSRF-Token'] = state.csrfToken;
   const res = await fetch(path, {
-    method,
-    headers,
-    credentials: 'same-origin',
+    method, headers, credentials: 'same-origin',
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   let data = null;
-  try { data = await res.json(); } catch { /* no json */ }
+  try { data = await res.json(); } catch { /* */ }
   if (!res.ok) {
     const err = new Error((data && data.error) || `http_${res.status}`);
     err.status = res.status;
@@ -64,111 +108,180 @@ async function loadMe() {
   }
 }
 
+// ===== Views =====
 function showAuth() {
   $('#authView').classList.remove('hidden');
   $('#appView').classList.add('hidden');
-  $('#userbar').classList.add('hidden');
 }
 
 function showApp() {
   $('#authView').classList.add('hidden');
   $('#appView').classList.remove('hidden');
-  $('#userbar').classList.remove('hidden');
   setText($('#userlabel'), state.user.username);
+  $('#userAvatar').textContent = initial(state.user.username);
+}
+
+// ===== Rendering =====
+function renderAccountCards() {
+  const root = $('#accountCards');
+  root.innerHTML = '';
+  if (state.accounts.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'account-card empty';
+    empty.textContent = 'No accounts yet. Tap "New account" to open one.';
+    empty.addEventListener('click', () => openModal('newAccountDialog'));
+    root.appendChild(empty);
+    return;
+  }
+  for (const acc of state.accounts) {
+    const card = document.createElement('div');
+    card.className = 'account-card';
+    card.style.background = gradientFor(acc);
+
+    const top = document.createElement('div');
+    top.className = 'ac-top';
+    const name = document.createElement('div');
+    name.className = 'ac-name';
+    name.textContent = acc.name;
+    const chip = document.createElement('div');
+    chip.className = 'ac-chip';
+    top.appendChild(name);
+    top.appendChild(chip);
+
+    const bottom = document.createElement('div');
+    bottom.className = 'ac-bottom';
+    const left = document.createElement('div');
+    const num = document.createElement('div');
+    num.className = 'ac-num';
+    num.textContent = fmtAccountNumber(acc.account_number);
+    left.appendChild(num);
+    const bal = document.createElement('div');
+    bal.className = 'ac-balance';
+    bal.textContent = fmtCents(acc.balance_cents);
+    bottom.appendChild(left);
+    bottom.appendChild(bal);
+
+    card.appendChild(top);
+    card.appendChild(bottom);
+    root.appendChild(card);
+  }
 }
 
 function renderAccountSelects() {
-  const selects = [
-    $('#depositForm select[name="account_id"]'),
-    $('#withdrawForm select[name="account_id"]'),
-    $('#transferForm select[name="from_account_id"]'),
-    $('#historyAccount'),
-  ].filter(Boolean);
-  for (const sel of selects) {
-    const prev = sel.value;
-    sel.innerHTML = '';
+  const selectors = [
+    '#depositForm select[name="account_id"]',
+    '#withdrawForm select[name="account_id"]',
+    '#transferForm select[name="from_account_id"]',
+    '#historyAccount',
+  ];
+  for (const sel of selectors) {
+    const el = $(sel);
+    if (!el) continue;
+    const prev = el.value;
+    el.innerHTML = '';
     for (const acc of state.accounts) {
       const opt = document.createElement('option');
       opt.value = String(acc.id);
-      opt.textContent = `${acc.name} · ${acc.account_number} · ${fmtCents(acc.balance_cents)}`;
-      sel.appendChild(opt);
+      opt.textContent = `${acc.name} · ${fmtCents(acc.balance_cents)}`;
+      el.appendChild(opt);
     }
-    if (prev && state.accounts.some((a) => String(a.id) === prev)) sel.value = prev;
+    if (prev && state.accounts.some((a) => String(a.id) === prev)) el.value = prev;
   }
 }
 
-function renderAccounts() {
-  const list = $('#accountList');
-  list.innerHTML = '';
-  if (state.accounts.length === 0) {
-    const li = document.createElement('li');
-    li.textContent = 'No accounts yet. Open one to get started.';
-    li.className = 'meta';
-    list.appendChild(li);
-  } else {
-    for (const acc of state.accounts) {
-      const li = document.createElement('li');
-      const left = document.createElement('div');
-      const name = document.createElement('div');
-      name.textContent = acc.name;
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.textContent = `#${acc.account_number}`;
-      left.appendChild(name);
-      left.appendChild(meta);
-      const right = document.createElement('div');
-      right.className = 'num';
-      right.textContent = fmtCents(acc.balance_cents);
-      li.appendChild(left);
-      li.appendChild(right);
-      list.appendChild(li);
-    }
+function renderTotal() {
+  const total = state.accounts.reduce((s, a) => s + a.balance_cents, 0);
+  setText($('#totalBalance'), fmtCents(total));
+  const n = state.accounts.length;
+  setText($('#accountCount'), `${n} ${n === 1 ? 'account' : 'accounts'}`);
+}
+
+function txIconSvg(type) {
+  if (type === 'deposit' || type === 'transfer_in') {
+    return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
   }
+  return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>';
+}
+
+function txLabel(type) {
+  return ({
+    deposit: 'Deposit',
+    withdrawal: 'Withdrawal',
+    transfer_in: 'Transfer received',
+    transfer_out: 'Transfer sent',
+  })[type] || type;
+}
+
+function renderTransactions(rows) {
+  const list = $('#txList');
+  list.innerHTML = '';
+  if (!rows || rows.length === 0) {
+    list.classList.add('hidden');
+    $('#txEmpty').classList.remove('hidden');
+    return;
+  }
+  list.classList.remove('hidden');
+  $('#txEmpty').classList.add('hidden');
+  for (const tx of rows) {
+    const isCredit = tx.type === 'deposit' || tx.type === 'transfer_in';
+    const li = document.createElement('li');
+
+    const icon = document.createElement('div');
+    icon.className = `tx-icon ${isCredit ? 'credit' : 'debit'}`;
+    icon.innerHTML = txIconSvg(tx.type);
+
+    const meta = document.createElement('div');
+    meta.className = 'tx-meta';
+    const t = document.createElement('div');
+    t.className = 'tx-title';
+    t.textContent = txLabel(tx.type);
+    const s = document.createElement('div');
+    s.className = 'tx-sub';
+    const note = tx.description ? ` · ${tx.description}` : '';
+    s.textContent = `${fmtDate(tx.created_at)}${note}`;
+    meta.appendChild(t);
+    meta.appendChild(s);
+
+    const amt = document.createElement('div');
+    amt.className = `tx-amount ${isCredit ? 'credit' : 'debit'}`;
+    amt.textContent = `${isCredit ? '+' : '-'}${fmtCents(tx.amount_cents)}`;
+
+    li.appendChild(icon);
+    li.appendChild(meta);
+    li.appendChild(amt);
+    list.appendChild(li);
+  }
+}
+
+// ===== Data loaders =====
+async function loadAccounts() {
+  const { accounts } = await api('GET', '/api/accounts');
+  state.accounts = accounts;
+  renderAccountCards();
   renderAccountSelects();
+  renderTotal();
   if (state.accounts.length > 0) {
     if (!state.selectedHistoryAccount || !state.accounts.some((a) => a.id === state.selectedHistoryAccount)) {
       state.selectedHistoryAccount = state.accounts[0].id;
     }
     $('#historyAccount').value = String(state.selectedHistoryAccount);
-    loadHistory();
+    await loadHistory();
   } else {
-    $('#txBody').innerHTML = '';
+    renderTransactions([]);
   }
-}
-
-async function loadAccounts() {
-  const { accounts } = await api('GET', '/api/accounts');
-  state.accounts = accounts;
-  renderAccounts();
 }
 
 async function loadHistory() {
   if (!state.selectedHistoryAccount) return;
-  const { transactions } = await api('GET', `/api/transactions/account/${state.selectedHistoryAccount}`);
-  const body = $('#txBody');
-  body.innerHTML = '';
-  for (const tx of transactions) {
-    const tr = document.createElement('tr');
-    const sign = (tx.type === 'deposit' || tx.type === 'transfer_in') ? '+' : '-';
-    tr.innerHTML = '';
-    const cells = [
-      fmtDate(tx.created_at),
-      tx.type.replace('_', ' '),
-      `${sign}${fmtCents(tx.amount_cents)}`,
-      fmtCents(tx.balance_after_cents),
-      tx.description || '',
-    ];
-    cells.forEach((val, idx) => {
-      const td = document.createElement('td');
-      td.textContent = val;
-      if (idx === 1) td.classList.add(`tx-type-${tx.type}`);
-      if (idx === 2 || idx === 3) td.classList.add('num');
-      tr.appendChild(td);
-    });
-    body.appendChild(tr);
+  try {
+    const { transactions } = await api('GET', `/api/transactions/account/${state.selectedHistoryAccount}`);
+    renderTransactions(transactions);
+  } catch {
+    renderTransactions([]);
   }
 }
 
+// ===== Form helpers =====
 function formToJson(form) {
   const fd = new FormData(form);
   const obj = {};
@@ -178,6 +291,36 @@ function formToJson(form) {
   return obj;
 }
 
+function explainError(err, fallback) {
+  const code = err && err.data && err.data.error;
+  if (code === 'insufficient_funds') return 'Insufficient funds in that account.';
+  if (code === 'same_account') return 'You cannot transfer to the same account.';
+  if (code === 'invalid_amount') return 'Please enter a valid amount.';
+  if (code === 'amount_too_large') return 'That amount is too large.';
+  if (code === 'invalid_csrf_token') return 'Session expired. Please reload the page.';
+  if (err && err.status === 404) return 'Destination account not found.';
+  if (err && err.status === 423) return 'Account temporarily locked. Try again later.';
+  if (err && err.status === 429) return 'Too many requests. Please slow down.';
+  if (err && err.status === 401) return 'Please sign in again.';
+  return fallback || 'Operation failed.';
+}
+
+function openModal(id) {
+  const dlg = document.getElementById(id);
+  if (!dlg) return;
+  const err = dlg.querySelector('.error');
+  if (err) setText(err, '');
+  const form = dlg.querySelector('form');
+  if (form) form.reset();
+  if (typeof dlg.showModal === 'function') dlg.showModal();
+}
+
+function closeModal(form) {
+  const dlg = form.closest('dialog');
+  if (dlg && dlg.open) dlg.close();
+}
+
+// ===== Bindings =====
 function bindTabs() {
   $$('.tab').forEach((tab) => {
     tab.addEventListener('click', () => {
@@ -201,11 +344,9 @@ function bindAuth() {
       await fetchCsrfToken();
       await loadAccounts();
       showApp();
+      toast(`Welcome back, ${user.username}.`, 'ok', 'Signed in');
     } catch (err) {
-      setText($('#loginError'),
-        err.status === 423 ? 'Account temporarily locked. Try again later.' :
-        err.status === 429 ? 'Too many attempts. Please wait.' :
-        'Invalid username or password.');
+      setText($('#loginError'), explainError(err, 'Invalid username or password.'));
     }
   });
 
@@ -219,6 +360,7 @@ function bindAuth() {
       await fetchCsrfToken();
       await loadAccounts();
       showApp();
+      toast('Your account is ready. Open your first banking account from the dashboard.', 'ok', 'Account created');
     } catch (err) {
       const msg = err.data && err.data.message ? err.data.message :
         err.status === 409 ? 'That username or email is unavailable.' :
@@ -229,40 +371,57 @@ function bindAuth() {
   });
 
   $('#logoutBtn').addEventListener('click', async () => {
-    try { await api('POST', '/api/auth/logout'); } catch { /* ignore */ }
-    state.user = null; state.accounts = []; state.csrfToken = null;
+    try { await api('POST', '/api/auth/logout'); } catch { /* */ }
+    state.user = null;
+    state.accounts = [];
+    state.csrfToken = null;
+    state.selectedHistoryAccount = null;
     await fetchCsrfToken();
     showAuth();
   });
 }
 
-function bindAccountActions() {
-  const dialog = $('#newAccountDialog');
-  $('#newAccountBtn').addEventListener('click', () => {
-    setText($('#newAccountError'), '');
-    $('#newAccountForm').reset();
-    if (typeof dialog.showModal === 'function') dialog.showModal();
+function bindHeroActions() {
+  $$('.action-btn[data-action]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.action;
+      if (state.accounts.length === 0 && (action === 'deposit' || action === 'withdraw' || action === 'transfer')) {
+        toast('Open an account first.', 'err', 'No accounts');
+        return;
+      }
+      const map = { deposit: 'depositDialog', withdraw: 'withdrawDialog', transfer: 'transferDialog' };
+      openModal(map[action]);
+    });
   });
 
+  $('#newAccountBtn').addEventListener('click', () => openModal('newAccountDialog'));
+
+  $$('[data-close]').forEach((b) => b.addEventListener('click', (e) => {
+    const dlg = e.target.closest('dialog');
+    if (dlg && dlg.open) dlg.close();
+  }));
+}
+
+function bindForms() {
   $('#newAccountForm').addEventListener('submit', async (e) => {
-    if (e.submitter && e.submitter.value === 'cancel') return;
     e.preventDefault();
+    setText($('#newAccountError'), '');
     try {
       const data = formToJson(e.target);
-      await api('POST', '/api/accounts', data);
-      dialog.close();
+      const { account } = await api('POST', '/api/accounts', data);
+      closeModal(e.target);
       await loadAccounts();
+      toast(`Account "${account.name}" opened with number ${fmtAccountNumber(account.account_number)}.`, 'ok', 'Account created');
     } catch (err) {
-      setText($('#newAccountError'),
-        err.status === 409 ? 'You’ve reached the account limit.' : 'Could not create account.');
+      setText($('#newAccountError'), err.status === 409 ? 'You have reached the account limit.' : 'Could not create account.');
     }
   });
 
-  const movementForms = [
-    { form: '#depositForm', path: '/api/transactions/deposit', err: '#depositError' },
-    { form: '#withdrawForm', path: '/api/transactions/withdraw', err: '#withdrawError' },
+  const movement = [
+    { form: '#depositForm', path: '/api/transactions/deposit', err: '#depositError', label: 'Deposit', verb: 'deposited' },
+    { form: '#withdrawForm', path: '/api/transactions/withdraw', err: '#withdrawError', label: 'Withdrawal', verb: 'withdrew' },
   ];
-  for (const { form, path, err } of movementForms) {
+  for (const { form, path, err, label, verb } of movement) {
     $(form).addEventListener('submit', async (e) => {
       e.preventDefault();
       setText($(err), '');
@@ -270,14 +429,11 @@ function bindAccountActions() {
         const data = formToJson(e.target);
         if (data.account_id) data.account_id = Number(data.account_id);
         await api('POST', path, data);
-        e.target.reset();
+        closeModal(e.target);
         await loadAccounts();
+        toast(`Successfully ${verb} $${data.amount}.`, 'ok', label);
       } catch (ex) {
-        setText($(err),
-          ex.status === 400 && ex.data && ex.data.error === 'insufficient_funds' ? 'Insufficient funds.' :
-          ex.status === 400 ? 'Invalid amount.' :
-          ex.status === 429 ? 'Too many requests. Slow down.' :
-          'Operation failed.');
+        setText($(err), explainError(ex));
       }
     });
   }
@@ -289,16 +445,11 @@ function bindAccountActions() {
       const data = formToJson(e.target);
       if (data.from_account_id) data.from_account_id = Number(data.from_account_id);
       await api('POST', '/api/transactions/transfer', data);
-      e.target.reset();
+      closeModal(e.target);
       await loadAccounts();
+      toast(`Sent $${data.amount} to ${fmtAccountNumber(data.to_account_number)}.`, 'ok', 'Transfer sent');
     } catch (ex) {
-      const code = ex.data && ex.data.error;
-      setText($('#transferError'),
-        code === 'insufficient_funds' ? 'Insufficient funds.' :
-        code === 'same_account' ? 'Cannot transfer to the same account.' :
-        ex.status === 404 ? 'Destination account not found.' :
-        ex.status === 429 ? 'Too many requests. Slow down.' :
-        'Transfer failed.');
+      setText($('#transferError'), explainError(ex, 'Transfer failed.'));
     }
   });
 
@@ -308,10 +459,12 @@ function bindAccountActions() {
   });
 }
 
+// ===== Init =====
 async function init() {
   bindTabs();
   bindAuth();
-  bindAccountActions();
+  bindHeroActions();
+  bindForms();
   await fetchCsrfToken();
   const loggedIn = await loadMe();
   if (loggedIn) {

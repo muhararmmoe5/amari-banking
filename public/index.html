@@ -4,142 +4,226 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="referrer" content="no-referrer" />
+    <meta name="color-scheme" content="dark" />
     <title>Amari Banking</title>
     <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%237c3aed'/%3E%3Cpath d='M20 44 L32 18 L44 44 Z M26 38 H38' stroke='white' stroke-width='3' fill='none' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E" />
   </head>
   <body>
-    <header class="topbar">
-      <h1>Amari Banking</h1>
-      <div id="userbar" class="userbar hidden">
-        <span id="userlabel"></span>
-        <button id="logoutBtn" type="button" class="btn ghost">Sign out</button>
+    <!-- ============= AUTH VIEW ============= -->
+    <section id="authView" class="auth-view">
+      <div class="auth-hero">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 64 64" width="32" height="32"><rect width="64" height="64" rx="14" fill="url(#g)"/><path d="M20 44 L32 18 L44 44 Z M26 38 H38" stroke="white" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round"/><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c3aed"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs></svg>
+          </span>
+          <span class="brand-name">Amari</span>
+        </div>
+        <h1 class="hero-title">Banking, reimagined.</h1>
+        <p class="hero-sub">Open accounts, send money, and track every cent — with security built in from the ground up.</p>
+        <ul class="hero-features">
+          <li>End-to-end encrypted sessions</li>
+          <li>Atomic transfers, never lose a cent</li>
+          <li>Audit log of every sensitive action</li>
+        </ul>
       </div>
-    </header>
 
-    <main>
-      <section id="authView" class="card">
-        <div class="tabs">
-          <button class="tab active" data-tab="login">Sign in</button>
-          <button class="tab" data-tab="register">Create account</button>
+      <div class="auth-card card">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="login" role="tab">Sign in</button>
+          <button class="tab" data-tab="register" role="tab">Create account</button>
         </div>
 
         <form id="loginForm" class="form" autocomplete="on">
-          <label>Username
+          <label class="field">
+            <span>Username</span>
             <input name="username" type="text" required minlength="3" maxlength="32" autocomplete="username" />
           </label>
-          <label>Password
+          <label class="field">
+            <span>Password</span>
             <input name="password" type="password" required minlength="12" maxlength="128" autocomplete="current-password" />
           </label>
-          <button type="submit" class="btn primary">Sign in</button>
+          <button type="submit" class="btn primary block">Sign in</button>
           <p class="error" id="loginError"></p>
         </form>
 
         <form id="registerForm" class="form hidden" autocomplete="on">
-          <label>Username
+          <label class="field">
+            <span>Username</span>
             <input name="username" type="text" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_]+" autocomplete="username" />
           </label>
-          <label>Email
+          <label class="field">
+            <span>Email</span>
             <input name="email" type="email" required maxlength="254" autocomplete="email" />
           </label>
-          <label>Password
+          <label class="field">
+            <span>Password</span>
             <input name="password" type="password" required minlength="12" maxlength="128" autocomplete="new-password" />
-            <small class="hint">12+ chars with 3 of: lowercase, uppercase, digit, symbol.</small>
+            <small class="hint">12+ characters with 3 of: lowercase, uppercase, digit, symbol.</small>
           </label>
-          <button type="submit" class="btn primary">Create account</button>
+          <button type="submit" class="btn primary block">Create account</button>
           <p class="error" id="registerError"></p>
         </form>
-      </section>
+      </div>
+    </section>
 
-      <section id="appView" class="hidden">
-        <div class="grid">
-          <div class="card">
-            <div class="card-head">
-              <h2>Your accounts</h2>
-              <button id="newAccountBtn" type="button" class="btn">+ New account</button>
-            </div>
-            <ul id="accountList" class="account-list"></ul>
-          </div>
-
-          <div class="card">
-            <h2>Actions</h2>
-            <form id="depositForm" class="form inline">
-              <h3>Deposit</h3>
-              <label>Account
-                <select name="account_id" required></select>
-              </label>
-              <label>Amount (USD)
-                <input name="amount" type="text" inputmode="decimal" required pattern="^\d{1,12}(\.\d{1,2})?$" placeholder="0.00" />
-              </label>
-              <label>Note
-                <input name="description" type="text" maxlength="140" />
-              </label>
-              <button type="submit" class="btn">Deposit</button>
-              <p class="error" id="depositError"></p>
-            </form>
-
-            <form id="withdrawForm" class="form inline">
-              <h3>Withdraw</h3>
-              <label>Account
-                <select name="account_id" required></select>
-              </label>
-              <label>Amount (USD)
-                <input name="amount" type="text" inputmode="decimal" required pattern="^\d{1,12}(\.\d{1,2})?$" placeholder="0.00" />
-              </label>
-              <label>Note
-                <input name="description" type="text" maxlength="140" />
-              </label>
-              <button type="submit" class="btn">Withdraw</button>
-              <p class="error" id="withdrawError"></p>
-            </form>
-
-            <form id="transferForm" class="form inline">
-              <h3>Transfer</h3>
-              <label>From
-                <select name="from_account_id" required></select>
-              </label>
-              <label>To account number
-                <input name="to_account_number" type="text" required pattern="\d{12}" maxlength="12" placeholder="12-digit number" />
-              </label>
-              <label>Amount (USD)
-                <input name="amount" type="text" inputmode="decimal" required pattern="^\d{1,12}(\.\d{1,2})?$" placeholder="0.00" />
-              </label>
-              <label>Note
-                <input name="description" type="text" maxlength="140" />
-              </label>
-              <button type="submit" class="btn">Send transfer</button>
-              <p class="error" id="transferError"></p>
-            </form>
-          </div>
-
-          <div class="card wide">
-            <div class="card-head">
-              <h2>Transaction history</h2>
-              <select id="historyAccount"></select>
-            </div>
-            <table class="tx-table">
-              <thead>
-                <tr><th>Date</th><th>Type</th><th class="num">Amount</th><th class="num">Balance after</th><th>Note</th></tr>
-              </thead>
-              <tbody id="txBody"></tbody>
-            </table>
-          </div>
+    <!-- ============= APP VIEW ============= -->
+    <div id="appView" class="app-view hidden">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 64 64" width="28" height="28"><rect width="64" height="64" rx="14" fill="url(#g2)"/><path d="M20 44 L32 18 L44 44 Z M26 38 H38" stroke="white" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round"/><defs><linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c3aed"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs></svg>
+          </span>
+          <span class="brand-name">Amari</span>
         </div>
-      </section>
-    </main>
+        <div class="user-menu">
+          <span class="avatar" id="userAvatar">M</span>
+          <span class="user-name" id="userlabel"></span>
+          <button id="logoutBtn" type="button" class="btn ghost small">Sign out</button>
+        </div>
+      </header>
 
-    <dialog id="newAccountDialog">
-      <form method="dialog" id="newAccountForm" class="form">
-        <h3>Open new account</h3>
-        <label>Name
-          <input name="name" required minlength="1" maxlength="64" placeholder="Checking" />
+      <main class="app-main">
+        <!-- Hero: total balance -->
+        <section class="hero-card">
+          <div>
+            <div class="hero-label">Total balance</div>
+            <div class="hero-balance" id="totalBalance">$0.00</div>
+            <div class="hero-sub-line" id="accountCount">0 accounts</div>
+          </div>
+          <div class="hero-actions">
+            <button class="action-btn" data-action="deposit" type="button">
+              <span class="action-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+              <span>Deposit</span>
+            </button>
+            <button class="action-btn" data-action="withdraw" type="button">
+              <span class="action-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+              <span>Withdraw</span>
+            </button>
+            <button class="action-btn" data-action="transfer" type="button">
+              <span class="action-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>
+              <span>Transfer</span>
+            </button>
+            <button class="action-btn" id="newAccountBtn" type="button">
+              <span class="action-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M12 14h4"/></svg></span>
+              <span>New account</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Accounts row -->
+        <section class="section">
+          <div class="section-head">
+            <h2>Your accounts</h2>
+          </div>
+          <div class="account-cards" id="accountCards"></div>
+        </section>
+
+        <!-- Transactions -->
+        <section class="section">
+          <div class="section-head">
+            <h2>Recent transactions</h2>
+            <label class="select-wrap">
+              <span class="visually-hidden">Filter account</span>
+              <select id="historyAccount"></select>
+            </label>
+          </div>
+          <ul class="tx-list" id="txList"></ul>
+          <p id="txEmpty" class="empty hidden">No transactions yet. Make a deposit to get started.</p>
+        </section>
+      </main>
+    </div>
+
+    <!-- ============= MODALS ============= -->
+    <dialog id="depositDialog" class="modal">
+      <form class="form" id="depositForm">
+        <h3>Deposit funds</h3>
+        <label class="field">
+          <span>To account</span>
+          <select name="account_id" required></select>
         </label>
-        <menu>
-          <button value="cancel" class="btn ghost">Cancel</button>
-          <button id="newAccountSubmit" value="confirm" class="btn primary">Create</button>
+        <label class="field">
+          <span>Amount (USD)</span>
+          <input name="amount" type="text" inputmode="decimal" required pattern="^\d{1,12}(\.\d{1,2})?$" placeholder="0.00" />
+        </label>
+        <label class="field">
+          <span>Note (optional)</span>
+          <input name="description" type="text" maxlength="140" />
+        </label>
+        <p class="error" id="depositError"></p>
+        <menu class="modal-actions">
+          <button type="button" class="btn ghost" data-close>Cancel</button>
+          <button type="submit" class="btn primary">Deposit</button>
         </menu>
-        <p class="error" id="newAccountError"></p>
       </form>
     </dialog>
+
+    <dialog id="withdrawDialog" class="modal">
+      <form class="form" id="withdrawForm">
+        <h3>Withdraw funds</h3>
+        <label class="field">
+          <span>From account</span>
+          <select name="account_id" required></select>
+        </label>
+        <label class="field">
+          <span>Amount (USD)</span>
+          <input name="amount" type="text" inputmode="decimal" required pattern="^\d{1,12}(\.\d{1,2})?$" placeholder="0.00" />
+        </label>
+        <label class="field">
+          <span>Note (optional)</span>
+          <input name="description" type="text" maxlength="140" />
+        </label>
+        <p class="error" id="withdrawError"></p>
+        <menu class="modal-actions">
+          <button type="button" class="btn ghost" data-close>Cancel</button>
+          <button type="submit" class="btn primary">Withdraw</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="transferDialog" class="modal">
+      <form class="form" id="transferForm">
+        <h3>Send a transfer</h3>
+        <label class="field">
+          <span>From account</span>
+          <select name="from_account_id" required></select>
+        </label>
+        <label class="field">
+          <span>To account number</span>
+          <input name="to_account_number" type="text" required pattern="\d{12}" maxlength="12" placeholder="12-digit account number" />
+        </label>
+        <label class="field">
+          <span>Amount (USD)</span>
+          <input name="amount" type="text" inputmode="decimal" required pattern="^\d{1,12}(\.\d{1,2})?$" placeholder="0.00" />
+        </label>
+        <label class="field">
+          <span>Note (optional)</span>
+          <input name="description" type="text" maxlength="140" />
+        </label>
+        <p class="error" id="transferError"></p>
+        <menu class="modal-actions">
+          <button type="button" class="btn ghost" data-close>Cancel</button>
+          <button type="submit" class="btn primary">Send transfer</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="newAccountDialog" class="modal">
+      <form class="form" id="newAccountForm">
+        <h3>Open a new account</h3>
+        <label class="field">
+          <span>Account name</span>
+          <input name="name" required minlength="1" maxlength="64" placeholder="e.g. Checking, Savings, Travel" />
+        </label>
+        <p class="error" id="newAccountError"></p>
+        <menu class="modal-actions">
+          <button type="button" class="btn ghost" data-close>Cancel</button>
+          <button type="submit" class="btn primary">Create</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <div id="toasts" class="toasts" aria-live="polite"></div>
 
     <script src="/js/app.js" defer></script>
   </body>
