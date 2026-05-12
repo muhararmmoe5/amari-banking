@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Amari Banking</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Amari Banking</h1>
+      <div id="userbar" class="userbar hidden">
+        <span id="userlabel"></span>
+        <button id="logoutBtn" type="button" class="btn ghost">Sign out</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="authView" class="card">
+        <div class="tabs">
+          <button class="tab active" data-tab="login">Sign in</button>
+          <button class="tab" data-tab="register">Create account</button>
+        </div>
+
+        <form id="loginForm" class="form" autocomplete="on">
+          <label>Username
+            <input name="username" type="text" required minlength="3" maxlength="32" autocomplete="username" />
+          </label>
+          <label>Password
+            <input name="password" type="password" required minlength="12" maxlength="128" autocomplete="current-password" />
+          </label>
+          <button type="submit" class="btn primary">Sign in</button>
+          <p class="error" id="loginError"></p>
+        </form>
+
+        <form id="registerForm" class="form hidden" autocomplete="on">
+          <label>Username
+            <input name="username" type="text" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_]+" autocomplete="username" />
+          </label>
+          <label>Email
+            <input name="email" type="email" required maxlength="254" autocomplete="email" />
+          </label>
+          <label>Password
+            <input name="password" type="password" required minlength="12" maxlength="128" autocomplete="new-password" />
+            <small class="hint">12+ chars with 3 of: lowercase, uppercase, digit, symbol.</small>
+          </label>
+          <button type="submit" class="btn primary">Create account</button>
+          <p class="error" id="registerError"></p>
+        </form>
+      </section>
+
+      <section id="appView" class="hidden">
+        <div class="grid">
+          <div class="card">
+            <div class="card-head">
+              <h2>Your accounts</h2>
+              <button id="newAccountBtn" type="button" class="btn">+ New account</button>
+            </div>
+            <ul id="accountList" class="account-list"></ul>
+          </div>
+
+          <div class="card">
+            <h2>Actions</h2>
+            <form id="depositForm" class="form inline">
+              <h3>Deposit</h3>
+              <label>Account
+                <select name="account_id" required></select>
+              </label>
+              <label>Amount (USD)
+                <input name="amount" type="text" inputmode="decimal" required pattern="^\d{1,12}(\.\d{1,2})?$" placeholder="0.00" />
+              </label>
+              <label>Note
+                <input name="description" type="text" maxlength="140" />
+              </label>
+              <button type="submit" class="btn">Deposit</button>
+              <p class="error" id="depositError"></p>
+            </form>
+
+            <form id="withdrawForm" class="form inline">
+              <h3>Withdraw</h3>
+              <label>Account
+                <select name="account_id" required></select>
+              </label>
+              <label>Amount (USD)
+                <input name="amount" type="text" inputmode="decimal" required pattern="^\d{1,12}(\.\d{1,2})?$" placeholder="0.00" />
+              </label>
+              <label>Note
+                <input name="description" type="text" maxlength="140" />
+              </label>
+              <button type="submit" class="btn">Withdraw</button>
+              <p class="error" id="withdrawError"></p>
+            </form>
+
+            <form id="transferForm" class="form inline">
+              <h3>Transfer</h3>
+              <label>From
+                <select name="from_account_id" required></select>
+              </label>
+              <label>To account number
+                <input name="to_account_number" type="text" required pattern="\d{12}" maxlength="12" placeholder="12-digit number" />
+              </label>
+              <label>Amount (USD)
+                <input name="amount" type="text" inputmode="decimal" required pattern="^\d{1,12}(\.\d{1,2})?$" placeholder="0.00" />
+              </label>
+              <label>Note
+                <input name="description" type="text" maxlength="140" />
+              </label>
+              <button type="submit" class="btn">Send transfer</button>
+              <p class="error" id="transferError"></p>
+            </form>
+          </div>
+
+          <div class="card wide">
+            <div class="card-head">
+              <h2>Transaction history</h2>
+              <select id="historyAccount"></select>
+            </div>
+            <table class="tx-table">
+              <thead>
+                <tr><th>Date</th><th>Type</th><th class="num">Amount</th><th class="num">Balance after</th><th>Note</th></tr>
+              </thead>
+              <tbody id="txBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="newAccountDialog">
+      <form method="dialog" id="newAccountForm" class="form">
+        <h3>Open new account</h3>
+        <label>Name
+          <input name="name" required minlength="1" maxlength="64" placeholder="Checking" />
+        </label>
+        <menu>
+          <button value="cancel" class="btn ghost">Cancel</button>
+          <button id="newAccountSubmit" value="confirm" class="btn primary">Create</button>
+        </menu>
+        <p class="error" id="newAccountError"></p>
+      </form>
+    </dialog>
+
+    <script src="/js/app.js" defer></script>
+  </body>
+</html>

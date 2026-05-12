@@ -1,0 +1,14 @@
+node_modules/
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.env
+.env.local
+sessions.sqlite*
+npm-debug.log*
+.DS_Store
+coverage/
+.idea/
+.vscode/
