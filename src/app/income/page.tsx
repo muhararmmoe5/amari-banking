@@ -1,7 +1,8 @@
 import { getDb } from '@/lib/db';
-import { incomeBySources, listTransactions } from '@/lib/db/queries';
+import { incomeBySources, listTransactions, incomeByMonthAndSource } from '@/lib/db/queries';
 import { Money } from '@/components/Money';
 import { fmtMoney, fmtDate } from '@/lib/format';
+import IncomeChart from './IncomeChart';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,7 @@ const SOURCE_LABELS: Record<string, string> = {
 export default function IncomePage() {
   const db = getDb();
   const sources = incomeBySources();
+  const timeSeries = incomeByMonthAndSource();
   const spacetelReceipts = listTransactions({
     limit: 100,
     orderBy: 'posting_date',
@@ -41,6 +43,11 @@ export default function IncomePage() {
       <div>
         <h1 className="text-2xl font-semibold">Income tracker</h1>
         <p className="text-sm text-ink-dim mt-1">Where money comes from, by source and over time.</p>
+      </div>
+
+      <div className="card p-5">
+        <h2 className="text-sm uppercase tracking-wider text-ink-dim mb-4">Income over time</h2>
+        <IncomeChart points={timeSeries.points} sources={timeSeries.sources} />
       </div>
 
       <div className="card p-5">

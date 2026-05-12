@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import Sidebar from '@/components/Sidebar';
+import { ToastProvider } from '@/components/Toast';
 import { portfolioSummary } from '@/lib/db/queries';
 
 export const metadata: Metadata = {
@@ -20,10 +21,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <div className="flex min-h-screen">
-          <Sidebar openFlags={openFlags} />
-          <main className="flex-1 min-w-0">{children}</main>
-        </div>
+        <ToastProvider>
+          <div className="flex min-h-screen">
+            <Sidebar openFlags={openFlags} />
+            <main className="flex-1 min-w-0">{children}</main>
+          </div>
+        </ToastProvider>
       </body>
     </html>
   );

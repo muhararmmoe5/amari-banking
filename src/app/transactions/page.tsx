@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { listTransactions, countTransactions } from '@/lib/db/queries';
 import { ACCOUNTS } from '@/constants/accounts';
-import { TransactionRow } from './TransactionRow';
+import VirtualTable from './VirtualTable';
 import type { EntityType, AuditStatus } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +24,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
     search: searchParams.search,
     hideInternal,
     flaggedOnly: searchParams.flagged === '1',
-    limit: 500,
+    limit: 5000,
   };
   const rows = listTransactions(filters);
   const total = countTransactions({ hideInternal });
@@ -83,30 +83,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
         </div>
       </form>
 
-      <div className="card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-bg-2 text-ink-dim">
-            <tr>
-              <th className="text-left px-3 py-2 font-medium">Date</th>
-              <th className="text-left px-3 py-2 font-medium">Acct</th>
-              <th className="text-left px-3 py-2 font-medium">Merchant / Description</th>
-              <th className="text-right px-3 py-2 font-medium">Amount</th>
-              <th className="text-left px-3 py-2 font-medium">Category</th>
-              <th className="text-left px-3 py-2 font-medium">Entity</th>
-              <th className="text-left px-3 py-2 font-medium">Status</th>
-              <th className="text-left px-3 py-2 font-medium">Flag</th>
-              <th className="text-left px-3 py-2 font-medium">Purpose</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr><td className="px-3 py-12 text-center text-ink-mute" colSpan={9}>No transactions match these filters.</td></tr>
-            ) : (
-              rows.map((tx) => <TransactionRow key={tx.id} tx={tx} />)
-            )}
-          </tbody>
-        </table>
-      </div>
+      <VirtualTable rows={rows} />
     </div>
   );
 }

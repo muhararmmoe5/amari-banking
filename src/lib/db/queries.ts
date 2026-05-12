@@ -419,6 +419,43 @@ export function zelleByPerson(): ZelleAggregate[] {
   }));
 }
 
+export interface IncomeTimePoint {
+  month: string;
+  [source: string]: number | string;
+}
+
+export function incomeByMonthAndSource(): { points: IncomeTimePoint[]; sources: string[] } {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT
+      substr(posting_date, 1, 7) as month,
+      income_source as source,
+      SUM(amount) as total
+    FROM transactions
+    WHERE income_source IS NOT NULL AND amount > 0 AND is_internal = 0
+    GROUP BY month, source
+    ORDER BY month ASC
+  `).all() as { month: string; source: string; total: number }[];
+
+  const sourceSet = new Set<string>();
+  const byMonth = new Map<string, Record<string, number>>();
+  for (const r of rows) {
+    sourceSet.add(r.source);
+    const m = byMonth.get(r.month) || {};
+    m[r.source] = (m[r.source] || 0) + r.total;
+    byMonth.set(r.month, m);
+  }
+  const sources = Array.from(sourceSet);
+  const points: IncomeTimePoint[] = Array.from(byMonth.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, vals]) => {
+      const point: IncomeTimePoint = { month };
+      for (const s of sources) point[s] = vals[s] || 0;
+      return point;
+    });
+  return { points, sources };
+}
+
 export interface ImportBatchRow {
   id: string;
   fileName: string;

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { listTransactions, portfolioSummary } from '@/lib/db/queries';
-import { AuditCard } from './AuditCard';
+import AuditClient from './AuditClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +13,7 @@ export default function AuditPage({ searchParams }: { searchParams: SP }) {
   if (sev === 'crit') { minScore = 80; maxScore = 1000; }
   else if (sev === 'high') { minScore = 60; maxScore = 79; }
   else if (sev === 'med') { minScore = 35; maxScore = 59; }
-  const rows = listTransactions({ flaggedOnly: true, orderBy: 'audit_score', limit: 100 });
+  const rows = listTransactions({ flaggedOnly: true, orderBy: 'audit_score', limit: 200 });
   const filtered = rows.filter((r) => r.auditScore >= minScore && r.auditScore <= maxScore);
   const p = portfolioSummary();
   const reviewPct = p.totalCount > 0 ? Math.round((p.reviewedCount / p.totalCount) * 100) : 0;
@@ -37,17 +37,7 @@ export default function AuditPage({ searchParams }: { searchParams: SP }) {
         <Tab href="/audit?sev=med" active={sev === 'med'} label={`🟡 Medium (${p.mediumFlagCount})`} />
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="card p-12 text-center text-ink-mute">
-          {p.openFlagCount === 0 ? 'No open flags. Great work 🎉' : 'No flags in this severity bucket.'}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {filtered.map((tx) => (
-            <AuditCard key={tx.id} tx={tx} />
-          ))}
-        </div>
-      )}
+      <AuditClient initialRows={filtered} />
     </div>
   );
 }

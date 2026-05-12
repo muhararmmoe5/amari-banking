@@ -46,3 +46,14 @@ input:focus, select:focus, textarea:focus {
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: #0f0f13; }
 ::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 6px; }
+
+@keyframes toast-in {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.animate-toast-in { animation: toast-in 180ms ease-out; }
+
+kbd {
+  @apply inline-block px-1.5 py-0.5 mono text-[11px] bg-bg-3 border border-line rounded text-ink-dim;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset;
+}
