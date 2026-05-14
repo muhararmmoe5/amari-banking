@@ -15,6 +15,8 @@ import {
   FileSpreadsheet,
   Settings,
   Repeat2,
+  Users,
+  PieChart as PieChartIcon,
 } from 'lucide-react';
 
 const NAV = [
@@ -29,6 +31,9 @@ const NAV = [
   { href: '/pl', label: 'Entity P&L', icon: PieChart },
   { href: '/cpa', label: 'CPA Export', icon: FileSpreadsheet },
   { href: '/reconcile', label: 'Reconciliation', icon: Repeat2 },
+  { divider: true } as const,
+  { href: '/team', label: 'Team & Investors', icon: Users },
+  { href: '/cap', label: 'Cap Table', icon: PieChartIcon },
 ];
 
 export default function Sidebar({ openFlags }: { openFlags?: number }) {

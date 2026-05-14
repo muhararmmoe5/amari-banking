@@ -81,6 +81,70 @@ export function getDb(): Database.Database {
       matched_at INTEGER NOT NULL,
       status TEXT NOT NULL DEFAULT 'AUTO_MATCHED'
     );
+
+    CREATE TABLE IF NOT EXISTS people (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT,
+      role TEXT NOT NULL DEFAULT 'OTHER',
+      notes TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_people_role ON people(role);
+
+    CREATE TABLE IF NOT EXISTS equity_holdings (
+      id TEXT PRIMARY KEY,
+      entity TEXT NOT NULL,
+      person_id TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+      percent REAL NOT NULL CHECK (percent >= 0 AND percent <= 100),
+      shares INTEGER,
+      grant_date TEXT,
+      vesting_cliff_months INTEGER,
+      vesting_total_months INTEGER,
+      vesting_start TEXT,
+      notes TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_equity_entity ON equity_holdings(entity);
+    CREATE INDEX IF NOT EXISTS idx_equity_person ON equity_holdings(person_id);
+
+    CREATE TABLE IF NOT EXISTS cash_contributions (
+      id TEXT PRIMARY KEY,
+      entity TEXT NOT NULL,
+      person_id TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+      amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+      contribution_date TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'CASH',
+      linked_transaction_id TEXT,
+      notes TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_contrib_entity ON cash_contributions(entity, contribution_date DESC);
+    CREATE INDEX IF NOT EXISTS idx_contrib_person ON cash_contributions(person_id);
+
+    CREATE TABLE IF NOT EXISTS safe_notes (
+      id TEXT PRIMARY KEY,
+      entity TEXT NOT NULL,
+      person_id TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+      amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+      issue_date TEXT NOT NULL,
+      valuation_cap_cents INTEGER,
+      discount_pct REAL,
+      mfn INTEGER NOT NULL DEFAULT 0,
+      note_type TEXT NOT NULL DEFAULT 'SAFE',
+      interest_rate_pct REAL,
+      maturity_date TEXT,
+      status TEXT NOT NULL DEFAULT 'OUTSTANDING',
+      converted_at TEXT,
+      converted_holding_id TEXT REFERENCES equity_holdings(id) ON DELETE SET NULL,
+      notes TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_safe_entity ON safe_notes(entity);
+    CREATE INDEX IF NOT EXISTS idx_safe_person ON safe_notes(person_id);
+    CREATE INDEX IF NOT EXISTS idx_safe_status ON safe_notes(status);
   `);
 
   // Seed accounts on first run

@@ -42,6 +42,14 @@ export const ACCOUNTS: AccountConfig[] = [
   { id: '9828', last4: '9828', entity: 'ROCKET_WIRELESS', label: 'Rocket Wireless / TCETRA Main', purpose: 'Highest volume — main TCETRA account', color: '#20A0D8', isActive: true },
 ];
 
+export const BUSINESS_ENTITIES: EntityType[] = [
+  'BYTES_AI',
+  'ROCKET_WIRELESS',
+  'DELICIOUS_BYTES',
+  'AMARI_VENTURES',
+  'BYTES_REST_TECH',
+];
+
 export function getAccount(id: string): AccountConfig | undefined {
   return ACCOUNTS.find((a) => a.id === id);
 }
