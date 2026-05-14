@@ -62,7 +62,12 @@ export function parseChaseCsv(csvText: string, filename: string, overrideAccount
     transformHeader: (h) => h.trim(),
   });
   if (result.errors && result.errors.length > 0) {
-    for (const e of result.errors) errors.push(`Row ${e.row ?? '?'}: ${e.message}`);
+    for (const e of result.errors) {
+      // FieldMismatch (extra/missing columns) is non-fatal: Papa still gives us the row data.
+      // Chase exports sometimes have a trailing empty column or an extra Memo field.
+      if (e.code === 'TooManyFields' || e.code === 'TooFewFields' || e.type === 'FieldMismatch') continue;
+      errors.push(`Row ${e.row ?? '?'}: ${e.message}`);
+    }
   }
   if (!accountId) {
     errors.push('Could not detect account from filename — please select it manually.');
