@@ -228,8 +228,13 @@ export interface AccountSummary {
   topIncomeSource: string | null;
 }
 
-export function summarizeAccounts(): AccountSummary[] {
+export function summarizeAccounts(dateFrom?: string, dateTo?: string): AccountSummary[] {
   const db = getDb();
+  const where: string[] = [];
+  const p: Record<string, unknown> = {};
+  if (dateFrom) { where.push('posting_date >= @dateFrom'); p.dateFrom = dateFrom; }
+  if (dateTo) { where.push('posting_date <= @dateTo'); p.dateTo = dateTo; }
+  const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const rows = db.prepare(`
     SELECT
       account_id,
@@ -238,16 +243,17 @@ export function summarizeAccounts(): AccountSummary[] {
       SUM(CASE WHEN is_internal = 0 THEN amount ELSE 0 END) as net,
       SUM(CASE WHEN is_internal = 0 THEN 1 ELSE 0 END) as count,
       SUM(CASE WHEN is_internal = 1 THEN 1 ELSE 0 END) as internalCount
-    FROM transactions
+    FROM transactions ${w}
     GROUP BY account_id
-  `).all() as any[];
+  `).all(p) as any[];
 
   const incomeBySrc = db.prepare(`
     SELECT account_id, income_source, SUM(amount) as total
     FROM transactions
     WHERE income_source IS NOT NULL AND is_internal = 0 AND amount > 0
+      ${where.length ? 'AND ' + where.join(' AND ') : ''}
     GROUP BY account_id, income_source
-  `).all() as any[];
+  `).all(p) as any[];
 
   const topByAcct = new Map<string, { source: string; total: number }>();
   for (const r of incomeBySrc) {
@@ -280,24 +286,30 @@ export interface PortfolioSummary {
   mediumFlagCount: number;
 }
 
-export function portfolioSummary(): PortfolioSummary {
+export function portfolioSummary(dateFrom?: string, dateTo?: string): PortfolioSummary {
   const db = getDb();
+  const where: string[] = [];
+  const p: Record<string, unknown> = {};
+  if (dateFrom) { where.push('posting_date >= @dateFrom'); p.dateFrom = dateFrom; }
+  if (dateTo) { where.push('posting_date <= @dateTo'); p.dateTo = dateTo; }
+  const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
   const agg = db.prepare(`
     SELECT
       SUM(CASE WHEN amount > 0 AND is_internal = 0 THEN amount ELSE 0 END) as income,
       SUM(CASE WHEN amount < 0 AND is_internal = 0 THEN ABS(amount) ELSE 0 END) as expenses,
       SUM(CASE WHEN is_internal = 0 THEN 1 ELSE 0 END) as total,
       SUM(CASE WHEN audit_status IN ('CONFIRMED','TAGGED','PERSONAL_NO_DEDUCT','NEEDS_RECEIPT') THEN 1 ELSE 0 END) as reviewed
-    FROM transactions
-  `).get() as any;
+    FROM transactions ${w}
+  `).get(p) as any;
 
   const flags = db.prepare(`
     SELECT
       SUM(CASE WHEN audit_status = 'UNREVIEWED' AND audit_score >= 80 THEN 1 ELSE 0 END) as crit,
       SUM(CASE WHEN audit_status = 'UNREVIEWED' AND audit_score >= 60 AND audit_score < 80 THEN 1 ELSE 0 END) as high,
       SUM(CASE WHEN audit_status = 'UNREVIEWED' AND audit_score >= 35 AND audit_score < 60 THEN 1 ELSE 0 END) as med
-    FROM transactions
-  `).get() as any;
+    FROM transactions ${w}
+  `).get(p) as any;
 
   const c = flags.crit || 0;
   const h = flags.high || 0;
@@ -321,16 +333,64 @@ export interface IncomeSourceBreakdown {
   count: number;
 }
 
-export function incomeBySources(): IncomeSourceBreakdown[] {
+export function incomeBySources(dateFrom?: string, dateTo?: string): IncomeSourceBreakdown[] {
   const db = getDb();
+  const where: string[] = ['income_source IS NOT NULL', 'amount > 0', 'is_internal = 0'];
+  const p: Record<string, unknown> = {};
+  if (dateFrom) { where.push('posting_date >= @dateFrom'); p.dateFrom = dateFrom; }
+  if (dateTo) { where.push('posting_date <= @dateTo'); p.dateTo = dateTo; }
   const rows = db.prepare(`
     SELECT income_source as source, SUM(amount) as total, COUNT(*) as count
     FROM transactions
-    WHERE income_source IS NOT NULL AND amount > 0 AND is_internal = 0
+    WHERE ${where.join(' AND ')}
     GROUP BY income_source
     ORDER BY total DESC
-  `).all() as any[];
+  `).all(p) as any[];
   return rows.map((r) => ({ source: r.source, total: r.total, count: r.count }));
+}
+
+export interface AuditRings {
+  wires: { total: number; reviewed: number };
+  zelle: { total: number; reviewed: number };
+  personal: { total: number; reviewed: number };
+}
+
+export function auditRings(dateFrom?: string, dateTo?: string): AuditRings {
+  const db = getDb();
+  const where: string[] = [];
+  const p: Record<string, unknown> = {};
+  if (dateFrom) { where.push('posting_date >= @dateFrom'); p.dateFrom = dateFrom; }
+  if (dateTo) { where.push('posting_date <= @dateTo'); p.dateTo = dateTo; }
+  const w = where.length ? 'AND ' + where.join(' AND ') : '';
+  const reviewedExpr = `audit_status IN ('CONFIRMED','TAGGED','PERSONAL_NO_DEDUCT','NEEDS_RECEIPT')`;
+
+  const wires = db.prepare(`
+    SELECT
+      COUNT(*) as total,
+      SUM(CASE WHEN ${reviewedExpr} THEN 1 ELSE 0 END) as reviewed
+    FROM transactions
+    WHERE category IN ('EXPENSE_WIRE_INTL','EXPENSE_WIRE_DOMESTIC','EXPENSE_REMITTANCE','INCOME_WIRE') ${w}
+  `).get(p) as any;
+  const zelle = db.prepare(`
+    SELECT
+      COUNT(*) as total,
+      SUM(CASE WHEN ${reviewedExpr} THEN 1 ELSE 0 END) as reviewed
+    FROM transactions
+    WHERE zelle_person IS NOT NULL ${w}
+  `).get(p) as any;
+  const personal = db.prepare(`
+    SELECT
+      COUNT(*) as total,
+      SUM(CASE WHEN ${reviewedExpr} THEN 1 ELSE 0 END) as reviewed
+    FROM transactions
+    WHERE account_id = '7056' AND is_internal = 0 ${w}
+  `).get(p) as any;
+
+  return {
+    wires: { total: wires.total || 0, reviewed: wires.reviewed || 0 },
+    zelle: { total: zelle.total || 0, reviewed: zelle.reviewed || 0 },
+    personal: { total: personal.total || 0, reviewed: personal.reviewed || 0 },
+  };
 }
 
 export interface EntityPL {
@@ -341,16 +401,21 @@ export interface EntityPL {
   topExpenseCategories: { category: string; amount: number }[];
 }
 
-export function entityPLs(): EntityPL[] {
+export function entityPLs(dateFrom?: string, dateTo?: string): EntityPL[] {
   const db = getDb();
+  const where: string[] = [];
+  const p: Record<string, unknown> = {};
+  if (dateFrom) { where.push('posting_date >= @dateFrom'); p.dateFrom = dateFrom; }
+  if (dateTo) { where.push('posting_date <= @dateTo'); p.dateTo = dateTo; }
+  const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const agg = db.prepare(`
     SELECT
       COALESCE(confirmed_entity, entity_tag) as entity,
       SUM(CASE WHEN amount > 0 AND is_internal = 0 THEN amount ELSE 0 END) as income,
       SUM(CASE WHEN amount < 0 AND is_internal = 0 THEN ABS(amount) ELSE 0 END) as expenses
-    FROM transactions
+    FROM transactions ${w}
     GROUP BY entity
-  `).all() as any[];
+  `).all(p) as any[];
 
   const expensesByCat = db.prepare(`
     SELECT
@@ -359,8 +424,9 @@ export function entityPLs(): EntityPL[] {
       SUM(ABS(amount)) as total
     FROM transactions
     WHERE amount < 0 AND is_internal = 0
+      ${where.length ? 'AND ' + where.join(' AND ') : ''}
     GROUP BY entity, category
-  `).all() as any[];
+  `).all(p) as any[];
 
   const byEntityCat = new Map<string, { category: string; amount: number }[]>();
   for (const r of expensesByCat) {

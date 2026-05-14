@@ -40,6 +40,37 @@ export const EXPENSE_RULES: MerchantRule[] = [
     auditFlags: ['REMITTANCE', 'NEEDS_DOCUMENTATION'],
     suggestedPurpose: 'Wise transfer — document recipient and business purpose',
   },
+  {
+    match: ['WORLDREMIT', 'WORLD REMIT'],
+    merchantName: 'WorldRemit',
+    category: 'EXPENSE_REMITTANCE',
+    entityTag: 'UNKNOWN',
+    baseAuditScore: 68,
+    auditFlags: ['INTERNATIONAL_REMITTANCE', 'NEEDS_RECIPIENT', 'NEEDS_PURPOSE'],
+    suggestedPurpose: 'International remittance — document recipient, country, purpose',
+  },
+
+  // ===== Tax / IRS =====
+  {
+    match: ['IRS USATAXPYMT', 'IRS ', 'US TREASURY', 'USATAXPYMT'],
+    merchantName: 'IRS / Federal Tax',
+    category: 'EXPENSE_PAYROLL',
+    entityTag: 'AMARI_VENTURES',
+    baseAuditScore: 5,
+    auditFlags: ['NOT_DEDUCTIBLE_BUSINESS_EXPENSE'],
+    suggestedPurpose: 'Federal tax payment — NOT deductible as a business expense',
+  },
+
+  // ===== Rent (Amari Ventures via AnneBush) =====
+  {
+    match: ['ANNEBUSH', 'ANNE BUSH', 'ANNE BUSH TRUST'],
+    merchantName: 'AnneBush Trust — Rent',
+    category: 'EXPENSE_RENT',
+    entityTag: 'AMARI_VENTURES',
+    baseAuditScore: 10,
+    auditFlags: ['CONFIRM_ENTITY', 'GET_LEASE_AGREEMENT'],
+    suggestedPurpose: 'Rent payment — AnneBush Trust. Document with lease agreement.',
+  },
 
   // ===== Payroll (Bytes Restaurant Tech only) =====
   {
@@ -104,7 +135,8 @@ export const EXPENSE_RULES: MerchantRule[] = [
       'ANAM.AI', 'ANAM ', 'INTERCOM', 'ASANA', 'LINEAR APP', 'LINEAR.APP', 'CURSOR',
       'EXPO.DEV', '650 INDUSTRIES', 'TWINGATE', 'STREAMORDERS', 'CAL.COM',
       'GAMMA.APP', 'GAMMA APP', 'BLINQ', 'WEAVE', 'IDEOGRAM', 'CLUELY', 'FRAME.IO',
-      'RINGCENTRAL', 'REDIS',
+      'RINGCENTRAL', 'REDIS', 'REPLIT', 'VERCEL', 'SUPABASE', 'RAILWAY', 'RENDER.COM',
+      'LINKTREE',
     ],
     merchantName: 'Bytes AI Software',
     category: 'EXPENSE_SOFTWARE_BYTES',
@@ -264,13 +296,13 @@ export const EXPENSE_RULES: MerchantRule[] = [
 
   // ===== Payment platforms =====
   {
-    match: ['APPLE CASH'],
+    match: ['APPLE CASH', 'PYMT SENT APPLE', 'PYMT SENT TO APPLE'],
     merchantName: 'Apple Cash',
     category: 'EXPENSE_APPLE_CASH',
     entityTag: 'UNKNOWN',
     baseAuditScore: 50,
-    auditFlags: ['UNCLASSIFIED_PAYMENT', 'NEEDS_RECIPIENT'],
-    suggestedPurpose: 'Apple Cash — identify recipient and purpose',
+    auditFlags: ['UNCLASSIFIED_PAYMENT', 'NEEDS_RECIPIENT', 'BUSINESS_VS_PERSONAL'],
+    suggestedPurpose: 'Apple Cash — document who received this and why. High audit risk.',
   },
   {
     match: ['PAYPAL'],

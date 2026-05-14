@@ -3,65 +3,89 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
+import {
+  LayoutDashboard,
+  Upload,
+  ListTree,
+  ShieldAlert,
+  Building2,
+  TrendingUp,
+  Banknote,
+  PieChart,
+  FileSpreadsheet,
+  Settings,
+  Repeat2,
+} from 'lucide-react';
 
 const NAV = [
-  { href: '/', label: 'Dashboard', icon: '◆' },
-  { href: '/import', label: 'Import CSV', icon: '⬆' },
-  { href: '/transactions', label: 'Transactions', icon: '≡' },
-  { href: '/audit', label: 'Audit Review', icon: '⚠' },
-  { href: '/accounts', label: 'Accounts', icon: '⌗' },
-  { href: '/income', label: 'Income', icon: '↗' },
-  { href: '/zelle', label: 'Zelle / 1099', icon: '☎' },
-  { href: '/pl', label: 'Entity P&L', icon: '◐' },
-  { href: '/cpa', label: 'CPA Export', icon: '⬇' },
+  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/import', label: 'Import CSV', icon: Upload },
+  { href: '/transactions', label: 'Transactions', icon: ListTree },
+  { href: '/audit', label: 'Audit Review', icon: ShieldAlert, flagBadge: true },
+  { divider: true } as const,
+  { href: '/accounts', label: 'Accounts', icon: Building2 },
+  { href: '/income', label: 'Income Tracker', icon: TrendingUp },
+  { href: '/zelle', label: 'Zelle / 1099', icon: Banknote },
+  { href: '/pl', label: 'Entity P&L', icon: PieChart },
+  { href: '/cpa', label: 'CPA Export', icon: FileSpreadsheet },
+  { href: '/reconcile', label: 'Reconciliation', icon: Repeat2 },
 ];
 
 export default function Sidebar({ openFlags }: { openFlags?: number }) {
   const path = usePathname();
   return (
-    <aside className="w-60 shrink-0 border-r border-line bg-bg-1 min-h-screen flex flex-col">
-      <div className="p-5 border-b border-line">
-        <div className="flex items-center gap-2">
-          <span
-            className="w-8 h-8 rounded-md inline-flex items-center justify-center"
-            style={{
-              background: 'linear-gradient(135deg, #C8F060 0%, #60C8F0 100%)',
-              color: '#0C0C0E',
-              fontWeight: 800,
-            }}
-          >
-            A
-          </span>
-          <div>
-            <div className="font-semibold text-sm leading-none">Amari</div>
-            <div className="text-[11px] text-ink-mute leading-none mt-1">Reconciliation</div>
-          </div>
-        </div>
-      </div>
-      <nav className="p-2 flex-1">
-        {NAV.map((n) => {
-          const isActive = n.href === '/' ? path === '/' : path?.startsWith(n.href);
+    <aside className="w-[68px] shrink-0 border-r border-line bg-bg-1 min-h-screen flex flex-col items-center py-4 sticky top-0 z-30">
+      <Link
+        href="/"
+        className="w-10 h-10 rounded-full inline-flex items-center justify-center mb-6"
+        style={{
+          background: 'linear-gradient(135deg, #C060F0 0%, #7c3aed 100%)',
+          color: '#fff',
+          fontWeight: 800,
+          fontSize: 14,
+          letterSpacing: 0.5,
+        }}
+        title="Amari Ventures"
+      >
+        AV
+      </Link>
+
+      <nav className="flex-1 flex flex-col items-center gap-1 w-full">
+        {NAV.map((n, idx) => {
+          if ('divider' in n) return <div key={idx} className="w-8 h-px bg-line my-2" />;
+          const Icon = n.icon;
+          const isActive = n.href === '/' ? path === '/' : path?.startsWith(n.href!);
           return (
             <Link
               key={n.href}
-              href={n.href}
+              href={n.href!}
+              title={n.label}
               className={clsx(
-                'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition',
-                isActive ? 'bg-bg-3 text-ink' : 'text-ink-dim hover:text-ink hover:bg-bg-2'
+                'relative w-11 h-11 inline-flex items-center justify-center rounded-lg transition group',
+                isActive ? 'bg-bg-3 text-entity-bytes' : 'text-ink-dim hover:text-ink hover:bg-bg-2'
               )}
             >
-              <span className="w-4 text-center opacity-70">{n.icon}</span>
-              <span className="flex-1">{n.label}</span>
-              {n.href === '/audit' && openFlags ? (
-                <span className="pill bg-flag-critBg text-flag-critText">{openFlags}</span>
+              <Icon size={18} strokeWidth={1.75} />
+              {n.flagBadge && openFlags ? (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold inline-flex items-center justify-center bg-flag-critText/90 text-bg-0">
+                  {openFlags > 99 ? '99+' : openFlags}
+                </span>
               ) : null}
+              <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap px-2 py-1 rounded-md bg-bg-3 border border-line text-[12px] text-ink opacity-0 group-hover:opacity-100 transition shadow-soft z-50">
+                {n.label}
+              </span>
             </Link>
           );
         })}
       </nav>
-      <div className="p-4 text-[11px] text-ink-mute border-t border-line">
-        Local. Private. Your data never leaves this machine.
-      </div>
+
+      <button
+        className="w-11 h-11 inline-flex items-center justify-center rounded-lg text-ink-mute hover:text-ink hover:bg-bg-2"
+        title="Settings (coming soon)"
+        type="button"
+      >
+        <Settings size={18} strokeWidth={1.75} />
+      </button>
     </aside>
   );
 }
