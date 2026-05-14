@@ -12,6 +12,32 @@ npm run dev
 
 On first run the SQLite DB is created at `./data/amari.db` and seeded with all 15 Chase accounts.
 
+## Enable the AI assistant (optional)
+
+The floating **Ask AI** button in the bottom-right corner can answer questions about your data, navigate you to filtered views, and export CSVs on command. It needs an Anthropic API key.
+
+1. Sign in (or create an account) at <https://console.anthropic.com>.
+2. Go to **Settings → API Keys** and click **Create Key**. Copy it (starts with `sk-ant-…`).
+3. In the project root, create a file called `.env.local` containing:
+   ```
+   ANTHROPIC_API_KEY=sk-ant-your-key-here
+   ```
+4. Stop and restart `npm run dev`.
+
+The model defaults to `claude-opus-4-7`. To use a cheaper model, add a second line:
+```
+ANTHROPIC_MODEL=claude-haiku-4-5
+```
+
+Cost ballpark per question (with the system prompt cached): Haiku ≈ $0.001, Sonnet ≈ $0.01, Opus ≈ $0.03.
+
+### What you can ask
+- "Bring up all Zelle transactions" → opens `/transactions?…` filtered to Zelle.
+- "Export every Spacetel wire to CSV" → returns a download button.
+- "Total spend by entity this month" → returns a bar breakdown.
+- "Show me wires over $1,000."
+- "How much did I pay Sami this year?"
+
 ## Workflow
 
 1. **Import** (`/import`) — drag in one or many `Chase####_Activity_*.CSV` files. Account number is auto-detected from the filename. Each row is parsed, categorized, entity-tagged, audit-scored, and de-duplicated by `(account, date, amount, description)`. Internal transfers are matched automatically after every import.

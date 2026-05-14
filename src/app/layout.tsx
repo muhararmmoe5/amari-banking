@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import Sidebar from '@/components/Sidebar';
 import { ToastProvider } from '@/components/Toast';
+import AIChat from '@/components/AIChat';
 import { portfolioSummary } from '@/lib/db/queries';
 
 export const metadata: Metadata = {
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Sidebar openFlags={openFlags} />
             <main className="flex-1 min-w-0">{children}</main>
           </div>
+          <AIChat />
         </ToastProvider>
       </body>
     </html>
