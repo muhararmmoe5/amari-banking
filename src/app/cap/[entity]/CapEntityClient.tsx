@@ -1,16 +1,18 @@
 'use client';
 
 import { useState, useTransition, useMemo } from 'react';
+import Link from 'next/link';
 import { Plus, Trash2 } from 'lucide-react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import type { EntityType } from '@/types';
-import type { Person, EquityHolding, CashContribution, SafeNote } from '@/types/cap';
+import type { Person, EquityHolding, CashContribution, SafeNote, EntityValuation, HolderType } from '@/types/cap';
 import { parseAmountToCents, fmtCents, fmtPct, vestedFraction } from '@/lib/cap';
 import { useToast } from '@/components/Toast';
 import {
   actCreateHolding, actUpdateHolding, actDeleteHolding,
   actCreateContribution, actDeleteContribution,
   actCreateSafe, actUpdateSafeStatus, actDeleteSafe,
+  actCreateValuation, actDeleteValuation,
 } from '../actions';
 
 interface Props {
@@ -19,7 +21,16 @@ interface Props {
   initialHoldings: EquityHolding[];
   initialContributions: CashContribution[];
   initialSafes: SafeNote[];
+  initialValuations: EntityValuation[];
 }
+
+const HOLDER_TYPES: { value: HolderType; label: string; color: string }[] = [
+  { value: 'PARTNER', label: 'Partner', color: '#C8F060' },
+  { value: 'TEAM_MEMBER', label: 'Team member', color: '#60C8F0' },
+  { value: 'OBSERVER', label: 'Observer', color: '#888888' },
+];
+
+const holderConfig = (t: HolderType) => HOLDER_TYPES.find((h) => h.value === t) || HOLDER_TYPES[0];
 
 const SLICE_COLORS = ['#C8F060', '#60C8F0', '#F0A060', '#C060F0', '#FBBF24', '#F87171', '#A0D8FF', '#A8D840', '#D880FF', '#666666'];
 
@@ -29,7 +40,9 @@ export default function CapEntityClient(props: Props) {
   const [holdings, setHoldings] = useState(props.initialHoldings);
   const [contributions, setContributions] = useState(props.initialContributions);
   const [safes, setSafes] = useState(props.initialSafes);
-  const [tab, setTab] = useState<'equity' | 'cash' | 'safes'>('equity');
+  const [valuations, setValuations] = useState(props.initialValuations);
+  const [tab, setTab] = useState<'equity' | 'cash' | 'safes' | 'valuation'>('equity');
+  const currentValuation = valuations[0]?.valuationCents || null;
 
   const totalPct = holdings.reduce((s, h) => s + h.percent, 0);
   const unallocated = Math.max(0, 100 - totalPct);
@@ -100,10 +113,20 @@ export default function CapEntityClient(props: Props) {
             {safes.filter((s) => s.status === 'OUTSTANDING').length} outstanding · {safes.filter((s) => s.status === 'CONVERTED').length} converted
           </div>
         </div>
+
+        <div className="card p-4">
+          <div className="text-xs text-ink-mute uppercase tracking-wider">Current valuation</div>
+          <div className="mono tabnum text-2xl mt-2">
+            {currentValuation != null ? fmtCents(currentValuation) : <span className="text-ink-mute">Not set</span>}
+          </div>
+          <div className="text-[11px] text-ink-mute mt-1">
+            {valuations[0] ? `as of ${valuations[0].asOfDate} · ${valuations[0].type.replace('_', ' ').toLowerCase()}` : 'Add one in the Valuation tab'}
+          </div>
+        </div>
       </div>
 
       <div className="flex gap-1 border-b border-line">
-        {(['equity', 'cash', 'safes'] as const).map((t) => (
+        {(['equity', 'cash', 'safes', 'valuation'] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -112,7 +135,10 @@ export default function CapEntityClient(props: Props) {
               tab === t ? 'border-entity-bytes text-ink' : 'border-transparent text-ink-dim hover:text-ink'
             }`}
           >
-            {t === 'equity' ? `Equity (${holdings.length})` : t === 'cash' ? `Contributions (${contributions.length})` : `SAFEs / Notes (${safes.length})`}
+            {t === 'equity' ? `Equity (${holdings.length})`
+              : t === 'cash' ? `Contributions (${contributions.length})`
+              : t === 'safes' ? `SAFEs / Notes (${safes.length})`
+              : `Valuation (${valuations.length})`}
           </button>
         ))}
       </div>
@@ -125,6 +151,7 @@ export default function CapEntityClient(props: Props) {
           setHoldings={setHoldings}
           peopleById={peopleById}
           unallocated={unallocated}
+          currentValuation={currentValuation}
         />
       ) : tab === 'cash' ? (
         <CashTab
@@ -134,13 +161,19 @@ export default function CapEntityClient(props: Props) {
           setContributions={setContributions}
           peopleById={peopleById}
         />
-      ) : (
+      ) : tab === 'safes' ? (
         <SafesTab
           entity={entity}
           people={people}
           safes={safes}
           setSafes={setSafes}
           peopleById={peopleById}
+        />
+      ) : (
+        <ValuationTab
+          entity={entity}
+          valuations={valuations}
+          setValuations={setValuations}
         />
       )}
     </div>
@@ -149,7 +182,7 @@ export default function CapEntityClient(props: Props) {
 
 // ===== Equity tab =====
 function EquityTab({
-  entity, people, holdings, setHoldings, peopleById, unallocated,
+  entity, people, holdings, setHoldings, peopleById, unallocated, currentValuation,
 }: {
   entity: EntityType;
   people: Person[];
@@ -157,6 +190,7 @@ function EquityTab({
   setHoldings: (h: EquityHolding[] | ((cur: EquityHolding[]) => EquityHolding[])) => void;
   peopleById: Map<string, Person>;
   unallocated: number;
+  currentValuation: number | null;
 }) {
   const [adding, setAdding] = useState(false);
   const [, startTx] = useTransition();
@@ -182,6 +216,7 @@ function EquityTab({
           personId,
           percent,
           shares: shares && Number.isFinite(shares) ? shares : null,
+          holderType: (String(fd.get('holderType') || 'PARTNER') as HolderType),
           grantDate,
           vestingCliffMonths: useVesting && cliffStr ? parseInt(cliffStr, 10) : null,
           vestingTotalMonths: useVesting && totalStr ? parseInt(totalStr, 10) : null,
@@ -229,6 +264,11 @@ function EquityTab({
                 {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </Field>
+            <Field label="Role *">
+              <select name="holderType" defaultValue="PARTNER">
+                {HOLDER_TYPES.map((h) => <option key={h.value} value={h.value}>{h.label}</option>)}
+              </select>
+            </Field>
             <Field label="Percent * (0–100)">
               <input name="percent" type="number" step="0.0001" min="0.0001" max="100" required defaultValue={unallocated > 0 ? unallocated.toFixed(2) : ''} />
             </Field>
@@ -271,11 +311,12 @@ function EquityTab({
             <thead className="bg-bg-2 text-ink-dim text-xs uppercase tracking-wider">
               <tr>
                 <th className="text-left px-3 py-2 font-medium">Person</th>
-                <th className="text-right px-3 py-2 font-medium">% (granted)</th>
-                <th className="text-right px-3 py-2 font-medium">% (vested today)</th>
-                <th className="text-right px-3 py-2 font-medium">Shares</th>
+                <th className="text-left px-3 py-2 font-medium">Role</th>
+                <th className="text-right px-3 py-2 font-medium">% granted</th>
+                <th className="text-right px-3 py-2 font-medium">% vested</th>
+                <th className="text-right px-3 py-2 font-medium">Vested value</th>
                 <th className="text-left px-3 py-2 font-medium">Vesting</th>
-                <th className="text-right px-3 py-2 font-medium w-16"></th>
+                <th className="text-right px-3 py-2 font-medium w-12"></th>
               </tr>
             </thead>
             <tbody>
@@ -283,14 +324,28 @@ function EquityTab({
                 const vested = vestedFraction(h);
                 const vestedPct = h.percent * vested;
                 const hasVesting = !!(h.vestingTotalMonths && h.vestingStart);
+                const vestedValue = currentValuation != null ? Math.round(((vestedPct) / 100) * currentValuation) : null;
+                const hc = holderConfig(h.holderType);
                 return (
                   <tr key={h.id} className="border-t border-line/60">
-                    <td className="px-3 py-2">{peopleById.get(h.personId)?.name || '?'}</td>
+                    <td className="px-3 py-2">
+                      <Link href={`/team/${h.personId}`} className="hover:text-entity-bytes">{peopleById.get(h.personId)?.name || '?'}</Link>
+                    </td>
+                    <td className="px-3 py-2">
+                      <span
+                        className="pill text-[10px]"
+                        style={{ background: `${hc.color}1f`, color: hc.color, border: `1px solid ${hc.color}40` }}
+                      >
+                        {hc.label}
+                      </span>
+                    </td>
                     <td className="px-3 py-2 text-right mono tabnum">{fmtPct(h.percent, 2)}</td>
                     <td className="px-3 py-2 text-right mono tabnum">
-                      {hasVesting ? <span className={vested >= 1 ? 'text-income' : 'text-warn'}>{fmtPct(vestedPct, 2)}</span> : <span className="text-ink-dim">fully vested</span>}
+                      {hasVesting ? <span className={vested >= 1 ? 'text-income' : 'text-warn'}>{fmtPct(vestedPct, 2)}</span> : <span className="text-ink-dim">100.00%</span>}
                     </td>
-                    <td className="px-3 py-2 text-right mono tabnum text-ink-dim">{h.shares != null ? h.shares.toLocaleString() : '—'}</td>
+                    <td className="px-3 py-2 text-right mono tabnum">
+                      {vestedValue != null ? <span className="text-income">{fmtCents(vestedValue)}</span> : <span className="text-ink-mute">—</span>}
+                    </td>
                     <td className="px-3 py-2 text-xs text-ink-dim">
                       {hasVesting
                         ? `${h.vestingCliffMonths || 0}mo cliff / ${h.vestingTotalMonths}mo total · start ${h.vestingStart}`
@@ -660,5 +715,133 @@ function Field({ label, children, className = '' }: { label: string; children: R
       <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">{label}</div>
       <div>{children}</div>
     </label>
+  );
+}
+
+// ===== Valuation tab =====
+function ValuationTab({
+  entity, valuations, setValuations,
+}: {
+  entity: EntityType;
+  valuations: EntityValuation[];
+  setValuations: (v: EntityValuation[] | ((cur: EntityValuation[]) => EntityValuation[])) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [, startTx] = useTransition();
+  const { saveStart, saveEnd, saveError, toast } = useToast();
+
+  async function add(form: HTMLFormElement) {
+    const fd = new FormData(form);
+    const amountCents = parseAmountToCents(String(fd.get('amount') || ''));
+    const date = String(fd.get('date') || '').trim();
+    if (!amountCents) { toast({ kind: 'err', title: 'Enter a valuation amount' }); return; }
+    if (!date) { toast({ kind: 'err', title: 'Date required' }); return; }
+    const tId = saveStart();
+    startTx(async () => {
+      try {
+        const v = await actCreateValuation({
+          entity,
+          valuationCents: amountCents,
+          asOfDate: date,
+          type: (String(fd.get('type') || 'MANUAL') as EntityValuation['type']),
+          notes: String(fd.get('notes') || '').trim() || null,
+        });
+        setValuations((cur) => [v, ...cur].sort((a, b) => b.asOfDate.localeCompare(a.asOfDate)));
+        saveEnd(tId);
+        setAdding(false);
+      } catch (e: any) { saveError(tId, e?.message); }
+    });
+  }
+
+  async function remove(v: EntityValuation) {
+    if (!confirm(`Delete the ${fmtCents(v.valuationCents)} valuation from ${v.asOfDate}?`)) return;
+    const tId = saveStart();
+    startTx(async () => {
+      try {
+        await actDeleteValuation(v.id);
+        setValuations((cur) => cur.filter((x) => x.id !== v.id));
+        saveEnd(tId);
+      } catch (e: any) { saveError(tId, e?.message); }
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-ink-dim">
+          The most recent entry is the entity&apos;s current valuation. Used to compute portfolio value for every holder.
+        </p>
+        {!adding ? (
+          <button type="button" onClick={() => setAdding(true)} className="btn btn-primary text-sm">
+            <Plus size={14} /> Set valuation
+          </button>
+        ) : null}
+      </div>
+
+      {adding ? (
+        <form className="card p-4 space-y-3" onSubmit={(e) => { e.preventDefault(); add(e.currentTarget); }}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Field label="Valuation (USD) *">
+              <input name="amount" required pattern="^\d{1,12}(\.\d{1,2})?$" placeholder="5000000" />
+            </Field>
+            <Field label="As of date *">
+              <input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} />
+            </Field>
+            <Field label="Type">
+              <select name="type" defaultValue="MANUAL">
+                <option value="MANUAL">Manual estimate</option>
+                <option value="LAST_ROUND">Last priced round</option>
+                <option value="409A">409A appraisal</option>
+                <option value="INTERNAL">Internal model</option>
+                <option value="EXIT">Exit / acquisition</option>
+              </select>
+            </Field>
+            <Field label="Notes" className="md:col-span-3">
+              <input name="notes" maxLength={500} placeholder="e.g. Series Seed priced at $5M post-money on 2026-04-15" />
+            </Field>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setAdding(false)} className="btn">Cancel</button>
+            <button type="submit" className="btn btn-primary">Save</button>
+          </div>
+        </form>
+      ) : null}
+
+      {valuations.length === 0 ? (
+        <div className="card p-10 text-center text-ink-mute text-sm">
+          No valuation set. Add one so every holder&apos;s portfolio value can be calculated.
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-bg-2 text-ink-dim text-xs uppercase tracking-wider">
+              <tr>
+                <th className="text-left px-3 py-2 font-medium">As of</th>
+                <th className="text-right px-3 py-2 font-medium">Valuation</th>
+                <th className="text-left px-3 py-2 font-medium">Type</th>
+                <th className="text-left px-3 py-2 font-medium">Notes</th>
+                <th className="text-right px-3 py-2 font-medium w-12"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {valuations.map((v, i) => (
+                <tr key={v.id} className={`border-t border-line/60 ${i === 0 ? 'bg-entity-bytes/[0.04]' : ''}`}>
+                  <td className="px-3 py-2 text-xs mono">
+                    {v.asOfDate}
+                    {i === 0 ? <span className="ml-2 pill text-[10px] bg-entity-bytes/15 text-entity-bytes border border-entity-bytes/40">current</span> : null}
+                  </td>
+                  <td className="px-3 py-2 text-right mono tabnum">{fmtCents(v.valuationCents)}</td>
+                  <td className="px-3 py-2 text-xs text-ink-dim">{v.type.replace('_', ' ').toLowerCase()}</td>
+                  <td className="px-3 py-2 text-xs text-ink-dim truncate max-w-[320px]">{v.notes || '—'}</td>
+                  <td className="px-3 py-2 text-right">
+                    <button onClick={() => remove(v)} className="btn btn-ghost !p-1.5 text-expense" title="Delete"><Trash2 size={13} /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }

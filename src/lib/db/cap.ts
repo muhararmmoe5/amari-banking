@@ -3,8 +3,10 @@ import crypto from 'crypto';
 import { getDb } from './index';
 import type {
   Person, PersonRole, EquityHolding, CashContribution, SafeNote, EntityCapSummary,
+  EntityValuation, HolderType, ValuationType,
 } from '@/types/cap';
 import type { EntityType } from '@/types';
+import { vestedFraction } from '@/lib/cap';
 
 // ===== People =====
 
@@ -76,6 +78,7 @@ function rowToHolding(r: any): EquityHolding {
     personId: r.person_id,
     percent: r.percent,
     shares: r.shares,
+    holderType: (r.holder_type || 'PARTNER') as HolderType,
     grantDate: r.grant_date,
     vestingCliffMonths: r.vesting_cliff_months,
     vestingTotalMonths: r.vesting_total_months,
@@ -99,6 +102,7 @@ export interface HoldingInput {
   personId: string;
   percent: number;
   shares?: number | null;
+  holderType?: HolderType;
   grantDate?: string | null;
   vestingCliffMonths?: number | null;
   vestingTotalMonths?: number | null;
@@ -111,9 +115,9 @@ export function createHolding(input: HoldingInput): EquityHolding {
   const id = crypto.randomUUID();
   const now = Date.now();
   db.prepare(
-    `INSERT INTO equity_holdings (id, entity, person_id, percent, shares, grant_date,
+    `INSERT INTO equity_holdings (id, entity, person_id, percent, shares, holder_type, grant_date,
        vesting_cliff_months, vesting_total_months, vesting_start, notes, created_at, updated_at)
-     VALUES (@id, @entity, @person_id, @percent, @shares, @grant_date,
+     VALUES (@id, @entity, @person_id, @percent, @shares, @holder_type, @grant_date,
        @vesting_cliff_months, @vesting_total_months, @vesting_start, @notes, @now, @now)`
   ).run({
     id,
@@ -121,6 +125,7 @@ export function createHolding(input: HoldingInput): EquityHolding {
     person_id: input.personId,
     percent: input.percent,
     shares: input.shares ?? null,
+    holder_type: input.holderType || 'PARTNER',
     grant_date: input.grantDate || null,
     vesting_cliff_months: input.vestingCliffMonths ?? null,
     vesting_total_months: input.vestingTotalMonths ?? null,
@@ -140,6 +145,7 @@ export function updateHolding(id: string, patch: Partial<HoldingInput>): void {
     personId: 'person_id',
     percent: 'percent',
     shares: 'shares',
+    holderType: 'holder_type',
     grantDate: 'grant_date',
     vestingCliffMonths: 'vesting_cliff_months',
     vestingTotalMonths: 'vesting_total_months',
@@ -323,6 +329,7 @@ export function entityCapSummary(entity: EntityType): EntityCapSummary {
   const safes = db.prepare(
     `SELECT COALESCE(SUM(amount_cents), 0) as total, COUNT(*) as count FROM safe_notes WHERE entity = ? AND status = 'OUTSTANDING'`
   ).get(entity) as any;
+  const val = getCurrentValuation(entity);
   return {
     entity,
     totalEquityPct: eq.totalPct || 0,
@@ -332,6 +339,8 @@ export function entityCapSummary(entity: EntityType): EntityCapSummary {
     contributorCount: cash.contributors || 0,
     outstandingSafeCents: safes.total || 0,
     outstandingSafeCount: safes.count || 0,
+    currentValuationCents: val ? val.valuationCents : null,
+    currentValuationDate: val ? val.asOfDate : null,
   };
 }
 
@@ -359,4 +368,133 @@ export function personRollup(personId: string): PersonRollup | null {
   const safes = (db.prepare('SELECT * FROM safe_notes WHERE person_id = ? ORDER BY issue_date DESC').all(personId) as any[]).map(rowToSafe);
   const totalCashCents = contributions.reduce((s, c) => s + c.amountCents, 0);
   return { person, holdings, contributions, safes, totalCashCents };
+}
+
+// ===== Entity valuations =====
+
+function rowToValuation(r: any): EntityValuation {
+  return {
+    id: r.id,
+    entity: r.entity,
+    valuationCents: r.valuation_cents,
+    asOfDate: r.as_of_date,
+    type: r.type,
+    notes: r.notes,
+    createdAt: r.created_at,
+  };
+}
+
+export interface ValuationInput {
+  entity: EntityType;
+  valuationCents: number;
+  asOfDate: string;
+  type?: ValuationType;
+  notes?: string | null;
+}
+
+export function createValuation(input: ValuationInput): EntityValuation {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  db.prepare(
+    `INSERT INTO entity_valuations (id, entity, valuation_cents, as_of_date, type, notes, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    id,
+    input.entity,
+    input.valuationCents,
+    input.asOfDate,
+    input.type || 'MANUAL',
+    input.notes?.trim() || null,
+    Date.now(),
+  );
+  return rowToValuation(db.prepare('SELECT * FROM entity_valuations WHERE id = ?').get(id) as any);
+}
+
+export function deleteValuation(id: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM entity_valuations WHERE id = ?').run(id);
+}
+
+export function listValuations(entity: EntityType): EntityValuation[] {
+  const db = getDb();
+  const rows = db.prepare(
+    'SELECT * FROM entity_valuations WHERE entity = ? ORDER BY as_of_date DESC, created_at DESC'
+  ).all(entity) as any[];
+  return rows.map(rowToValuation);
+}
+
+export function getCurrentValuation(entity: EntityType): EntityValuation | null {
+  const db = getDb();
+  const r = db.prepare(
+    'SELECT * FROM entity_valuations WHERE entity = ? ORDER BY as_of_date DESC, created_at DESC LIMIT 1'
+  ).get(entity) as any;
+  return r ? rowToValuation(r) : null;
+}
+
+// ===== Portfolio math =====
+
+export interface HoldingValuation {
+  holding: EquityHolding;
+  currentValuationCents: number | null;
+  vestedFraction: number;        // 0..1
+  vestedPercent: number;         // h.percent * vested
+  grantedValueCents: number | null;  // h.percent * valuation
+  vestedValueCents: number | null;   // vestedPercent * valuation
+}
+
+export function valuePersonHoldings(personId: string): {
+  totalGrantedCents: number;
+  totalVestedCents: number;
+  rows: HoldingValuation[];
+} {
+  const holdings = listHoldingsForPerson(personId);
+  let totalGranted = 0;
+  let totalVested = 0;
+  const rows: HoldingValuation[] = holdings.map((h) => {
+    const val = getCurrentValuation(h.entity);
+    const valCents = val ? val.valuationCents : null;
+    const vf = vestedFraction(h);
+    const granted = valCents != null ? Math.round((h.percent / 100) * valCents) : null;
+    const vested = valCents != null ? Math.round(((h.percent * vf) / 100) * valCents) : null;
+    if (granted != null) totalGranted += granted;
+    if (vested != null) totalVested += vested;
+    return {
+      holding: h,
+      currentValuationCents: valCents,
+      vestedFraction: vf,
+      vestedPercent: h.percent * vf,
+      grantedValueCents: granted,
+      vestedValueCents: vested,
+    };
+  });
+  return { totalGrantedCents: totalGranted, totalVestedCents: totalVested, rows };
+}
+
+export function listHoldingsForPerson(personId: string): EquityHolding[] {
+  const db = getDb();
+  const rows = db.prepare(
+    'SELECT * FROM equity_holdings WHERE person_id = ? ORDER BY entity, percent DESC'
+  ).all(personId) as any[];
+  return rows.map(rowToHolding);
+}
+
+export function portfolioByPerson(): Map<string, number> {
+  // Returns map of person_id -> total vested portfolio value (cents)
+  const db = getDb();
+  const holdings = (db.prepare('SELECT * FROM equity_holdings').all() as any[]).map(rowToHolding);
+  const valCache = new Map<string, number | null>();
+  const out = new Map<string, number>();
+  for (const h of holdings) {
+    let valCents = valCache.get(h.entity);
+    if (valCents === undefined) {
+      const v = getCurrentValuation(h.entity);
+      valCents = v ? v.valuationCents : null;
+      valCache.set(h.entity, valCents);
+    }
+    if (valCents == null) continue;
+    const vf = vestedFraction(h);
+    const cents = Math.round(((h.percent * vf) / 100) * valCents);
+    out.set(h.personId, (out.get(h.personId) || 0) + cents);
+  }
+  return out;
 }

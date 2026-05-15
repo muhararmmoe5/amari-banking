@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { listPeople, listHoldings, listContributions, listSafes } from '@/lib/db/cap';
+import { listPeople, listHoldings, listContributions, listSafes, listValuations } from '@/lib/db/cap';
 import { ENTITY_LABELS, ENTITY_COLORS, BUSINESS_ENTITIES } from '@/constants/accounts';
 import type { EntityType } from '@/types';
 import { ArrowLeft } from 'lucide-react';
@@ -16,6 +16,7 @@ export default function CapEntityPage({ params }: { params: { entity: string } }
   const holdings = listHoldings(entity);
   const contributions = listContributions(entity);
   const safes = listSafes(entity);
+  const valuations = listValuations(entity);
 
   return (
     <div className="p-8 space-y-5 max-w-[1320px]">
@@ -42,6 +43,7 @@ export default function CapEntityPage({ params }: { params: { entity: string } }
           initialHoldings={holdings}
           initialContributions={contributions}
           initialSafes={safes}
+          initialValuations={valuations}
         />
       )}
     </div>

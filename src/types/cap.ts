@@ -8,6 +8,8 @@ export type PersonRole =
   | 'ADVISOR'
   | 'OTHER';
 
+export type HolderType = 'PARTNER' | 'TEAM_MEMBER' | 'OBSERVER';
+
 export interface Person {
   id: string;
   name: string;
@@ -24,6 +26,7 @@ export interface EquityHolding {
   personId: string;
   percent: number;            // 0–100
   shares: number | null;      // optional share count
+  holderType: HolderType;
   grantDate: string | null;   // YYYY-MM-DD
   vestingCliffMonths: number | null;  // null = no vesting (fully owned)
   vestingTotalMonths: number | null;  // typically 48
@@ -31,6 +34,18 @@ export interface EquityHolding {
   notes: string | null;
   createdAt: number;
   updatedAt: number;
+}
+
+export type ValuationType = 'LAST_ROUND' | 'INTERNAL' | 'MANUAL' | 'EXIT' | '409A';
+
+export interface EntityValuation {
+  id: string;
+  entity: EntityType;
+  valuationCents: number;
+  asOfDate: string;           // YYYY-MM-DD
+  type: ValuationType;
+  notes: string | null;
+  createdAt: number;
 }
 
 export type ContributionType = 'CASH' | 'LOAN' | 'SWEAT' | 'NOTE_CONVERSION';
@@ -77,4 +92,6 @@ export interface EntityCapSummary {
   contributorCount: number;
   outstandingSafeCents: number;
   outstandingSafeCount: number;
+  currentValuationCents: number | null;
+  currentValuationDate: string | null;
 }

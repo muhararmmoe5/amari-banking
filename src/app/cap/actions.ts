@@ -6,7 +6,9 @@ import {
   createHolding, updateHolding, deleteHolding,
   createContribution, deleteContribution,
   createSafe, updateSafeStatus, deleteSafe,
+  createValuation, deleteValuation,
   type PersonInput, type HoldingInput, type ContributionInput, type SafeInput,
+  type ValuationInput,
 } from '@/lib/db/cap';
 
 function revalidateAll() {
@@ -65,5 +67,15 @@ export async function actUpdateSafeStatus(id: string, status: 'OUTSTANDING' | 'C
 }
 export async function actDeleteSafe(id: string) {
   deleteSafe(id);
+  revalidateAll();
+}
+
+export async function actCreateValuation(input: ValuationInput) {
+  const v = createValuation(input);
+  revalidateAll();
+  return v;
+}
+export async function actDeleteValuation(id: string) {
+  deleteValuation(id);
   revalidateAll();
 }

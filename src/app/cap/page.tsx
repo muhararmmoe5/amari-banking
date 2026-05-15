@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { allEntitySummaries, listHoldings, listPeople } from '@/lib/db/cap';
+import { allEntitySummaries, listHoldings, listPeople, portfolioByPerson } from '@/lib/db/cap';
 import { ENTITY_LABELS, ENTITY_COLORS } from '@/constants/accounts';
 import { fmtCents, fmtPct } from '@/lib/cap';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, TrendingUp } from 'lucide-react';
 import type { EntityType } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -12,6 +12,10 @@ export default function CapOverviewPage() {
   const people = listPeople();
   const peopleById = new Map(people.map((p) => [p.id, p]));
   const allHoldings = listHoldings();
+  const portfolioMap = portfolioByPerson();
+  const totalPortfolio = Array.from(portfolioMap.values()).reduce((s, v) => s + v, 0);
+  const totalValuation = summaries.reduce((s, x) => s + (x.currentValuationCents || 0), 0);
+  const totalCash = summaries.reduce((s, x) => s + x.totalCashCents, 0);
   const holdingsByEntity = new Map<EntityType, typeof allHoldings>();
   for (const h of allHoldings) {
     const list = holdingsByEntity.get(h.entity) || [];
@@ -38,7 +42,13 @@ export default function CapOverviewPage() {
           <Link href="/team" className="btn btn-primary inline-flex">Go to Team</Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Kpi label="Combined entity valuation" value={totalValuation ? fmtCents(totalValuation) : '—'} tone="primary" />
+            <Kpi label="Total cash invested across entities" value={fmtCents(totalCash)} tone="income" />
+            <Kpi label="Total vested portfolio (all people)" value={totalPortfolio ? fmtCents(totalPortfolio) : '—'} tone="primary" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {summaries.map((s) => {
             const holders = (holdingsByEntity.get(s.entity) || []).slice(0, 4);
             const unallocated = Math.max(0, 100 - s.totalEquityPct);
@@ -63,10 +73,15 @@ export default function CapOverviewPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-xs">
-                  <Stat label="Allocated equity" value={fmtPct(s.totalEquityPct, 1)} tone={Math.abs(s.totalEquityPct - 100) < 0.01 ? 'good' : 'neutral'} />
+                  <Stat
+                    label="Current valuation"
+                    value={s.currentValuationCents ? fmtCents(s.currentValuationCents) : 'Not set'}
+                    tone={s.currentValuationCents ? 'good' : 'neutral'}
+                    sub={s.currentValuationDate ? `as of ${s.currentValuationDate}` : 'set in entity page'}
+                  />
                   <Stat label="Total cash in" value={fmtCents(s.totalCashCents)} tone="income" />
+                  <Stat label="Allocated equity" value={fmtPct(s.totalEquityPct, 1)} tone={Math.abs(s.totalEquityPct - 100) < 0.01 ? 'good' : 'neutral'} />
                   <Stat label="SAFEs outstanding" value={s.outstandingSafeCount.toString()} sub={s.outstandingSafeCents > 0 ? fmtCents(s.outstandingSafeCents) : undefined} />
-                  <Stat label="Unallocated %" value={fmtPct(unallocated, 1)} tone={unallocated < 0.01 ? 'good' : unallocated > 50 ? 'warn' : 'neutral'} />
                 </div>
 
                 {holders.length > 0 ? (
@@ -85,8 +100,19 @@ export default function CapOverviewPage() {
               </Link>
             );
           })}
-        </div>
+          </div>
+        </>
       )}
+    </div>
+  );
+}
+
+function Kpi({ label, value, tone }: { label: string; value: string; tone: 'primary' | 'income' | 'neutral' }) {
+  const tones = { primary: 'text-entity-bytes', income: 'text-income', neutral: 'text-ink' } as const;
+  return (
+    <div className="card p-4">
+      <div className="text-[11px] uppercase tracking-wider text-ink-mute">{label}</div>
+      <div className={`mono tabnum text-xl font-semibold mt-1 ${tones[tone]}`}>{value}</div>
     </div>
   );
 }

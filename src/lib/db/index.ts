@@ -145,7 +145,25 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_safe_entity ON safe_notes(entity);
     CREATE INDEX IF NOT EXISTS idx_safe_person ON safe_notes(person_id);
     CREATE INDEX IF NOT EXISTS idx_safe_status ON safe_notes(status);
+
+    CREATE TABLE IF NOT EXISTS entity_valuations (
+      id TEXT PRIMARY KEY,
+      entity TEXT NOT NULL,
+      valuation_cents INTEGER NOT NULL CHECK (valuation_cents > 0),
+      as_of_date TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'MANUAL',
+      notes TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_val_entity ON entity_valuations(entity, as_of_date DESC);
   `);
+
+  // Forward-compatible column adds (SQLite ALTER ignores if column exists in some versions; we catch)
+  for (const sql of [
+    `ALTER TABLE equity_holdings ADD COLUMN holder_type TEXT NOT NULL DEFAULT 'PARTNER'`,
+  ]) {
+    try { db.exec(sql); } catch (_e) { /* column already present */ }
+  }
 
   // Seed accounts on first run
   const count = (db.prepare('SELECT COUNT(*) as c FROM accounts').get() as { c: number }).c;

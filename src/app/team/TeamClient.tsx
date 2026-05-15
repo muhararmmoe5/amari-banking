@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Plus, Trash2, Pencil, X } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, Trash2, Pencil } from 'lucide-react';
 import type { Person, PersonRole } from '@/types/cap';
 import { actCreatePerson, actUpdatePerson, actDeletePerson } from '../cap/actions';
 import { useToast } from '@/components/Toast';
+import { fmtCents } from '@/lib/cap';
 
 const ROLES: { value: PersonRole; label: string; color: string }[] = [
   { value: 'FOUNDER', label: 'Founder', color: '#C8F060' },
@@ -17,7 +19,7 @@ const ROLES: { value: PersonRole; label: string; color: string }[] = [
 
 const roleConfig = (r: PersonRole) => ROLES.find((x) => x.value === r) || ROLES[5];
 
-export default function TeamClient({ initialPeople }: { initialPeople: Person[] }) {
+export default function TeamClient({ initialPeople, portfolioMap }: { initialPeople: Person[]; portfolioMap: Record<string, number> }) {
   const [people, setPeople] = useState(initialPeople);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Person | null>(null);
@@ -130,6 +132,7 @@ export default function TeamClient({ initialPeople }: { initialPeople: Person[] 
               <tr>
                 <th className="text-left px-3 py-2 font-medium">Name</th>
                 <th className="text-left px-3 py-2 font-medium">Role</th>
+                <th className="text-right px-3 py-2 font-medium">Portfolio (vested)</th>
                 <th className="text-left px-3 py-2 font-medium">Email</th>
                 <th className="text-left px-3 py-2 font-medium">Notes</th>
                 <th className="text-right px-3 py-2 font-medium w-24">Actions</th>
@@ -138,7 +141,7 @@ export default function TeamClient({ initialPeople }: { initialPeople: Person[] 
             <tbody>
               {people.map((p) => editing?.id === p.id ? (
                 <tr key={p.id} className="border-t border-line/60 bg-bg-2/40">
-                  <td colSpan={5} className="p-3">
+                  <td colSpan={6} className="p-3">
                     <form
                       className="grid grid-cols-1 md:grid-cols-5 gap-2"
                       onSubmit={(e) => { e.preventDefault(); save(e.currentTarget, p); }}
@@ -158,7 +161,9 @@ export default function TeamClient({ initialPeople }: { initialPeople: Person[] 
                 </tr>
               ) : (
                 <tr key={p.id} className="border-t border-line/60 hover:bg-bg-2/40">
-                  <td className="px-3 py-2 font-medium">{p.name}</td>
+                  <td className="px-3 py-2 font-medium">
+                    <Link href={`/team/${p.id}`} className="hover:text-entity-bytes">{p.name}</Link>
+                  </td>
                   <td className="px-3 py-2">
                     <span
                       className="pill text-xs"
@@ -170,6 +175,9 @@ export default function TeamClient({ initialPeople }: { initialPeople: Person[] 
                     >
                       {roleConfig(p.role).label}
                     </span>
+                  </td>
+                  <td className="px-3 py-2 text-right mono tabnum">
+                    {portfolioMap[p.id] ? <span className="text-income">{fmtCents(portfolioMap[p.id])}</span> : <span className="text-ink-mute">—</span>}
                   </td>
                   <td className="px-3 py-2 text-xs text-ink-dim">{p.email || '—'}</td>
                   <td className="px-3 py-2 text-xs text-ink-dim truncate max-w-[260px]">{p.notes || '—'}</td>
