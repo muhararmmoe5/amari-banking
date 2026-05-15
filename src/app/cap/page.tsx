@@ -1,13 +1,27 @@
 import Link from 'next/link';
-import { allEntitySummaries, listHoldings, listPeople, portfolioByPerson } from '@/lib/db/cap';
+import { redirect } from 'next/navigation';
+import {
+  allEntitySummaries, listHoldings, listPeople, portfolioByPerson, listHoldingsForPerson,
+} from '@/lib/db/cap';
 import { ENTITY_LABELS, ENTITY_COLORS } from '@/constants/accounts';
 import { fmtCents, fmtPct } from '@/lib/cap';
 import { ArrowRight, TrendingUp } from 'lucide-react';
 import type { EntityType } from '@/types';
+import { requireUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export default function CapOverviewPage() {
+  const user = requireUser();
+  const isOwner = user.role === 'OWNER';
+
+  // Non-owners with a single holding go straight to that entity / their portfolio
+  if (!isOwner) {
+    const my = user.personId ? listHoldingsForPerson(user.personId) : [];
+    if (user.personId) redirect(`/team/${user.personId}`);
+    if (my.length === 0) redirect('/login');
+  }
+
   const summaries = allEntitySummaries();
   const people = listPeople();
   const peopleById = new Map(people.map((p) => [p.id, p]));

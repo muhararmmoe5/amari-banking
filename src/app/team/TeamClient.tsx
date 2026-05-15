@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Plus, Trash2, Pencil } from 'lucide-react';
+import { Plus, Trash2, Pencil, Send, Copy, Check } from 'lucide-react';
 import type { Person, PersonRole } from '@/types/cap';
-import { actCreatePerson, actUpdatePerson, actDeletePerson } from '../cap/actions';
+import { actCreatePerson, actUpdatePerson, actDeletePerson, actCreateInvite } from '../cap/actions';
 import { useToast } from '@/components/Toast';
 import { fmtCents } from '@/lib/cap';
 
@@ -19,12 +19,45 @@ const ROLES: { value: PersonRole; label: string; color: string }[] = [
 
 const roleConfig = (r: PersonRole) => ROLES.find((x) => x.value === r) || ROLES[5];
 
+interface InviteResult { personId: string; url: string; expiresAt: number; copied: boolean }
+
 export default function TeamClient({ initialPeople, portfolioMap }: { initialPeople: Person[]; portfolioMap: Record<string, number> }) {
   const [people, setPeople] = useState(initialPeople);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Person | null>(null);
+  const [inviting, setInviting] = useState<Person | null>(null);
+  const [inviteResult, setInviteResult] = useState<InviteResult | null>(null);
   const [, startTx] = useTransition();
   const { toast, saveStart, saveEnd, saveError } = useToast();
+
+  async function generateInvite(person: Person, form: HTMLFormElement) {
+    const fd = new FormData(form);
+    const email = String(fd.get('email') || '').trim();
+    if (!email) { toast({ kind: 'err', title: 'Email required' }); return; }
+    const role = (String(fd.get('role') || 'PARTNER') as 'PARTNER' | 'TEAM_MEMBER' | 'OBSERVER');
+    const safeRole = role === 'OBSERVER' ? 'TEAM_MEMBER' : role;
+    const tId = saveStart();
+    startTx(async () => {
+      try {
+        const res = await actCreateInvite(person.id, email, safeRole);
+        if ('error' in res) { saveError(tId, res.error); return; }
+        setInviteResult({ personId: person.id, url: res.url, expiresAt: res.expiresAt, copied: false });
+        setInviting(null);
+        saveEnd(tId);
+      } catch (e: any) { saveError(tId, e?.message); }
+    });
+  }
+
+  async function copyInvite() {
+    if (!inviteResult) return;
+    try {
+      await navigator.clipboard.writeText(inviteResult.url);
+      setInviteResult({ ...inviteResult, copied: true });
+      toast({ kind: 'ok', title: 'Invite link copied' });
+    } catch {
+      toast({ kind: 'err', title: 'Could not copy — select the link and copy manually' });
+    }
+  }
 
   async function add(form: HTMLFormElement) {
     const fd = new FormData(form);
@@ -121,6 +154,49 @@ export default function TeamClient({ initialPeople, portfolioMap }: { initialPeo
         </form>
       ) : null}
 
+      {inviting ? (
+        <form
+          className="card p-4 space-y-3 border-entity-bytes/40"
+          onSubmit={(e) => { e.preventDefault(); generateInvite(inviting, e.currentTarget); }}
+        >
+          <h3 className="text-sm font-medium">Generate invite link for {inviting.name}</h3>
+          <p className="text-xs text-ink-dim">They&apos;ll set their own password and sign in. The link is valid for 14 days.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label className="block">
+              <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Email</div>
+              <input name="email" type="email" required defaultValue={inviting.email || ''} className="w-full" autoFocus />
+            </label>
+            <label className="block">
+              <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Role</div>
+              <select name="role" defaultValue="PARTNER">
+                <option value="PARTNER">Partner (sees their own equity)</option>
+                <option value="TEAM_MEMBER">Team member (read-only)</option>
+              </select>
+            </label>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setInviting(null)} className="btn">Cancel</button>
+            <button type="submit" className="btn btn-primary"><Send size={13} /> Generate link</button>
+          </div>
+        </form>
+      ) : null}
+
+      {inviteResult ? (
+        <div className="card p-4 space-y-2 border-entity-bytes/40">
+          <h3 className="text-sm font-medium">Invite link ready</h3>
+          <p className="text-xs text-ink-dim">Copy this link and send it to them however you like (email, text, Slack). Anyone with the link can claim it once, so don&apos;t post publicly.</p>
+          <div className="flex items-center gap-2">
+            <input readOnly value={inviteResult.url} className="flex-1 mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+            <button onClick={copyInvite} className="btn btn-primary">
+              {inviteResult.copied ? <Check size={13} /> : <Copy size={13} />}
+              {inviteResult.copied ? 'Copied' : 'Copy'}
+            </button>
+            <button onClick={() => setInviteResult(null)} className="btn btn-ghost">Done</button>
+          </div>
+          <p className="text-[11px] text-ink-mute">Expires {new Date(inviteResult.expiresAt).toLocaleDateString()}.</p>
+        </div>
+      ) : null}
+
       {people.length === 0 ? (
         <div className="card p-12 text-center text-ink-mute">
           No one tracked yet. Add your first founder, partner, or investor.
@@ -182,6 +258,7 @@ export default function TeamClient({ initialPeople, portfolioMap }: { initialPeo
                   <td className="px-3 py-2 text-xs text-ink-dim">{p.email || '—'}</td>
                   <td className="px-3 py-2 text-xs text-ink-dim truncate max-w-[260px]">{p.notes || '—'}</td>
                   <td className="px-3 py-2 text-right">
+                    <button onClick={() => setInviting(p)} className="btn btn-ghost !p-1.5 text-entity-bytes" title="Generate invite link"><Send size={13} /></button>
                     <button onClick={() => setEditing(p)} className="btn btn-ghost !p-1.5" title="Edit"><Pencil size={13} /></button>
                     <button onClick={() => remove(p)} className="btn btn-ghost !p-1.5 text-expense" title="Delete"><Trash2 size={13} /></button>
                   </td>

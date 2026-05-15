@@ -1,0 +1,48 @@
+'use server';
+
+import { cookies, headers } from 'next/headers';
+import { redirect } from 'next/navigation';
+import {
+  getUserByEmail, createSession, recordLoginFailure, recordLoginSuccess, userCount,
+} from '@/lib/auth/sessions';
+import { verifyPassword } from '@/lib/auth/password';
+import { SESSION_COOKIE } from '@/lib/auth';
+
+export async function loginAction(formData: FormData): Promise<{ error?: string }> {
+  if (userCount() === 0) {
+    redirect('/setup');
+  }
+  const email = String(formData.get('email') || '').trim();
+  const password = String(formData.get('password') || '');
+  const next = String(formData.get('next') || '/');
+  if (!email || !password) return { error: 'Email and password required' };
+
+  const user = getUserByEmail(email);
+  // Always do a hash check to keep timing roughly constant
+  const dummy = 'scrypt$16384$00000000000000000000000000000000$00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000';
+  const ok = await verifyPassword(password, user ? user.password_hash : dummy);
+  if (!user) return { error: 'Invalid email or password' };
+  if (user.locked_until && user.locked_until > Date.now()) {
+    return { error: 'Account temporarily locked. Try again later.' };
+  }
+  if (!ok) {
+    recordLoginFailure(user.id, user.failed_login_count);
+    return { error: 'Invalid email or password' };
+  }
+  recordLoginSuccess(user.id);
+
+  const h = headers();
+  const ua = (h.get('user-agent') || '').slice(0, 512);
+  const ip = (h.get('x-forwarded-for') || '').split(',')[0].trim() || null;
+  const token = createSession(user.id, ip || undefined, ua || undefined);
+
+  cookies().set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 30,
+  });
+
+  redirect(next.startsWith('/') ? next : '/');
+}

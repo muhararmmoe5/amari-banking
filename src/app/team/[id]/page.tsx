@@ -4,6 +4,8 @@ import { ArrowLeft } from 'lucide-react';
 import { getPerson, personRollup, valuePersonHoldings } from '@/lib/db/cap';
 import { ENTITY_LABELS, ENTITY_COLORS } from '@/constants/accounts';
 import { fmtCents, fmtPct } from '@/lib/cap';
+import { requireUser } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +25,12 @@ const HOLDER_TYPES: Record<string, { label: string; color: string }> = {
 };
 
 export default function PersonDetailPage({ params }: { params: { id: string } }) {
+  const user = requireUser();
+  // Non-owners may only see their own person page
+  if (user.role !== 'OWNER' && user.personId !== params.id) {
+    if (user.personId) redirect(`/team/${user.personId}`);
+    redirect('/cap');
+  }
   const person = getPerson(params.id);
   if (!person) notFound();
 

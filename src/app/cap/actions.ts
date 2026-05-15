@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import {
-  createPerson, updatePerson, deletePerson,
+  createPerson, updatePerson, deletePerson, getPerson,
   createHolding, updateHolding, deleteHolding,
   createContribution, deleteContribution,
   createSafe, updateSafeStatus, deleteSafe,
@@ -10,6 +10,9 @@ import {
   type PersonInput, type HoldingInput, type ContributionInput, type SafeInput,
   type ValuationInput,
 } from '@/lib/db/cap';
+import { createInvite, type UserRole } from '@/lib/auth/sessions';
+import { getCurrentUser } from '@/lib/auth';
+import { headers } from 'next/headers';
 
 function revalidateAll() {
   revalidatePath('/cap');
@@ -78,4 +81,18 @@ export async function actCreateValuation(input: ValuationInput) {
 export async function actDeleteValuation(id: string) {
   deleteValuation(id);
   revalidateAll();
+}
+
+export async function actCreateInvite(personId: string, email: string, role: UserRole = 'PARTNER'): Promise<{ url: string; expiresAt: number } | { error: string }> {
+  const user = getCurrentUser();
+  if (!user || user.role !== 'OWNER') return { error: 'Only the owner can create invites' };
+  const person = getPerson(personId);
+  if (!person) return { error: 'Person not found' };
+  if (!email.trim()) return { error: 'Email is required' };
+  const invite = createInvite(personId, email, role, user.id);
+  const h = headers();
+  const host = h.get('host') || 'localhost:3000';
+  const proto = h.get('x-forwarded-proto') || (host.startsWith('localhost') ? 'http' : 'https');
+  const url = `${proto}://${host}/invite/${invite.token}`;
+  return { url, expiresAt: invite.expiresAt };
 }

@@ -156,6 +156,45 @@ export function getDb(): Database.Database {
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_val_entity ON entity_valuations(entity, as_of_date DESC);
+
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      password_hash TEXT NOT NULL,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'PARTNER',
+      person_id TEXT REFERENCES people(id) ON DELETE SET NULL,
+      failed_login_count INTEGER NOT NULL DEFAULT 0,
+      locked_until INTEGER,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+    CREATE INDEX IF NOT EXISTS idx_users_person ON users(person_id);
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      last_seen_at INTEGER NOT NULL,
+      ip TEXT,
+      user_agent TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
+    CREATE TABLE IF NOT EXISTS invite_tokens (
+      token TEXT PRIMARY KEY,
+      person_id TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'PARTNER',
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      created_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      used_at INTEGER,
+      used_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_invite_person ON invite_tokens(person_id);
   `);
 
   // Forward-compatible column adds (SQLite ALTER ignores if column exists in some versions; we catch)

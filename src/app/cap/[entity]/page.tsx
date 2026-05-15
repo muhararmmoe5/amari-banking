@@ -1,16 +1,29 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { listPeople, listHoldings, listContributions, listSafes, listValuations } from '@/lib/db/cap';
+import { listPeople, listHoldings, listContributions, listSafes, listValuations, listHoldingsForPerson } from '@/lib/db/cap';
 import { ENTITY_LABELS, ENTITY_COLORS, BUSINESS_ENTITIES } from '@/constants/accounts';
 import type { EntityType } from '@/types';
 import { ArrowLeft } from 'lucide-react';
 import CapEntityClient from './CapEntityClient';
+import { requireUser } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 export default function CapEntityPage({ params }: { params: { entity: string } }) {
   const entity = params.entity as EntityType;
   if (!BUSINESS_ENTITIES.includes(entity)) notFound();
+
+  const user = requireUser();
+  // Non-owners may only view entities where they have a holding
+  if (user.role !== 'OWNER') {
+    const my = user.personId ? listHoldingsForPerson(user.personId) : [];
+    const ok = my.some((h) => h.entity === entity);
+    if (!ok) {
+      if (user.personId) redirect(`/team/${user.personId}`);
+      redirect('/login');
+    }
+  }
 
   const people = listPeople();
   const holdings = listHoldings(entity);

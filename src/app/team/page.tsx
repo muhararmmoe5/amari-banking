@@ -1,9 +1,16 @@
+import { redirect } from 'next/navigation';
 import { listPeople, portfolioByPerson } from '@/lib/db/cap';
+import { requireUser } from '@/lib/auth';
 import TeamClient from './TeamClient';
 
 export const dynamic = 'force-dynamic';
 
 export default function TeamPage() {
+  const user = requireUser();
+  if (user.role !== 'OWNER') {
+    if (user.personId) redirect(`/team/${user.personId}`);
+    redirect('/cap');
+  }
   const people = listPeople();
   const portfolio = portfolioByPerson();
   const portfolioMap: Record<string, number> = {};
