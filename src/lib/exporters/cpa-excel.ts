@@ -212,7 +212,8 @@ export function generateCpaWorkbook(opts: CpaExportOptions = {}): Buffer {
     SELECT posting_date, account_id, description, amount,
       COALESCE(confirmed_entity, entity_tag) as entity,
       COALESCE(confirmed_category, category) as category,
-      audit_status, business_purpose, receipt_ref
+      audit_status, business_purpose, receipt_ref,
+      individual, sub_category_1, sub_category_2, source_of_money, need_to_get_from
     FROM transactions
     WHERE audit_status IN ('CONFIRMED','TAGGED','PERSONAL_NO_DEDUCT')
       ${where.length ? 'AND ' + where.join(' AND ') : ''}
@@ -221,11 +222,13 @@ export function generateCpaWorkbook(opts: CpaExportOptions = {}): Buffer {
   XLSX.utils.book_append_sheet(
     wb,
     XLSX.utils.aoa_to_sheet([
-      ['Date', 'Account', 'Description', 'Amount', 'Entity', 'Category', 'Status', 'Purpose', 'Doc Ref'],
+      ['Date', 'Account', 'Description', 'Amount', 'Entity', 'Category', 'Sub 1', 'Sub 2', 'Individual', 'Source of Money', 'Need to Get From', 'Status', 'Purpose', 'Doc Ref'],
       ...ledger.map((r) => [
         r.posting_date, r.account_id, r.description, r.amount,
         ENTITY_LABELS[r.entity as keyof typeof ENTITY_LABELS] || r.entity,
-        r.category, r.audit_status, r.business_purpose || '', r.receipt_ref || '',
+        r.category, r.sub_category_1 || '', r.sub_category_2 || '',
+        r.individual || '', r.source_of_money || '', r.need_to_get_from || '',
+        r.audit_status, r.business_purpose || '', r.receipt_ref || '',
       ]),
     ]),
     'Full Ledger'

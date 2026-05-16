@@ -161,6 +161,11 @@ function Card({
   const [confirmedEntity, setConfirmedEntity] = useState<EntityType>(tx.confirmedEntity || tx.entityTag);
   const [purpose, setPurpose] = useState(tx.businessPurpose || '');
   const [docRef, setDocRef] = useState(tx.receiptRef || '');
+  const [individual, setIndividual] = useState(tx.individual || '');
+  const [sub1, setSub1] = useState(tx.subCategory1 || '');
+  const [sub2, setSub2] = useState(tx.subCategory2 || '');
+  const [sourceOfMoney, setSourceOfMoney] = useState(tx.sourceOfMoney || '');
+  const [needFrom, setNeedFrom] = useState(tx.needToGetFrom || '');
   const acct = ACCOUNTS.find((a) => a.id === tx.accountId);
 
   return (
@@ -201,6 +206,61 @@ function Card({
               <option key={o} value={o}>{ENTITY_LABELS[o]}</option>
             ))}
           </select>
+        </label>
+        <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Individual</div>
+          <input
+            type="text"
+            value={individual}
+            onChange={(e) => setIndividual(e.target.value)}
+            onBlur={() => onPersist({ individual: individual || null })}
+            className="w-full"
+            placeholder="Person / vendor this is about"
+          />
+        </label>
+        <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Sub category 1</div>
+          <input
+            type="text"
+            value={sub1}
+            onChange={(e) => setSub1(e.target.value)}
+            onBlur={() => onPersist({ subCategory1: sub1 || null })}
+            className="w-full"
+            placeholder="e.g. Grubhub revenue, Software"
+          />
+        </label>
+        <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Sub category 2</div>
+          <input
+            type="text"
+            value={sub2}
+            onChange={(e) => setSub2(e.target.value)}
+            onBlur={() => onPersist({ subCategory2: sub2 || null })}
+            className="w-full"
+            placeholder="Optional further breakdown"
+          />
+        </label>
+        <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Source of money to pay</div>
+          <input
+            type="text"
+            value={sourceOfMoney}
+            onChange={(e) => setSourceOfMoney(e.target.value)}
+            onBlur={() => onPersist({ sourceOfMoney: sourceOfMoney || null })}
+            className="w-full"
+            placeholder="Which account covers this"
+          />
+        </label>
+        <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Need to get from</div>
+          <input
+            type="text"
+            value={needFrom}
+            onChange={(e) => setNeedFrom(e.target.value)}
+            onBlur={() => onPersist({ needToGetFrom: needFrom || null })}
+            className="w-full"
+            placeholder="Where to source funds from"
+          />
         </label>
         <label className="block">
           <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Doc reference</div>

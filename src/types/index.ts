@@ -111,6 +111,11 @@ export interface Transaction {
   notes: string | null;
   zellePerson: string | null;
   zelleType: ZelleType | null;
+  individual: string | null;
+  subCategory1: string | null;
+  subCategory2: string | null;
+  sourceOfMoney: string | null;
+  needToGetFrom: string | null;
   importedAt: number;
   updatedAt: number;
   importBatchId: string;

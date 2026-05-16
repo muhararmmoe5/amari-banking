@@ -200,6 +200,11 @@ export function getDb(): Database.Database {
   // Forward-compatible column adds (SQLite ALTER ignores if column exists in some versions; we catch)
   for (const sql of [
     `ALTER TABLE equity_holdings ADD COLUMN holder_type TEXT NOT NULL DEFAULT 'PARTNER'`,
+    `ALTER TABLE transactions ADD COLUMN individual TEXT`,
+    `ALTER TABLE transactions ADD COLUMN sub_category_1 TEXT`,
+    `ALTER TABLE transactions ADD COLUMN sub_category_2 TEXT`,
+    `ALTER TABLE transactions ADD COLUMN source_of_money TEXT`,
+    `ALTER TABLE transactions ADD COLUMN need_to_get_from TEXT`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }

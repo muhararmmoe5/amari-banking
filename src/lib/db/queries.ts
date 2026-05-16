@@ -34,6 +34,11 @@ function rowToTransaction(r: any): Transaction {
     notes: r.notes,
     zellePerson: r.zelle_person,
     zelleType: r.zelle_type,
+    individual: r.individual ?? null,
+    subCategory1: r.sub_category_1 ?? null,
+    subCategory2: r.sub_category_2 ?? null,
+    sourceOfMoney: r.source_of_money ?? null,
+    needToGetFrom: r.need_to_get_from ?? null,
     importedAt: r.imported_at,
     updatedAt: r.updated_at,
     importBatchId: r.import_batch_id,
@@ -198,6 +203,11 @@ export interface UpdateTxPatch {
   auditStatus?: AuditStatus;
   notes?: string | null;
   zelleType?: string | null;
+  individual?: string | null;
+  subCategory1?: string | null;
+  subCategory2?: string | null;
+  sourceOfMoney?: string | null;
+  needToGetFrom?: string | null;
 }
 
 export function updateTransaction(id: string, patch: UpdateTxPatch): void {
@@ -211,6 +221,11 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   if (patch.auditStatus !== undefined) { fields.push('audit_status = @audit_status'); params.audit_status = patch.auditStatus; }
   if (patch.notes !== undefined) { fields.push('notes = @notes'); params.notes = patch.notes; }
   if (patch.zelleType !== undefined) { fields.push('zelle_type = @zelle_type'); params.zelle_type = patch.zelleType; }
+  if (patch.individual !== undefined) { fields.push('individual = @individual'); params.individual = patch.individual; }
+  if (patch.subCategory1 !== undefined) { fields.push('sub_category_1 = @sub_category_1'); params.sub_category_1 = patch.subCategory1; }
+  if (patch.subCategory2 !== undefined) { fields.push('sub_category_2 = @sub_category_2'); params.sub_category_2 = patch.subCategory2; }
+  if (patch.sourceOfMoney !== undefined) { fields.push('source_of_money = @source_of_money'); params.source_of_money = patch.sourceOfMoney; }
+  if (patch.needToGetFrom !== undefined) { fields.push('need_to_get_from = @need_to_get_from'); params.need_to_get_from = patch.needToGetFrom; }
   if (fields.length === 0) return;
   fields.push('updated_at = @updated_at');
   db.prepare(`UPDATE transactions SET ${fields.join(', ')} WHERE id = @id`).run(params);
