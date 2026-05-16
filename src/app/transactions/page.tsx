@@ -16,6 +16,7 @@ interface SearchProps {
   from?: string;
   to?: string;
   preset?: string;
+  order?: string; // 'oldest' | 'newest'
 }
 
 function presetToRange(preset?: string): { from?: string; to?: string } {
@@ -60,6 +61,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
   const presetRange = presetToRange(searchParams.preset);
   const dateFrom = searchParams.from || presetRange.from;
   const dateTo = searchParams.to || presetRange.to;
+  const orderDir: 'ASC' | 'DESC' = searchParams.order === 'oldest' ? 'ASC' : 'DESC';
   const filters = {
     accountId: searchParams.account,
     entityTag: searchParams.entity as EntityType | undefined,
@@ -69,6 +71,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
     flaggedOnly: searchParams.flagged === '1',
     dateFrom,
     dateTo,
+    orderDir,
     limit: 5000,
   };
   const rows = listTransactions(filters);
@@ -82,6 +85,11 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
           <p className="text-sm text-ink-dim mt-1">
             Showing {rows.length} of {total.toLocaleString()} non-internal transactions
           </p>
+          {!searchParams.account ? (
+            <p className="text-[11px] text-warn mt-1">
+              💡 Tip: pick a single account in the filter below to read the running "Balance after" column like a bank statement.
+            </p>
+          ) : null}
         </div>
         <Link href="/import" className="btn btn-primary">⬆ Import more</Link>
       </div>
@@ -139,7 +147,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
             <option value="NEEDS_RECEIPT">Needs receipt</option>
             <option value="PERSONAL_NO_DEDUCT">Personal no-deduct</option>
           </select>
-          <div className="flex items-center gap-3 text-ink-dim">
+          <div className="flex items-center gap-3 text-ink-dim flex-wrap">
             <label className="inline-flex items-center gap-1">
               <input type="checkbox" name="internal" value="1" defaultChecked={!hideInternal} className="accent-entity-bytes" />
               Show internal
@@ -147,6 +155,13 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
             <label className="inline-flex items-center gap-1">
               <input type="checkbox" name="flagged" value="1" defaultChecked={filters.flaggedOnly} className="accent-entity-bytes" />
               Flags only
+            </label>
+            <label className="inline-flex items-center gap-1">
+              <span className="text-ink-mute">Order</span>
+              <select name="order" defaultValue={searchParams.order === 'oldest' ? 'oldest' : 'newest'}>
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
             </label>
           </div>
         </div>

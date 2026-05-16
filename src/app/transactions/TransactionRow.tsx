@@ -7,6 +7,7 @@ import { Money } from '@/components/Money';
 import { EntityDot } from '@/components/EntityBadge';
 import { FlagBadge } from '@/components/FlagBadge';
 import { fmtDateShort } from '@/lib/format';
+import { fmtMoney } from '@/lib/format';
 import { saveTransaction } from './actions';
 import { useToast } from '@/components/Toast';
 
@@ -19,7 +20,7 @@ const STATUS_OPTIONS: AuditStatus[] = [
   'UNREVIEWED', 'TAGGED', 'CONFIRMED', 'NEEDS_RECEIPT', 'PERSONAL_NO_DEDUCT', 'DISPUTED',
 ];
 
-export const ROW_GRID = '92px 80px 1fr 120px 140px 160px 160px 110px 220px';
+export const ROW_GRID = '92px 80px 1fr 120px 120px 140px 160px 160px 110px 200px';
 
 export function TransactionRow({ tx }: { tx: Transaction }) {
   const [, startTx] = useTransition();
@@ -58,6 +59,13 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
         <div className="text-[11px] text-ink-mute truncate">{tx.description}</div>
       </div>
       <div className="px-3 py-2 text-right whitespace-nowrap"><Money value={tx.amount} /></div>
+      <div className="px-3 py-2 text-right whitespace-nowrap mono tabnum text-xs">
+        {tx.balance != null ? (
+          <span className={tx.balance < 0 ? 'text-expense' : 'text-ink-dim'}>{fmtMoney(tx.balance)}</span>
+        ) : (
+          <span className="text-ink-mute">—</span>
+        )}
+      </div>
       <div className="px-3 py-2 text-xs text-ink-dim whitespace-nowrap truncate">
         {tx.isInternal
           ? <span className="pill bg-bg-3 text-ink-dim">Internal</span>

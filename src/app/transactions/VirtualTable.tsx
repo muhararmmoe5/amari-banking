@@ -25,6 +25,7 @@ export default function VirtualTable({ rows }: { rows: Transaction[] }) {
         <Cell>Acct</Cell>
         <Cell>Merchant / Description</Cell>
         <Cell className="text-right">Amount</Cell>
+        <Cell className="text-right">Balance after</Cell>
         <Cell>Category</Cell>
         <Cell>Entity</Cell>
         <Cell>Status</Cell>
