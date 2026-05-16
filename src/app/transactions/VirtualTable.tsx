@@ -21,13 +21,14 @@ export default function VirtualTable({ rows }: { rows: Transaction[] }) {
         className="bg-bg-2 text-ink-dim text-xs grid items-center font-medium uppercase tracking-wider"
         style={{ gridTemplateColumns: ROW_GRID }}
       >
+        <Cell className="text-center" title="Trace where this money came from">🔍</Cell>
         <Cell>Date</Cell>
-        <Cell>Acct</Cell>
+        <Cell title="The Chase account this transaction posted on">Paid from</Cell>
         <Cell>Merchant / Description</Cell>
         <Cell className="text-right">Amount</Cell>
         <Cell className="text-right">Balance after</Cell>
         <Cell>Category</Cell>
-        <Cell>Entity</Cell>
+        <Cell title="Which business this expense is booked to (independent of which account paid)">Books to entity</Cell>
         <Cell>Status</Cell>
         <Cell>Flag</Cell>
         <Cell>Purpose</Cell>
@@ -64,6 +65,6 @@ export default function VirtualTable({ rows }: { rows: Transaction[] }) {
   );
 }
 
-function Cell({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`px-3 py-2.5 ${className}`}>{children}</div>;
+function Cell({ children, className = '', title }: { children: React.ReactNode; className?: string; title?: string }) {
+  return <div className={`px-3 py-2.5 ${className}`} title={title}>{children}</div>;
 }

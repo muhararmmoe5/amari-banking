@@ -6,10 +6,12 @@ import { ACCOUNTS, ENTITY_LABELS } from '@/constants/accounts';
 import { Money } from '@/components/Money';
 import { EntityDot } from '@/components/EntityBadge';
 import { FlagBadge } from '@/components/FlagBadge';
+import { Search } from 'lucide-react';
 import { fmtDateShort } from '@/lib/format';
 import { fmtMoney } from '@/lib/format';
 import { saveTransaction } from './actions';
 import { useToast } from '@/components/Toast';
+import SourceTraceModal from './SourceTraceModal';
 
 const ENTITY_OPTIONS: EntityType[] = [
   'BYTES_AI', 'ROCKET_WIRELESS', 'DELICIOUS_BYTES', 'AMARI_VENTURES',
@@ -20,13 +22,14 @@ const STATUS_OPTIONS: AuditStatus[] = [
   'UNREVIEWED', 'TAGGED', 'CONFIRMED', 'NEEDS_RECEIPT', 'PERSONAL_NO_DEDUCT', 'DISPUTED',
 ];
 
-export const ROW_GRID = '92px 80px 1fr 120px 120px 140px 160px 160px 110px 200px';
+export const ROW_GRID = '36px 92px 80px 1fr 120px 120px 140px 160px 160px 110px 200px';
 
 export function TransactionRow({ tx }: { tx: Transaction }) {
   const [, startTx] = useTransition();
   const [confirmedEntity, setConfirmedEntity] = useState<string>(tx.confirmedEntity || '');
   const [status, setStatus] = useState<string>(tx.auditStatus);
   const [purpose, setPurpose] = useState<string>(tx.businessPurpose || '');
+  const [traceOpen, setTraceOpen] = useState(false);
   const acct = ACCOUNTS.find((a) => a.id === tx.accountId);
   const { saveStart, saveEnd, saveError } = useToast();
 
@@ -47,6 +50,14 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
       className="border-t border-line/60 hover:bg-bg-2/40 grid items-center text-sm"
       style={{ gridTemplateColumns: ROW_GRID }}
     >
+      <button
+        type="button"
+        onClick={() => setTraceOpen(true)}
+        title="Trace where this money came from"
+        className="inline-flex items-center justify-center w-7 h-7 rounded text-ink-mute hover:text-entity-bytes hover:bg-bg-3 mx-auto"
+      >
+        <Search size={13} />
+      </button>
       <div className="px-3 py-2 mono text-xs whitespace-nowrap text-ink-dim">{fmtDateShort(tx.postingDate)}</div>
       <div className="px-3 py-2 whitespace-nowrap">
         <span className="inline-flex items-center gap-1.5">
@@ -105,6 +116,7 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
           onBlur={() => persist({ businessPurpose: purpose || null })}
         />
       </div>
+      {traceOpen ? <SourceTraceModal txId={tx.id} onClose={() => setTraceOpen(false)} /> : null}
     </div>
   );
 }
