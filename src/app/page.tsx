@@ -6,6 +6,7 @@ import {
   entityPLs,
   auditRings,
   listTransactions,
+  dashboardAlerts,
 } from '@/lib/db/queries';
 import { ACCOUNTS, ENTITY_COLORS, ENTITY_LABELS } from '@/constants/accounts';
 import type { EntityType } from '@/types';
@@ -18,7 +19,7 @@ import EntityDonut from './EntityDonut';
 import AuditRings from './AuditRings';
 import AuditQueueActions from './AuditQueueActions';
 import { fmtMoney, fmtDate } from '@/lib/format';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, ArrowRight } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,16 @@ export default function DashboardPage({ searchParams }: { searchParams: { period
   const entities = entityPLs(from, to);
   const rings = auditRings(from, to);
   const topFlagged = listTransactions({ flaggedOnly: true, orderBy: 'audit_score', limit: 8 });
+  const alerts = dashboardAlerts(from, to);
+  type AlertCard = { key: string; label: string; count: number; tone: 'crit' | 'high' | 'med'; href: string };
+  const ALERT_CARDS: AlertCard[] = ([
+    { key: 'wires', label: 'Wires needing documentation', count: alerts.criticalWires, tone: 'crit', href: '/audit?sev=crit' },
+    { key: 'zelle', label: 'Unclassified Zelle recipients', count: alerts.unclassifiedZelle, tone: 'high', href: '/audit?sev=high&entity=UNKNOWN' },
+    { key: 'unkincome', label: 'Unknown income (no source)', count: alerts.unknownIncome, tone: 'high', href: '/audit?sev=high' },
+    { key: 'apple', label: 'Apple Cash / PayPal — needs recipient', count: alerts.applePayPayPal, tone: 'high', href: '/audit?sev=high' },
+    { key: '1099', label: 'Zelle recipients above $600 (1099)', count: alerts.near1099, tone: 'med', href: '/zelle' },
+    { key: 'personal', label: 'Personal-acct outflows >$200', count: alerts.personalOutflows, tone: 'med', href: '/audit?entity=PERSONAL' },
+  ] as AlertCard[]).filter((a) => a.count > 0);
 
   const acctMap = new Map(accountSummaries.map((a) => [a.accountId, a]));
   const reviewPct = p.totalCount > 0 ? Math.round((p.reviewedCount / p.totalCount) * 100) : 0;
@@ -77,6 +88,39 @@ export default function DashboardPage({ searchParams }: { searchParams: { period
           </div>
         ) : (
           <>
+            {/* Alerts strip — only renders if there's something to act on */}
+            {ALERT_CARDS.length > 0 ? (
+              <section>
+                <div className="flex items-center gap-2 mb-2 text-[11px] uppercase tracking-wider text-ink-mute">
+                  <AlertTriangle size={12} className="text-warn" />
+                  Needs your attention
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                  {ALERT_CARDS.map((a) => {
+                    const colors = {
+                      crit: { bg: 'rgba(239,68,68,0.10)', border: '#EF4444', text: '#F87171' },
+                      high: { bg: 'rgba(240,160,96,0.10)', border: '#F0A060', text: '#FBBF24' },
+                      med:  { bg: 'rgba(245,200,90,0.10)', border: '#FCD34D', text: '#EAB308' },
+                    }[a.tone];
+                    return (
+                      <Link
+                        key={a.key}
+                        href={a.href}
+                        className="rounded-lg p-3 border transition hover:opacity-90"
+                        style={{ background: colors.bg, borderColor: `${colors.border}40` }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="mono tabnum text-2xl font-semibold" style={{ color: colors.text }}>{a.count}</div>
+                          <ArrowRight size={14} className="text-ink-mute" />
+                        </div>
+                        <div className="text-[11px] text-ink-dim mt-1 leading-snug">{a.label}</div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
+
             {/* KPI cards */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <Kpi label="Total income" value={fmtMoney(p.totalIncome)} tone="income" />

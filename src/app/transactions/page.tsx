@@ -13,10 +13,53 @@ interface SearchProps {
   search?: string;
   internal?: string;
   flagged?: string;
+  from?: string;
+  to?: string;
+  preset?: string;
+}
+
+function presetToRange(preset?: string): { from?: string; to?: string } {
+  if (!preset) return {};
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  switch (preset) {
+    case '7d': {
+      const d = new Date(); d.setDate(d.getDate() - 6);
+      return { from: fmt(d), to: fmt(now) };
+    }
+    case '30d': {
+      const d = new Date(); d.setDate(d.getDate() - 29);
+      return { from: fmt(d), to: fmt(now) };
+    }
+    case 'mtd': {
+      return { from: fmt(new Date(y, m, 1)), to: fmt(now) };
+    }
+    case 'last_month': {
+      const start = new Date(y, m - 1, 1);
+      const end = new Date(y, m, 0);
+      return { from: fmt(start), to: fmt(end) };
+    }
+    case 'qtd': {
+      const q = Math.floor(m / 3);
+      return { from: fmt(new Date(y, q * 3, 1)), to: fmt(now) };
+    }
+    case 'ytd': {
+      return { from: fmt(new Date(y, 0, 1)), to: fmt(now) };
+    }
+    case 'last_year': {
+      return { from: `${y - 1}-01-01`, to: `${y - 1}-12-31` };
+    }
+    default: return {};
+  }
 }
 
 export default function TransactionsPage({ searchParams }: { searchParams: SearchProps }) {
   const hideInternal = searchParams.internal !== '1';
+  const presetRange = presetToRange(searchParams.preset);
+  const dateFrom = searchParams.from || presetRange.from;
+  const dateTo = searchParams.to || presetRange.to;
   const filters = {
     accountId: searchParams.account,
     entityTag: searchParams.entity as EntityType | undefined,
@@ -24,6 +67,8 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
     search: searchParams.search,
     hideInternal,
     flaggedOnly: searchParams.flagged === '1',
+    dateFrom,
+    dateTo,
     limit: 5000,
   };
   const rows = listTransactions(filters);
@@ -41,45 +86,83 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
         <Link href="/import" className="btn btn-primary">⬆ Import more</Link>
       </div>
 
-      <form className="card p-4 grid grid-cols-1 md:grid-cols-6 gap-3 text-xs" method="GET">
-        <input name="search" placeholder="Search description, merchant, Zelle name…" defaultValue={searchParams.search} className="md:col-span-2" />
-        <select name="account" defaultValue={searchParams.account || ''}>
-          <option value="">All accounts</option>
-          {ACCOUNTS.map((a) => (
-            <option key={a.id} value={a.id}>···{a.last4} — {a.label}</option>
+      <form className="card p-4 space-y-3 text-xs" method="GET">
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { v: '', l: 'All time' },
+            { v: '7d', l: 'Last 7d' },
+            { v: '30d', l: 'Last 30d' },
+            { v: 'mtd', l: 'Month-to-date' },
+            { v: 'last_month', l: 'Last month' },
+            { v: 'qtd', l: 'Quarter-to-date' },
+            { v: 'ytd', l: 'Year-to-date' },
+            { v: 'last_year', l: 'Last year' },
+          ].map((p) => (
+            <button
+              key={p.v || 'all'}
+              type="submit"
+              name="preset"
+              value={p.v}
+              className={`pill border ${
+                (searchParams.preset || '') === p.v
+                  ? 'bg-entity-bytes text-bg-0 border-entity-bytes'
+                  : 'bg-bg-2 text-ink-dim border-line hover:text-ink'
+              }`}
+            >
+              {p.l}
+            </button>
           ))}
-        </select>
-        <select name="entity" defaultValue={searchParams.entity || ''}>
-          <option value="">All entities</option>
-          <option value="BYTES_AI">Bytes AI</option>
-          <option value="ROCKET_WIRELESS">Rocket Wireless</option>
-          <option value="DELICIOUS_BYTES">Delicious Bytes</option>
-          <option value="AMARI_VENTURES">Amari Ventures</option>
-          <option value="BYTES_REST_TECH">Bytes Rest Tech</option>
-          <option value="PERSONAL">Personal</option>
-          <option value="UNKNOWN">Unknown</option>
-        </select>
-        <select name="status" defaultValue={searchParams.status || ''}>
-          <option value="">All statuses</option>
-          <option value="UNREVIEWED">Unreviewed</option>
-          <option value="TAGGED">Tagged</option>
-          <option value="CONFIRMED">Confirmed</option>
-          <option value="NEEDS_RECEIPT">Needs receipt</option>
-          <option value="PERSONAL_NO_DEDUCT">Personal no-deduct</option>
-        </select>
-        <div className="flex items-center gap-3 text-ink-dim">
-          <label className="inline-flex items-center gap-1">
-            <input type="checkbox" name="internal" value="1" defaultChecked={!hideInternal} className="accent-entity-bytes" />
-            Show internal
-          </label>
-          <label className="inline-flex items-center gap-1">
-            <input type="checkbox" name="flagged" value="1" defaultChecked={filters.flaggedOnly} className="accent-entity-bytes" />
-            Flags only
-          </label>
         </div>
-        <div className="md:col-span-6 flex justify-end gap-2">
-          <Link href="/transactions" className="btn">Clear</Link>
-          <button type="submit" className="btn btn-primary">Apply filters</button>
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+          <input name="search" placeholder="Search description, merchant, Zelle name…" defaultValue={searchParams.search} className="md:col-span-2" />
+          <select name="account" defaultValue={searchParams.account || ''}>
+            <option value="">All accounts</option>
+            {ACCOUNTS.map((a) => (
+              <option key={a.id} value={a.id}>···{a.last4} — {a.label}</option>
+            ))}
+          </select>
+          <select name="entity" defaultValue={searchParams.entity || ''}>
+            <option value="">All entities</option>
+            <option value="BYTES_AI">Bytes AI</option>
+            <option value="ROCKET_WIRELESS">Rocket Wireless</option>
+            <option value="DELICIOUS_BYTES">Delicious Bytes</option>
+            <option value="AMARI_VENTURES">Amari Ventures</option>
+            <option value="BYTES_REST_TECH">Bytes Rest Tech</option>
+            <option value="PERSONAL">Personal</option>
+            <option value="UNKNOWN">Unknown</option>
+          </select>
+          <select name="status" defaultValue={searchParams.status || ''}>
+            <option value="">All statuses</option>
+            <option value="UNREVIEWED">Unreviewed</option>
+            <option value="TAGGED">Tagged</option>
+            <option value="CONFIRMED">Confirmed</option>
+            <option value="NEEDS_RECEIPT">Needs receipt</option>
+            <option value="PERSONAL_NO_DEDUCT">Personal no-deduct</option>
+          </select>
+          <div className="flex items-center gap-3 text-ink-dim">
+            <label className="inline-flex items-center gap-1">
+              <input type="checkbox" name="internal" value="1" defaultChecked={!hideInternal} className="accent-entity-bytes" />
+              Show internal
+            </label>
+            <label className="inline-flex items-center gap-1">
+              <input type="checkbox" name="flagged" value="1" defaultChecked={filters.flaggedOnly} className="accent-entity-bytes" />
+              Flags only
+            </label>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+          <label className="block">
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">From</div>
+            <input name="from" type="date" defaultValue={searchParams.from || ''} className="w-full" />
+          </label>
+          <label className="block">
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">To</div>
+            <input name="to" type="date" defaultValue={searchParams.to || ''} className="w-full" />
+          </label>
+          <div className="md:col-span-2 flex justify-end gap-2">
+            <Link href="/transactions" className="btn">Clear</Link>
+            <button type="submit" className="btn btn-primary">Apply filters</button>
+          </div>
         </div>
       </form>
 

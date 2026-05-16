@@ -537,6 +537,61 @@ export function incomeByMonthAndSource(): { points: IncomeTimePoint[]; sources: 
   return { points, sources };
 }
 
+export interface DashboardAlerts {
+  criticalWires: number;
+  unclassifiedZelle: number;
+  applePayPayPal: number;
+  near1099: number;
+  personalOutflows: number;
+  unknownIncome: number;
+}
+
+export function dashboardAlerts(dateFrom?: string, dateTo?: string): DashboardAlerts {
+  const db = getDb();
+  const where: string[] = ["audit_status = 'UNREVIEWED'"];
+  const p: Record<string, unknown> = {};
+  if (dateFrom) { where.push('posting_date >= @dateFrom'); p.dateFrom = dateFrom; }
+  if (dateTo) { where.push('posting_date <= @dateTo'); p.dateTo = dateTo; }
+  const baseWhere = where.join(' AND ');
+
+  const criticalWires = (db.prepare(
+    `SELECT COUNT(*) c FROM transactions WHERE ${baseWhere}
+     AND category IN ('EXPENSE_WIRE_INTL','EXPENSE_WIRE_DOMESTIC')`
+  ).get(p) as { c: number }).c;
+
+  const unclassifiedZelle = (db.prepare(
+    `SELECT COUNT(*) c FROM transactions WHERE ${baseWhere}
+     AND zelle_person IS NOT NULL AND entity_tag = 'UNKNOWN'`
+  ).get(p) as { c: number }).c;
+
+  const applePayPayPal = (db.prepare(
+    `SELECT COUNT(*) c FROM transactions WHERE ${baseWhere}
+     AND category IN ('EXPENSE_APPLE_CASH','EXPENSE_PAYPAL')`
+  ).get(p) as { c: number }).c;
+
+  const near1099 = (db.prepare(
+    `SELECT COUNT(*) c FROM (
+       SELECT zelle_person, SUM(ABS(amount)) total FROM transactions
+       WHERE zelle_person IS NOT NULL AND amount < 0 AND is_internal = 0
+       ${dateFrom ? 'AND posting_date >= @dateFrom' : ''}
+       ${dateTo ? 'AND posting_date <= @dateTo' : ''}
+       GROUP BY zelle_person HAVING total >= 600
+     )`
+  ).get(p) as { c: number }).c;
+
+  const personalOutflows = (db.prepare(
+    `SELECT COUNT(*) c FROM transactions WHERE ${baseWhere}
+     AND account_id = '7056' AND amount < 0 AND ABS(amount) > 200 AND is_internal = 0`
+  ).get(p) as { c: number }).c;
+
+  const unknownIncome = (db.prepare(
+    `SELECT COUNT(*) c FROM transactions WHERE ${baseWhere}
+     AND amount > 0 AND is_internal = 0 AND (income_source = 'WIRE_UNKNOWN' OR income_source = 'OTHER' OR income_source IS NULL)`
+  ).get(p) as { c: number }).c;
+
+  return { criticalWires, unclassifiedZelle, applePayPayPal, near1099, personalOutflows, unknownIncome };
+}
+
 export function flagCountsByEntity(): Record<string, number> {
   const db = getDb();
   const rows = db.prepare(`
