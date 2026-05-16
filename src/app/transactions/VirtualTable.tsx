@@ -27,11 +27,12 @@ export default function VirtualTable({ rows }: { rows: Transaction[] }) {
         <Cell>Merchant / Description</Cell>
         <Cell className="text-right">Amount</Cell>
         <Cell className="text-right">Balance after</Cell>
-        <Cell>Category</Cell>
-        <Cell title="Which business this expense is booked to (independent of which account paid)">Books to entity</Cell>
+        <Cell title="Which business this expense is booked to (independent of which account paid)">Books to</Cell>
+        <Cell>Sub category</Cell>
         <Cell>Status</Cell>
+        <Cell className="text-center" title="CPA reviewed">CPA ✓</Cell>
+        <Cell title="Tagged date — any date you want to associate (booking period, review date, etc.)">Tagged date</Cell>
         <Cell>Flag</Cell>
-        <Cell>Purpose</Cell>
       </div>
 
       {rows.length === 0 ? (

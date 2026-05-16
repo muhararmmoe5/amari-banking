@@ -39,6 +39,8 @@ function rowToTransaction(r: any): Transaction {
     subCategory2: r.sub_category_2 ?? null,
     sourceOfMoney: r.source_of_money ?? null,
     needToGetFrom: r.need_to_get_from ?? null,
+    cpaReviewed: !!r.cpa_reviewed,
+    taggedDate: r.tagged_date ?? null,
     importedAt: r.imported_at,
     updatedAt: r.updated_at,
     importBatchId: r.import_batch_id,
@@ -208,6 +210,8 @@ export interface UpdateTxPatch {
   subCategory2?: string | null;
   sourceOfMoney?: string | null;
   needToGetFrom?: string | null;
+  cpaReviewed?: boolean;
+  taggedDate?: string | null;
 }
 
 export function updateTransaction(id: string, patch: UpdateTxPatch): void {
@@ -226,6 +230,8 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   if (patch.subCategory2 !== undefined) { fields.push('sub_category_2 = @sub_category_2'); params.sub_category_2 = patch.subCategory2; }
   if (patch.sourceOfMoney !== undefined) { fields.push('source_of_money = @source_of_money'); params.source_of_money = patch.sourceOfMoney; }
   if (patch.needToGetFrom !== undefined) { fields.push('need_to_get_from = @need_to_get_from'); params.need_to_get_from = patch.needToGetFrom; }
+  if (patch.cpaReviewed !== undefined) { fields.push('cpa_reviewed = @cpa_reviewed'); params.cpa_reviewed = patch.cpaReviewed ? 1 : 0; }
+  if (patch.taggedDate !== undefined) { fields.push('tagged_date = @tagged_date'); params.tagged_date = patch.taggedDate; }
   if (fields.length === 0) return;
   fields.push('updated_at = @updated_at');
   db.prepare(`UPDATE transactions SET ${fields.join(', ')} WHERE id = @id`).run(params);

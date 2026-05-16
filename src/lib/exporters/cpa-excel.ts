@@ -213,7 +213,8 @@ export function generateCpaWorkbook(opts: CpaExportOptions = {}): Buffer {
       COALESCE(t.confirmed_entity, t.entity_tag) as entity,
       COALESCE(t.confirmed_category, t.category) as category,
       t.audit_status, t.business_purpose, t.receipt_ref,
-      t.individual, t.sub_category_1, t.sub_category_2, t.source_of_money, t.need_to_get_from
+      t.individual, t.sub_category_1, t.sub_category_2, t.source_of_money, t.need_to_get_from,
+      t.cpa_reviewed, t.tagged_date
     FROM transactions t
     WHERE t.audit_status IN ('CONFIRMED','TAGGED','PERSONAL_NO_DEDUCT')
       ${where.length ? 'AND ' + where.join(' AND ').replace(/posting_date/g, 't.posting_date') : ''}
@@ -236,7 +237,7 @@ export function generateCpaWorkbook(opts: CpaExportOptions = {}): Buffer {
   const ledgerHeader = [
     'Date', 'Account', 'Description', 'Amount', 'Entity', 'Category',
     'Sub 1', 'Sub 2', 'Individual', 'Source of Money', 'Need to Get From',
-    'Status', 'Purpose', 'Doc Ref', 'Split',
+    'Status', 'CPA Reviewed', 'Tagged Date', 'Purpose', 'Doc Ref', 'Split',
   ];
   const ledgerAoa: any[][] = [ledgerHeader];
   for (const r of ledger) {
@@ -256,6 +257,8 @@ export function generateCpaWorkbook(opts: CpaExportOptions = {}): Buffer {
           r.source_of_money || '',
           r.need_to_get_from || '',
           r.audit_status,
+          r.cpa_reviewed ? 'YES' : 'NO',
+          r.tagged_date || '',
           s.business_purpose || r.business_purpose || '',
           r.receipt_ref || '',
           `${idx + 1}/${splits.length}`,
@@ -267,7 +270,10 @@ export function generateCpaWorkbook(opts: CpaExportOptions = {}): Buffer {
         ENTITY_LABELS[r.entity as keyof typeof ENTITY_LABELS] || r.entity,
         r.category, r.sub_category_1 || '', r.sub_category_2 || '',
         r.individual || '', r.source_of_money || '', r.need_to_get_from || '',
-        r.audit_status, r.business_purpose || '', r.receipt_ref || '',
+        r.audit_status,
+        r.cpa_reviewed ? 'YES' : 'NO',
+        r.tagged_date || '',
+        r.business_purpose || '', r.receipt_ref || '',
         '',
       ]);
     }

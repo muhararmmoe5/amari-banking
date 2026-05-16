@@ -116,6 +116,8 @@ export interface Transaction {
   subCategory2: string | null;
   sourceOfMoney: string | null;
   needToGetFrom: string | null;
+  cpaReviewed: boolean;
+  taggedDate: string | null;
   importedAt: number;
   updatedAt: number;
   importBatchId: string;

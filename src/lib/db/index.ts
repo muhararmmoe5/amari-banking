@@ -222,6 +222,8 @@ export function getDb(): Database.Database {
     `ALTER TABLE transactions ADD COLUMN sub_category_2 TEXT`,
     `ALTER TABLE transactions ADD COLUMN source_of_money TEXT`,
     `ALTER TABLE transactions ADD COLUMN need_to_get_from TEXT`,
+    `ALTER TABLE transactions ADD COLUMN cpa_reviewed INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE transactions ADD COLUMN tagged_date TEXT`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }
