@@ -537,6 +537,112 @@ export function incomeByMonthAndSource(): { points: IncomeTimePoint[]; sources: 
   return { points, sources };
 }
 
+// ===== Balances & money-flow trace =====
+
+export interface CurrentBalance {
+  accountId: string;
+  balance: number;
+  asOfDate: string;
+}
+
+export function getCurrentBalances(): Map<string, CurrentBalance> {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT account_id, balance, posting_date FROM (
+      SELECT account_id, balance, posting_date,
+        ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY posting_date DESC, id DESC) as rn
+      FROM transactions
+      WHERE balance IS NOT NULL
+    ) WHERE rn = 1
+  `).all() as { account_id: string; balance: number; posting_date: string }[];
+  const m = new Map<string, CurrentBalance>();
+  for (const r of rows) m.set(r.account_id, { accountId: r.account_id, balance: r.balance, asOfDate: r.posting_date });
+  return m;
+}
+
+export interface InflowEvent {
+  id: string;
+  accountId: string;
+  postingDate: string;
+  description: string;
+  merchantName: string | null;
+  amount: number;
+  incomeSource: string | null;
+  entity: string;
+}
+
+export function listLargeInflows(opts: {
+  minAmount?: number;
+  limit?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  accountId?: string;
+  incomeSource?: string;
+} = {}): InflowEvent[] {
+  const db = getDb();
+  const minAmount = opts.minAmount ?? 500;
+  const where: string[] = ['amount > 0', 'is_internal = 0', 'amount >= @minAmount'];
+  const p: Record<string, unknown> = { minAmount };
+  if (opts.dateFrom) { where.push('posting_date >= @dateFrom'); p.dateFrom = opts.dateFrom; }
+  if (opts.dateTo) { where.push('posting_date <= @dateTo'); p.dateTo = opts.dateTo; }
+  if (opts.accountId) { where.push('account_id = @accountId'); p.accountId = opts.accountId; }
+  if (opts.incomeSource) { where.push('income_source = @incomeSource'); p.incomeSource = opts.incomeSource; }
+  const rows = db.prepare(`
+    SELECT id, account_id, posting_date, description, merchant_name, amount, income_source,
+      COALESCE(confirmed_entity, entity_tag) as entity
+    FROM transactions
+    WHERE ${where.join(' AND ')}
+    ORDER BY amount DESC, posting_date DESC
+    LIMIT @limit
+  `).all({ ...p, limit: Math.min(200, opts.limit ?? 25) }) as any[];
+  return rows.map((r) => ({
+    id: r.id,
+    accountId: r.account_id,
+    postingDate: r.posting_date,
+    description: r.description,
+    merchantName: r.merchant_name,
+    amount: r.amount,
+    incomeSource: r.income_source,
+    entity: r.entity,
+  }));
+}
+
+export interface DayActivityRow {
+  id: string;
+  postingDate: string;
+  description: string;
+  merchantName: string | null;
+  amount: number;
+  balanceAfter: number | null;
+  isInternal: boolean;
+  counterpartyAccountId: string | null;
+  category: string;
+}
+
+export function getAccountDayActivity(accountId: string, date: string): DayActivityRow[] {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT t.id, t.posting_date, t.description, t.merchant_name, t.amount, t.balance,
+      t.is_internal, t.internal_linked_id, t.category,
+      linked.account_id as counterparty_account_id
+    FROM transactions t
+    LEFT JOIN transactions linked ON linked.id = t.internal_linked_id
+    WHERE t.account_id = ? AND t.posting_date = ?
+    ORDER BY t.id ASC
+  `).all(accountId, date) as any[];
+  return rows.map((r) => ({
+    id: r.id,
+    postingDate: r.posting_date,
+    description: r.description,
+    merchantName: r.merchant_name,
+    amount: r.amount,
+    balanceAfter: r.balance,
+    isInternal: !!r.is_internal,
+    counterpartyAccountId: r.counterparty_account_id,
+    category: r.category,
+  }));
+}
+
 export interface DashboardAlerts {
   criticalWires: number;
   unclassifiedZelle: number;

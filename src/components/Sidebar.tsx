@@ -19,6 +19,7 @@ import {
   PieChart as PieChartIcon,
   LogOut,
   User as UserIcon,
+  Waves,
 } from 'lucide-react';
 
 type NavItem = { href: string; label: string; icon: any; flagBadge?: boolean; ownerOnly?: boolean } | { divider: true; ownerOnly?: boolean };
@@ -30,6 +31,7 @@ const NAV: NavItem[] = [
   { href: '/audit', label: 'Audit Review', icon: ShieldAlert, flagBadge: true, ownerOnly: true },
   { divider: true, ownerOnly: true } as const,
   { href: '/accounts', label: 'Accounts', icon: Building2, ownerOnly: true },
+  { href: '/flow', label: 'Cash Flow', icon: Waves, ownerOnly: true },
   { href: '/income', label: 'Income Tracker', icon: TrendingUp, ownerOnly: true },
   { href: '/zelle', label: 'Zelle / 1099', icon: Banknote, ownerOnly: true },
   { href: '/pl', label: 'Entity P&L', icon: PieChart, ownerOnly: true },
