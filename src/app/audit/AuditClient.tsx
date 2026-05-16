@@ -9,6 +9,7 @@ import { EntityBadge } from '@/components/EntityBadge';
 import { fmtDate } from '@/lib/format';
 import { saveTransaction } from '../transactions/actions';
 import { useToast } from '@/components/Toast';
+import SplitEditor from './SplitEditor';
 
 const ENTITY_OPTIONS: EntityType[] = [
   'BYTES_AI', 'ROCKET_WIRELESS', 'DELICIOUS_BYTES', 'AMARI_VENTURES',
@@ -285,6 +286,8 @@ function Card({
           />
         </label>
       </div>
+
+      <SplitEditor transactionId={tx.id} transactionAmount={tx.amount} />
 
       <div className="flex flex-wrap gap-2 pt-2 border-t border-line">
         <button className="btn btn-primary" onClick={(e) => { e.stopPropagation(); onStatus('CONFIRMED'); }}>

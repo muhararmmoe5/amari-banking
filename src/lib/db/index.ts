@@ -195,6 +195,23 @@ export function getDb(): Database.Database {
       used_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL
     );
     CREATE INDEX IF NOT EXISTS idx_invite_person ON invite_tokens(person_id);
+
+    CREATE TABLE IF NOT EXISTS transaction_splits (
+      id TEXT PRIMARY KEY,
+      transaction_id TEXT NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+      amount_cents INTEGER NOT NULL,
+      entity TEXT NOT NULL DEFAULT 'UNKNOWN',
+      category TEXT,
+      individual TEXT,
+      sub_category_1 TEXT,
+      sub_category_2 TEXT,
+      business_purpose TEXT,
+      notes TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_splits_tx ON transaction_splits(transaction_id);
   `);
 
   // Forward-compatible column adds (SQLite ALTER ignores if column exists in some versions; we catch)

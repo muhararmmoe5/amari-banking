@@ -207,32 +207,72 @@ export function generateCpaWorkbook(opts: CpaExportOptions = {}): Buffer {
     'Spacetel Flow'
   );
 
-  // 9) Full Ledger (confirmed)
+  // 9) Full Ledger (confirmed) — emits one row per split if the tx has splits, else one row per tx
   const ledger = db.prepare(`
-    SELECT posting_date, account_id, description, amount,
-      COALESCE(confirmed_entity, entity_tag) as entity,
-      COALESCE(confirmed_category, category) as category,
-      audit_status, business_purpose, receipt_ref,
-      individual, sub_category_1, sub_category_2, source_of_money, need_to_get_from
-    FROM transactions
-    WHERE audit_status IN ('CONFIRMED','TAGGED','PERSONAL_NO_DEDUCT')
-      ${where.length ? 'AND ' + where.join(' AND ') : ''}
-    ORDER BY posting_date DESC
+    SELECT t.id, t.posting_date, t.account_id, t.description, t.amount,
+      COALESCE(t.confirmed_entity, t.entity_tag) as entity,
+      COALESCE(t.confirmed_category, t.category) as category,
+      t.audit_status, t.business_purpose, t.receipt_ref,
+      t.individual, t.sub_category_1, t.sub_category_2, t.source_of_money, t.need_to_get_from
+    FROM transactions t
+    WHERE t.audit_status IN ('CONFIRMED','TAGGED','PERSONAL_NO_DEDUCT')
+      ${where.length ? 'AND ' + where.join(' AND ').replace(/posting_date/g, 't.posting_date') : ''}
+    ORDER BY t.posting_date DESC
   `).all(params) as any[];
-  XLSX.utils.book_append_sheet(
-    wb,
-    XLSX.utils.aoa_to_sheet([
-      ['Date', 'Account', 'Description', 'Amount', 'Entity', 'Category', 'Sub 1', 'Sub 2', 'Individual', 'Source of Money', 'Need to Get From', 'Status', 'Purpose', 'Doc Ref'],
-      ...ledger.map((r) => [
+
+  const splitRows = db.prepare(`
+    SELECT transaction_id, amount_cents, entity, category, individual,
+      sub_category_1, sub_category_2, business_purpose, notes, sort_order
+    FROM transaction_splits
+    ORDER BY sort_order ASC, created_at ASC
+  `).all() as any[];
+  const splitsByTx = new Map<string, any[]>();
+  for (const s of splitRows) {
+    const list = splitsByTx.get(s.transaction_id) || [];
+    list.push(s);
+    splitsByTx.set(s.transaction_id, list);
+  }
+
+  const ledgerHeader = [
+    'Date', 'Account', 'Description', 'Amount', 'Entity', 'Category',
+    'Sub 1', 'Sub 2', 'Individual', 'Source of Money', 'Need to Get From',
+    'Status', 'Purpose', 'Doc Ref', 'Split',
+  ];
+  const ledgerAoa: any[][] = [ledgerHeader];
+  for (const r of ledger) {
+    const splits = splitsByTx.get(r.id);
+    if (splits && splits.length > 0) {
+      splits.forEach((s, idx) => {
+        ledgerAoa.push([
+          r.posting_date,
+          r.account_id,
+          r.description,
+          s.amount_cents / 100,
+          ENTITY_LABELS[s.entity as keyof typeof ENTITY_LABELS] || s.entity,
+          s.category || r.category,
+          s.sub_category_1 || r.sub_category_1 || '',
+          s.sub_category_2 || r.sub_category_2 || '',
+          s.individual || r.individual || '',
+          r.source_of_money || '',
+          r.need_to_get_from || '',
+          r.audit_status,
+          s.business_purpose || r.business_purpose || '',
+          r.receipt_ref || '',
+          `${idx + 1}/${splits.length}`,
+        ]);
+      });
+    } else {
+      ledgerAoa.push([
         r.posting_date, r.account_id, r.description, r.amount,
         ENTITY_LABELS[r.entity as keyof typeof ENTITY_LABELS] || r.entity,
         r.category, r.sub_category_1 || '', r.sub_category_2 || '',
         r.individual || '', r.source_of_money || '', r.need_to_get_from || '',
         r.audit_status, r.business_purpose || '', r.receipt_ref || '',
-      ]),
-    ]),
-    'Full Ledger'
-  );
+        '',
+      ]);
+    }
+  }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ledgerAoa), 'Full Ledger');
 
   // 10) Needs Review
   const needsReview = db.prepare(`
