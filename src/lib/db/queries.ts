@@ -537,6 +537,19 @@ export function incomeByMonthAndSource(): { points: IncomeTimePoint[]; sources: 
   return { points, sources };
 }
 
+export function flagCountsByEntity(): Record<string, number> {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT COALESCE(confirmed_entity, entity_tag) as entity, COUNT(*) as count
+    FROM transactions
+    WHERE audit_status = 'UNREVIEWED' AND audit_score > 0
+    GROUP BY entity
+  `).all() as { entity: string; count: number }[];
+  const out: Record<string, number> = {};
+  for (const r of rows) out[r.entity] = r.count;
+  return out;
+}
+
 export interface ImportBatchRow {
   id: string;
   fileName: string;
