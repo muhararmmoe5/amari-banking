@@ -9,8 +9,10 @@ import { saveTransaction } from './actions';
 import { useToast } from '@/components/Toast';
 import SplitEditor from '../audit/SplitEditor';
 import SourceTraceModal from './SourceTraceModal';
+import SourceTraceContent from './SourceTraceContent';
 import SameDayPanel from './SameDayPanel';
 import Portal from '@/components/Portal';
+import { ArrowDownToLine } from 'lucide-react';
 
 const ENTITY_OPTIONS: EntityType[] = [
   'BYTES_AI', 'ROCKET_WIRELESS', 'DELICIOUS_BYTES', 'AMARI_VENTURES',
@@ -136,6 +138,17 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                 <span>Posted as {tx.category.replace(/^(EXPENSE_|INCOME_)/, '').replace(/_/g, ' ').toLowerCase()}</span>
               </div>
             </div>
+
+            {/* Source of money — loaded inline at the very top so it's always visible */}
+            {tx.amount < 0 ? (
+              <section>
+                <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-2 inline-flex items-center gap-1.5">
+                  <ArrowDownToLine size={12} className="text-income" />
+                  Source of money for this expense
+                </div>
+                <SourceTraceContent txId={tx.id} compact />
+              </section>
+            ) : null}
 
             {/* Status + CPA reviewed + Tagged date */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
