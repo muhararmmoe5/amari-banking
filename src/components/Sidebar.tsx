@@ -12,9 +12,9 @@ import {
   TrendingUp,
   Banknote,
   Target,
+  Settings,
   PieChart,
   FileSpreadsheet,
-  Settings,
   Repeat2,
   Users,
   PieChart as PieChartIcon,
@@ -42,6 +42,7 @@ const NAV: NavItem[] = [
   { divider: true } as const,
   { href: '/team', label: 'Team & Investors', icon: Users, ownerOnly: true },
   { href: '/cap', label: 'Cap Table', icon: PieChartIcon },
+  { href: '/admin/options', label: 'Admin · Dropdown options', icon: Settings, ownerOnly: true },
 ];
 
 export default function Sidebar({

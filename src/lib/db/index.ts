@@ -244,6 +244,16 @@ export function getDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_budgets_status ON budgets(status);
     CREATE INDEX IF NOT EXISTS idx_budgets_entity ON budgets(entity);
+
+    CREATE TABLE IF NOT EXISTS field_options (
+      id TEXT PRIMARY KEY,
+      field TEXT NOT NULL,
+      value TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      UNIQUE (field, value) ON CONFLICT IGNORE
+    );
+    CREATE INDEX IF NOT EXISTS idx_field_options_field ON field_options(field, sort_order);
   `);
 
   // Forward-compatible column adds (SQLite ALTER ignores if column exists in some versions; we catch)

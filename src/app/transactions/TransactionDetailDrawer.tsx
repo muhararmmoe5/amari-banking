@@ -12,6 +12,7 @@ import SourceTraceContent from './SourceTraceContent';
 import SameDayPanel from './SameDayPanel';
 import Portal from '@/components/Portal';
 import { ArrowDownToLine } from 'lucide-react';
+import OptionSelect from '@/components/OptionSelect';
 
 const ENTITY_OPTIONS: EntityType[] = [
   'BYTES_AI', 'ROCKET_WIRELESS', 'DELICIOUS_BYTES', 'AMARI_VENTURES',
@@ -42,6 +43,9 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
   const [sourceAccountId, setSourceAccountId] = useState(tx.sourceAccountId || '');
   const [budgetId, setBudgetId] = useState(tx.budgetId || '');
   const [budgets, setBudgets] = useState<{ id: string; name: string; kind: string; entity: string | null }[] | null>(null);
+  const [optionLists, setOptionLists] = useState<Record<string, string[]>>({
+    individual: [], sub_category_1: [], sub_category_2: [], business_purpose: [], source_of_money: [], need_to_get_from: [],
+  });
   const [people, setPeople] = useState<{ id: string; name: string; role: string }[] | null>(null);
   const [, startTx] = useTransition();
   const { saveStart, saveEnd, saveError } = useToast();
@@ -73,8 +77,24 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
       .then((r) => r.json())
       .then((d) => { if (!cancelled) setBudgets(d.budgets || []); })
       .catch(() => { if (!cancelled) setBudgets([]); });
+    fetch('/api/options', { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        const grouped = d.options || {};
+        const next: Record<string, string[]> = {};
+        for (const k of ['individual', 'sub_category_1', 'sub_category_2', 'business_purpose', 'source_of_money', 'need_to_get_from']) {
+          next[k] = (grouped[k] || []).map((o: any) => o.value);
+        }
+        setOptionLists(next);
+      })
+      .catch(() => { /* leave empty */ });
     return () => { cancelled = true; };
   }, []);
+
+  function addToList(field: string, value: string) {
+    setOptionLists((prev) => prev[field]?.includes(value) ? prev : { ...prev, [field]: [...(prev[field] || []), value] });
+  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -219,33 +239,31 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                 ) : null}
               </Field>
               <Field label="Individual" hint="who is this about">
-                <input
-                  type="text"
+                <OptionSelect
+                  field="individual"
                   value={individual}
-                  onChange={(e) => setIndividual(e.target.value)}
-                  onBlur={() => persist({ individual: individual || null })}
-                  className="w-full"
-                  placeholder="Person / vendor"
+                  options={optionLists.individual || []}
+                  onChange={(v) => { setIndividual(v); persist({ individual: v || null }); }}
+                  onOptionAdded={(v) => addToList('individual', v)}
+                  placeholder="— pick a person / vendor —"
                 />
               </Field>
               <Field label="Sub category 1">
-                <input
-                  type="text"
+                <OptionSelect
+                  field="sub_category_1"
                   value={sub1}
-                  onChange={(e) => setSub1(e.target.value)}
-                  onBlur={() => persist({ subCategory1: sub1 || null })}
-                  className="w-full"
-                  placeholder="e.g. Grubhub revenue, Software"
+                  options={optionLists.sub_category_1 || []}
+                  onChange={(v) => { setSub1(v); persist({ subCategory1: v || null }); }}
+                  onOptionAdded={(v) => addToList('sub_category_1', v)}
                 />
               </Field>
               <Field label="Sub category 2">
-                <input
-                  type="text"
+                <OptionSelect
+                  field="sub_category_2"
                   value={sub2}
-                  onChange={(e) => setSub2(e.target.value)}
-                  onBlur={() => persist({ subCategory2: sub2 || null })}
-                  className="w-full"
-                  placeholder="optional further breakdown"
+                  options={optionLists.sub_category_2 || []}
+                  onChange={(v) => { setSub2(v); persist({ subCategory2: v || null }); }}
+                  onOptionAdded={(v) => addToList('sub_category_2', v)}
                 />
               </Field>
               {tx.amount > 0 ? (
@@ -285,25 +303,21 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
               ) : (
                 <>
                   <Field label="Source of money to pay">
-                    <input
-                      type="text"
-                      list="acct-list"
+                    <OptionSelect
+                      field="source_of_money"
                       value={sourceOfMoney}
-                      onChange={(e) => setSourceOfMoney(e.target.value)}
-                      onBlur={() => persist({ sourceOfMoney: sourceOfMoney || null })}
-                      className="w-full"
-                      placeholder="which account covers this"
+                      options={optionLists.source_of_money || []}
+                      onChange={(v) => { setSourceOfMoney(v); persist({ sourceOfMoney: v || null }); }}
+                      onOptionAdded={(v) => addToList('source_of_money', v)}
                     />
                   </Field>
                   <Field label="Need to get from">
-                    <input
-                      type="text"
-                      list="acct-list"
+                    <OptionSelect
+                      field="need_to_get_from"
                       value={needFrom}
-                      onChange={(e) => setNeedFrom(e.target.value)}
-                      onBlur={() => persist({ needToGetFrom: needFrom || null })}
-                      className="w-full"
-                      placeholder="where to source funds from"
+                      options={optionLists.need_to_get_from || []}
+                      onChange={(v) => { setNeedFrom(v); persist({ needToGetFrom: v || null }); }}
+                      onOptionAdded={(v) => addToList('need_to_get_from', v)}
                     />
                   </Field>
                 </>
@@ -328,13 +342,13 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                 </select>
               </Field>
               <Field label="Business purpose" className="md:col-span-2">
-                <input
-                  type="text"
+                <OptionSelect
+                  field="business_purpose"
                   value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                  onBlur={() => persist({ businessPurpose: purpose || null })}
-                  className="w-full"
-                  placeholder="What was this transaction for?"
+                  options={optionLists.business_purpose || []}
+                  onChange={(v) => { setPurpose(v); persist({ businessPurpose: v || null }); }}
+                  onOptionAdded={(v) => addToList('business_purpose', v)}
+                  placeholder="— pick a purpose —"
                 />
               </Field>
               <Field label="Doc reference" className="md:col-span-2">
