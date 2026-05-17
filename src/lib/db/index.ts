@@ -288,6 +288,7 @@ export function getDb(): Database.Database {
     `ALTER TABLE transactions ADD COLUMN passthrough_person_id TEXT REFERENCES people(id) ON DELETE SET NULL`,
     `ALTER TABLE transactions ADD COLUMN passthrough_notes TEXT`,
     `ALTER TABLE field_options ADD COLUMN parent_value TEXT`,
+    `ALTER TABLE transactions ADD COLUMN funded_by_transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }

@@ -54,6 +54,7 @@ function rowToTransaction(r: any): Transaction {
     passthroughPurpose: r.passthrough_purpose ?? null,
     passthroughPersonId: r.passthrough_person_id ?? null,
     passthroughNotes: r.passthrough_notes ?? null,
+    fundedByTransactionId: r.funded_by_transaction_id ?? null,
     importedAt: r.imported_at,
     updatedAt: r.updated_at,
     importBatchId: r.import_batch_id,
@@ -195,7 +196,71 @@ export function listTransactions(filters: ListFilters = {}): Transaction[] {
     LIMIT ${limit} OFFSET ${offset}
   `;
   const rows = db.prepare(sql).all(params) as any[];
-  return rows.map(rowToTransaction);
+
+  // Within a single (account_id, posting_date), Chase's actual processing
+  // order is not the CSV insertion order. The "balance after" column from
+  // Chase IS authoritative — each row's balance equals the previous
+  // chronological row's balance + this row's amount. We use that to chain
+  // same-day rows into Chase's true order so "Balance after" reads sensibly.
+  const ordered = chainSameDayByBalance(rows, orderDir);
+  return ordered.map(rowToTransaction);
+}
+
+/** Reorder rows within each (account_id, posting_date) group so that the
+ *  bank's balance column chains correctly. Falls back to insertion order
+ *  when the chain can't be reconstructed (missing balance, non-monotonic). */
+function chainSameDayByBalance(rows: any[], orderDir: 'ASC' | 'DESC'): any[] {
+  const out: any[] = [];
+  let i = 0;
+  while (i < rows.length) {
+    const dayKey = `${rows[i].account_id}|${rows[i].posting_date}`;
+    let j = i;
+    while (j < rows.length && `${rows[j].account_id}|${rows[j].posting_date}` === dayKey) j++;
+    const group = rows.slice(i, j);
+    if (group.length <= 1 || group.some((r) => r.balance == null)) {
+      out.push(...group);
+    } else {
+      out.push(...chainGroup(group, orderDir));
+    }
+    i = j;
+  }
+  return out;
+}
+
+function chainGroup(group: any[], orderDir: 'ASC' | 'DESC'): any[] {
+  // Build a map: prevBalance (rounded to cents) -> row
+  const EPS = 0.005;
+  const byPrev = new Map<string, any[]>();
+  for (const r of group) {
+    const prev = Math.round((r.balance - r.amount) * 100) / 100;
+    const key = prev.toFixed(2);
+    const arr = byPrev.get(key) || [];
+    arr.push(r);
+    byPrev.set(key, arr);
+  }
+  const balances = new Set(group.map((r) => (Math.round(r.balance * 100) / 100).toFixed(2)));
+  // The chronologically-first tx of the day has prev_balance NOT in this day's balances
+  // (because the prev balance was carried over from the previous day).
+  const starts = group.filter((r) => {
+    const prev = Math.round((r.balance - r.amount) * 100) / 100;
+    return !balances.has(prev.toFixed(2));
+  });
+  if (starts.length !== 1) {
+    // Multiple candidates or none — chain ambiguous, keep original order.
+    return group;
+  }
+  const chronological: any[] = [];
+  const seen = new Set<string>();
+  let cur: any | undefined = starts[0];
+  while (cur && !seen.has(cur.id)) {
+    chronological.push(cur);
+    seen.add(cur.id);
+    const key = (Math.round(cur.balance * 100) / 100).toFixed(2);
+    const next = (byPrev.get(key) || []).find((r) => !seen.has(r.id));
+    cur = next;
+  }
+  if (chronological.length !== group.length) return group;  // Couldn't fully chain
+  return orderDir === 'DESC' ? chronological.reverse() : chronological;
 }
 
 export function getTransaction(id: string): Transaction | null {
@@ -242,6 +307,7 @@ export interface UpdateTxPatch {
   passthroughPurpose?: string | null;
   passthroughPersonId?: string | null;
   passthroughNotes?: string | null;
+  fundedByTransactionId?: string | null;
 }
 
 export function updateTransaction(id: string, patch: UpdateTxPatch): void {

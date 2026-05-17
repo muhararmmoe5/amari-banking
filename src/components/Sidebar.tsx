@@ -142,7 +142,7 @@ export default function Sidebar({
           </span>
         </button>
         <div className="mt-2 text-[9px] mono text-ink-ghost" title="Build stamp">
-          v.downstream
+          v.balance-chain
         </div>
       </div>
     </aside>

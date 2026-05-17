@@ -131,6 +131,7 @@ export interface Transaction {
   passthroughPurpose: string | null;
   passthroughPersonId: string | null;
   passthroughNotes: string | null;
+  fundedByTransactionId: string | null;
   importedAt: number;
   updatedAt: number;
   importBatchId: string;
