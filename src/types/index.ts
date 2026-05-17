@@ -126,6 +126,10 @@ export interface Transaction {
   isSalary: boolean;
   salaryEntity: string | null;
   salaryPersonId: string | null;
+  passthroughEntity: string | null;
+  passthroughPurpose: string | null;
+  passthroughPersonId: string | null;
+  passthroughNotes: string | null;
   importedAt: number;
   updatedAt: number;
   importBatchId: string;

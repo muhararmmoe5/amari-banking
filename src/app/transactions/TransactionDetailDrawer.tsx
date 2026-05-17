@@ -45,6 +45,10 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
   const [isSalary, setIsSalary] = useState(tx.isSalary);
   const [salaryEntity, setSalaryEntity] = useState(tx.salaryEntity || '');
   const [salaryPersonId, setSalaryPersonId] = useState(tx.salaryPersonId || '');
+  const [passthroughEntity, setPassthroughEntity] = useState(tx.passthroughEntity || '');
+  const [passthroughPurpose, setPassthroughPurpose] = useState(tx.passthroughPurpose || '');
+  const [passthroughPersonId, setPassthroughPersonId] = useState(tx.passthroughPersonId || '');
+  const [passthroughNotes, setPassthroughNotes] = useState(tx.passthroughNotes || '');
   const [budgets, setBudgets] = useState<{ id: string; name: string; kind: string; entity: string | null }[] | null>(null);
   const [optionLists, setOptionLists] = useState<Record<string, string[]>>({
     individual: [], sub_category_1: [], sub_category_2: [], business_purpose: [], source_of_money: [], need_to_get_from: [],
@@ -373,6 +377,78 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                   <option value="1">Yes — this is a salary / wage payment</option>
                 </select>
               </Field>
+              <Field label="Was this passed onward? · sub-tag for another entity" className="md:col-span-2">
+                <select
+                  value={passthroughEntity ? '1' : '0'}
+                  onChange={(e) => {
+                    if (e.target.value === '0') {
+                      setPassthroughEntity('');
+                      setPassthroughPurpose('');
+                      setPassthroughPersonId('');
+                      setPassthroughNotes('');
+                      persist({ passthroughEntity: null, passthroughPurpose: null, passthroughPersonId: null, passthroughNotes: null });
+                    } else {
+                      // Show the fields; entity actually gets set when picked
+                      setPassthroughEntity('PENDING');
+                    }
+                  }}
+                  className="w-full"
+                >
+                  <option value="0">No — money stayed in this entity</option>
+                  <option value="1">Yes — funds were passed onward to another entity / debt</option>
+                </select>
+                <div className="text-[10px] text-ink-mute mt-1">
+                  Use this when e.g. Bytes AI pays you a salary, and you then take that money to fund Delicious Bytes LLC. The bank wire is on Bytes AI, but the economic hit lands on Delicious Bytes.
+                </div>
+              </Field>
+              {passthroughEntity ? (
+                <>
+                  <Field label="Onward · which entity ultimately pays">
+                    <select
+                      value={passthroughEntity === 'PENDING' ? '' : passthroughEntity}
+                      onChange={(e) => { setPassthroughEntity(e.target.value); persist({ passthroughEntity: e.target.value || null }); }}
+                      className="w-full"
+                    >
+                      <option value="">— pick —</option>
+                      {ENTITY_OPTIONS.map((en) => (
+                        <option key={en} value={en}>{ENTITY_LABELS[en]}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Onward · purpose">
+                    <input
+                      type="text"
+                      value={passthroughPurpose}
+                      onChange={(e) => setPassthroughPurpose(e.target.value)}
+                      onBlur={() => persist({ passthroughPurpose: passthroughPurpose || null })}
+                      placeholder="e.g. Pay restaurant owner debt, fund DB operating"
+                      className="w-full"
+                    />
+                  </Field>
+                  <Field label="Onward · recipient / person">
+                    <select
+                      value={passthroughPersonId}
+                      onChange={(e) => { setPassthroughPersonId(e.target.value); persist({ passthroughPersonId: e.target.value || null }); }}
+                      className="w-full"
+                    >
+                      <option value="">— none —</option>
+                      {(people || []).map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Onward · notes">
+                    <input
+                      type="text"
+                      value={passthroughNotes}
+                      onChange={(e) => setPassthroughNotes(e.target.value)}
+                      onBlur={() => persist({ passthroughNotes: passthroughNotes || null })}
+                      placeholder="optional context"
+                      className="w-full"
+                    />
+                  </Field>
+                </>
+              ) : null}
               {isSalary ? (
                 <>
                   <Field label="Salary · for which entity">

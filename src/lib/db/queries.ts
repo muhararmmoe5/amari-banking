@@ -49,6 +49,10 @@ function rowToTransaction(r: any): Transaction {
     isSalary: !!r.is_salary,
     salaryEntity: r.salary_entity ?? null,
     salaryPersonId: r.salary_person_id ?? null,
+    passthroughEntity: r.passthrough_entity ?? null,
+    passthroughPurpose: r.passthrough_purpose ?? null,
+    passthroughPersonId: r.passthrough_person_id ?? null,
+    passthroughNotes: r.passthrough_notes ?? null,
     importedAt: r.imported_at,
     updatedAt: r.updated_at,
     importBatchId: r.import_batch_id,
@@ -233,6 +237,10 @@ export interface UpdateTxPatch {
   isSalary?: boolean;
   salaryEntity?: string | null;
   salaryPersonId?: string | null;
+  passthroughEntity?: string | null;
+  passthroughPurpose?: string | null;
+  passthroughPersonId?: string | null;
+  passthroughNotes?: string | null;
 }
 
 export function updateTransaction(id: string, patch: UpdateTxPatch): void {
@@ -275,6 +283,10 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   if (patch.isSalary !== undefined) { fields.push('is_salary = @is_salary'); params.is_salary = patch.isSalary ? 1 : 0; }
   if (patch.salaryEntity !== undefined) { fields.push('salary_entity = @salary_entity'); params.salary_entity = patch.salaryEntity; }
   if (patch.salaryPersonId !== undefined) { fields.push('salary_person_id = @salary_person_id'); params.salary_person_id = patch.salaryPersonId; }
+  if (patch.passthroughEntity !== undefined) { fields.push('passthrough_entity = @passthrough_entity'); params.passthrough_entity = patch.passthroughEntity; }
+  if (patch.passthroughPurpose !== undefined) { fields.push('passthrough_purpose = @passthrough_purpose'); params.passthrough_purpose = patch.passthroughPurpose; }
+  if (patch.passthroughPersonId !== undefined) { fields.push('passthrough_person_id = @passthrough_person_id'); params.passthrough_person_id = patch.passthroughPersonId; }
+  if (patch.passthroughNotes !== undefined) { fields.push('passthrough_notes = @passthrough_notes'); params.passthrough_notes = patch.passthroughNotes; }
   if (fields.length === 0) return;
   fields.push('updated_at = @updated_at');
   db.prepare(`UPDATE transactions SET ${fields.join(', ')} WHERE id = @id`).run(params);
@@ -463,6 +475,10 @@ export interface EntityPL {
   expenses: number;
   net: number;
   topExpenseCategories: { category: string; amount: number }[];
+  /** Sum of expenses booked on this entity but tagged as passthrough to another entity (e.g. salary you took to fund another LLC). Subtract from this entity's "real" hit. */
+  passthroughOut: number;
+  /** Sum of expenses booked on OTHER entities but tagged as passthrough INTO this entity (e.g. partner-funded debt repayment). Add to this entity's "real" hit. */
+  passthroughIn: number;
 }
 
 export function entityPLs(dateFrom?: string, dateTo?: string): EntityPL[] {
@@ -499,15 +515,45 @@ export function entityPLs(dateFrom?: string, dateTo?: string): EntityPL[] {
     byEntityCat.set(r.entity, list);
   }
 
-  return agg.map((r) => ({
-    entity: r.entity as EntityType,
-    income: r.income || 0,
-    expenses: r.expenses || 0,
-    net: (r.income || 0) - (r.expenses || 0),
-    topExpenseCategories: (byEntityCat.get(r.entity) || [])
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 4),
-  }));
+  // Passthrough totals (amount flagged as "actually belongs to a different entity")
+  const passthroughOut = db.prepare(`
+    SELECT COALESCE(confirmed_entity, entity_tag) as entity, SUM(ABS(amount)) as total
+    FROM transactions
+    WHERE amount < 0 AND is_internal = 0 AND passthrough_entity IS NOT NULL
+      ${where.length ? 'AND ' + where.join(' AND ') : ''}
+    GROUP BY entity
+  `).all(p) as any[];
+  const outByEntity = new Map<string, number>();
+  for (const r of passthroughOut) outByEntity.set(r.entity, r.total);
+
+  const passthroughIn = db.prepare(`
+    SELECT passthrough_entity as entity, SUM(ABS(amount)) as total
+    FROM transactions
+    WHERE amount < 0 AND is_internal = 0 AND passthrough_entity IS NOT NULL
+      ${where.length ? 'AND ' + where.join(' AND ') : ''}
+    GROUP BY passthrough_entity
+  `).all(p) as any[];
+  const inByEntity = new Map<string, number>();
+  for (const r of passthroughIn) inByEntity.set(r.entity, r.total);
+
+  // Make sure entities that ONLY appear as passthrough targets still show up in the result
+  const allEntities = new Set<string>(agg.map((r) => r.entity));
+  for (const ent of inByEntity.keys()) allEntities.add(ent);
+
+  return Array.from(allEntities).map((entityKey) => {
+    const r = agg.find((x) => x.entity === entityKey) || { entity: entityKey, income: 0, expenses: 0 };
+    return {
+      entity: entityKey as EntityType,
+      income: r.income || 0,
+      expenses: r.expenses || 0,
+      net: (r.income || 0) - (r.expenses || 0),
+      topExpenseCategories: (byEntityCat.get(entityKey) || [])
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 4),
+      passthroughOut: outByEntity.get(entityKey) || 0,
+      passthroughIn: inByEntity.get(entityKey) || 0,
+    };
+  });
 }
 
 export interface ZelleAggregate {

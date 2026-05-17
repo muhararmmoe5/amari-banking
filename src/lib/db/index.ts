@@ -283,6 +283,10 @@ export function getDb(): Database.Database {
     `ALTER TABLE transactions ADD COLUMN is_salary INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE transactions ADD COLUMN salary_entity TEXT`,
     `ALTER TABLE transactions ADD COLUMN salary_person_id TEXT REFERENCES people(id) ON DELETE SET NULL`,
+    `ALTER TABLE transactions ADD COLUMN passthrough_entity TEXT`,
+    `ALTER TABLE transactions ADD COLUMN passthrough_purpose TEXT`,
+    `ALTER TABLE transactions ADD COLUMN passthrough_person_id TEXT REFERENCES people(id) ON DELETE SET NULL`,
+    `ALTER TABLE transactions ADD COLUMN passthrough_notes TEXT`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }

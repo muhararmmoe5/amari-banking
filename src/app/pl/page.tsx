@@ -29,6 +29,29 @@ export default function PLPage() {
               <Line label="Revenue" value={e.income} positive />
               <Line label="Total expenses" value={-e.expenses} />
             </div>
+            {(e.passthroughOut > 0 || e.passthroughIn > 0) ? (
+              <div className="mt-3 pt-3 border-t border-line space-y-1 text-xs">
+                <div className="text-[10px] uppercase tracking-wider text-ink-mute">Passthroughs · sub-tag</div>
+                {e.passthroughOut > 0 ? (
+                  <div className="flex justify-between">
+                    <span className="text-ink-dim">↗ Booked here but redirected to other entities</span>
+                    <span className="mono text-warn">−{fmtMoney(e.passthroughOut)}</span>
+                  </div>
+                ) : null}
+                {e.passthroughIn > 0 ? (
+                  <div className="flex justify-between">
+                    <span className="text-ink-dim">↘ Funded by other entities&apos; books but bears this entity</span>
+                    <span className="mono text-warn">+{fmtMoney(e.passthroughIn)}</span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between pt-1 border-t border-line/40">
+                  <span className="text-ink">Adjusted net (passthrough-aware)</span>
+                  <span className={`mono tabnum ${(e.net + e.passthroughOut - e.passthroughIn) >= 0 ? 'text-income' : 'text-expense'}`}>
+                    {fmtMoney(e.net + e.passthroughOut - e.passthroughIn)}
+                  </span>
+                </div>
+              </div>
+            ) : null}
             <div className="mt-4 pt-3 border-t border-line">
               <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-2">Top expense categories</div>
               <div className="space-y-1">
