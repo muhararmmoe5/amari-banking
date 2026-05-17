@@ -247,6 +247,8 @@ export function getDb(): Database.Database {
     `ALTER TABLE transactions ADD COLUMN source_person_id TEXT REFERENCES people(id) ON DELETE SET NULL`,
     `ALTER TABLE transactions ADD COLUMN transaction_date TEXT`,
     `ALTER TABLE transactions ADD COLUMN funding_commitment_id TEXT REFERENCES funding_commitments(id) ON DELETE SET NULL`,
+    `ALTER TABLE transactions ADD COLUMN source_business TEXT`,
+    `ALTER TABLE transactions ADD COLUMN source_account_id TEXT`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }

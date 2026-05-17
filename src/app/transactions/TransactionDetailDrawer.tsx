@@ -38,6 +38,8 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
   const [cpaReviewed, setCpaReviewed] = useState(tx.cpaReviewed);
   const [taggedDate, setTaggedDate] = useState(tx.taggedDate || '');
   const [sourcePersonId, setSourcePersonId] = useState(tx.sourcePersonId || '');
+  const [sourceBusiness, setSourceBusiness] = useState(tx.sourceBusiness || '');
+  const [sourceAccountId, setSourceAccountId] = useState(tx.sourceAccountId || '');
   const [people, setPeople] = useState<{ id: string; name: string; role: string }[] | null>(null);
   const [, startTx] = useTransition();
   const { saveStart, saveEnd, saveError } = useToast();
@@ -237,28 +239,66 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                   placeholder="optional further breakdown"
                 />
               </Field>
-              <Field label="Source of money to pay">
-                <input
-                  type="text"
-                  list="acct-list"
-                  value={sourceOfMoney}
-                  onChange={(e) => setSourceOfMoney(e.target.value)}
-                  onBlur={() => persist({ sourceOfMoney: sourceOfMoney || null })}
-                  className="w-full"
-                  placeholder="which account covers this"
-                />
-              </Field>
-              <Field label="Need to get from">
-                <input
-                  type="text"
-                  list="acct-list"
-                  value={needFrom}
-                  onChange={(e) => setNeedFrom(e.target.value)}
-                  onBlur={() => persist({ needToGetFrom: needFrom || null })}
-                  className="w-full"
-                  placeholder="where to source funds from"
-                />
-              </Field>
+              {tx.amount > 0 ? (
+                <>
+                  <Field label="Source business · who sent this">
+                    <select
+                      value={sourceBusiness}
+                      onChange={(e) => { setSourceBusiness(e.target.value); persist({ sourceBusiness: e.target.value || null }); }}
+                      className="w-full"
+                    >
+                      <option value="">— pick —</option>
+                      <option value="BYTES_AI">Bytes AI</option>
+                      <option value="ROCKET_WIRELESS">Rocket Wireless</option>
+                      <option value="DELICIOUS_BYTES">Delicious Bytes LLC</option>
+                      <option value="AMARI_VENTURES">Amari Ventures</option>
+                      <option value="BYTES_REST_TECH">Bytes Restaurant Tech</option>
+                      <option value="PERSONAL">Personal</option>
+                      <option value="EXTERNAL">External / N/A (outside business)</option>
+                    </select>
+                  </Field>
+                  <Field label="Source account · which bank sent it">
+                    <select
+                      value={sourceAccountId}
+                      onChange={(e) => { setSourceAccountId(e.target.value); persist({ sourceAccountId: e.target.value || null }); }}
+                      className="w-full"
+                    >
+                      <option value="">— pick —</option>
+                      {ACCOUNTS.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {ENTITY_LABELS[a.entity]} — ···{a.last4}
+                        </option>
+                      ))}
+                      <option value="EXTERNAL">External / N/A (outside account)</option>
+                    </select>
+                  </Field>
+                </>
+              ) : (
+                <>
+                  <Field label="Source of money to pay">
+                    <input
+                      type="text"
+                      list="acct-list"
+                      value={sourceOfMoney}
+                      onChange={(e) => setSourceOfMoney(e.target.value)}
+                      onBlur={() => persist({ sourceOfMoney: sourceOfMoney || null })}
+                      className="w-full"
+                      placeholder="which account covers this"
+                    />
+                  </Field>
+                  <Field label="Need to get from">
+                    <input
+                      type="text"
+                      list="acct-list"
+                      value={needFrom}
+                      onChange={(e) => setNeedFrom(e.target.value)}
+                      onBlur={() => persist({ needToGetFrom: needFrom || null })}
+                      className="w-full"
+                      placeholder="where to source funds from"
+                    />
+                  </Field>
+                </>
+              )}
               <Field label="Business purpose" className="md:col-span-2">
                 <input
                   type="text"

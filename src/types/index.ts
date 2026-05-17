@@ -120,6 +120,8 @@ export interface Transaction {
   taggedDate: string | null;
   sourcePersonId: string | null;
   transactionDate: string | null;
+  sourceBusiness: string | null;
+  sourceAccountId: string | null;
   importedAt: number;
   updatedAt: number;
   importBatchId: string;

@@ -43,6 +43,8 @@ function rowToTransaction(r: any): Transaction {
     taggedDate: r.tagged_date ?? null,
     sourcePersonId: r.source_person_id ?? null,
     transactionDate: r.transaction_date ?? null,
+    sourceBusiness: r.source_business ?? null,
+    sourceAccountId: r.source_account_id ?? null,
     importedAt: r.imported_at,
     updatedAt: r.updated_at,
     importBatchId: r.import_batch_id,
@@ -220,6 +222,8 @@ export interface UpdateTxPatch {
   cpaReviewed?: boolean;
   taggedDate?: string | null;
   sourcePersonId?: string | null;
+  sourceBusiness?: string | null;
+  sourceAccountId?: string | null;
 }
 
 export function updateTransaction(id: string, patch: UpdateTxPatch): void {
@@ -241,6 +245,8 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   if (patch.cpaReviewed !== undefined) { fields.push('cpa_reviewed = @cpa_reviewed'); params.cpa_reviewed = patch.cpaReviewed ? 1 : 0; }
   if (patch.taggedDate !== undefined) { fields.push('tagged_date = @tagged_date'); params.tagged_date = patch.taggedDate; }
   if (patch.sourcePersonId !== undefined) { fields.push('source_person_id = @source_person_id'); params.source_person_id = patch.sourcePersonId; }
+  if (patch.sourceBusiness !== undefined) { fields.push('source_business = @source_business'); params.source_business = patch.sourceBusiness; }
+  if (patch.sourceAccountId !== undefined) { fields.push('source_account_id = @source_account_id'); params.source_account_id = patch.sourceAccountId; }
   if (fields.length === 0) return;
   fields.push('updated_at = @updated_at');
   db.prepare(`UPDATE transactions SET ${fields.join(', ')} WHERE id = @id`).run(params);
