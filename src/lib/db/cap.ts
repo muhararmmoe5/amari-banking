@@ -218,7 +218,25 @@ export function createContribution(input: ContributionInput): CashContribution {
     input.notes?.trim() || null,
     Date.now(),
   );
+  ensureFundingCommitment(input.entity, input.personId, input.amountCents);
   return rowToContribution(db.prepare('SELECT * FROM cash_contributions WHERE id = ?').get(id) as any);
+}
+
+/** Make sure there's an ACTIVE funding commitment for this (entity, person) pair.
+ *  If none exists, create one with the contribution amount as the total. If one
+ *  already exists, leave it alone (we don't want to overwrite a real commitment). */
+function ensureFundingCommitment(entity: EntityType, personId: string, contributionAmountCents: number): void {
+  const db = getDb();
+  const existing = db.prepare(
+    `SELECT id FROM funding_commitments WHERE entity = ? AND person_id = ? AND status = 'ACTIVE'`
+  ).get(entity, personId);
+  if (existing) return;
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO funding_commitments (id, entity, person_id, total_amount_cents, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)`
+  ).run(id, entity, personId, contributionAmountCents, now, now);
 }
 
 export function updateContribution(id: string, patch: Partial<ContributionInput>): void {
@@ -234,6 +252,9 @@ export function updateContribution(id: string, patch: Partial<ContributionInput>
   if (patch.notes !== undefined) { fields.push('notes = @notes'); params.notes = patch.notes?.trim() || null; }
   if (!fields.length) return;
   db.prepare(`UPDATE cash_contributions SET ${fields.join(', ')} WHERE id = @id`).run(params);
+  // After updating, make sure a commitment exists for the (entity, person) pair so wires can be tagged
+  const updated = db.prepare('SELECT entity, person_id, amount_cents FROM cash_contributions WHERE id = ?').get(id) as any;
+  if (updated) ensureFundingCommitment(updated.entity as EntityType, updated.person_id, updated.amount_cents);
 }
 
 export function deleteContribution(id: string): void {

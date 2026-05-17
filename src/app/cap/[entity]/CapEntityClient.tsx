@@ -631,9 +631,26 @@ function CashTab({
     } catch { setTxResults([]); }
   }
 
+  async function syncToCommitments() {
+    const tId = saveStart();
+    startTx(async () => {
+      try {
+        const { actSyncContributionsToCommitments } = await import('../actions');
+        await actSyncContributionsToCommitments(entity);
+        saveEnd(tId);
+        toast({ kind: 'ok', title: 'Synced to commitments', body: 'Contributions are now reflected as commitments — wires can be tagged from the drawer.' });
+      } catch (e: any) { saveError(tId, e?.message); }
+    });
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        {contributions.length > 0 ? (
+          <button type="button" onClick={syncToCommitments} className="btn text-sm" title="Create a funding commitment for any contribution that doesn't have one yet">
+            ↻ Sync to commitments
+          </button>
+        ) : null}
         {!adding ? (
           <button type="button" onClick={() => setAdding(true)} disabled={people.length === 0} className="btn btn-primary text-sm">
             <Plus size={14} /> Log contribution
@@ -702,7 +719,7 @@ function CashTab({
               <tr>
                 <th className="text-left px-3 py-2 font-medium">Date</th>
                 <th className="text-left px-3 py-2 font-medium">Person</th>
-                <th className="text-right px-3 py-2 font-medium">Amount</th>
+                <th className="text-right px-3 py-2 font-medium">Committed amount</th>
                 <th className="text-left px-3 py-2 font-medium">Type</th>
                 <th className="text-left px-3 py-2 font-medium">Linked wire</th>
                 <th className="text-left px-3 py-2 font-medium">Notes</th>

@@ -1,5 +1,6 @@
 'use server';
 
+import crypto from 'crypto';
 import { revalidatePath } from 'next/cache';
 import {
   createPerson, updatePerson, deletePerson, getPerson, listPeople,
@@ -60,6 +61,37 @@ export async function actCreateContribution(input: ContributionInput) {
 export async function actUpdateContribution(id: string, patch: Partial<ContributionInput>) {
   updateContribution(id, patch);
   revalidateAll();
+}
+
+/** Force-sync: ensure every active cash contribution for (entity, person) has a
+ *  matching active funding_commitment so wires can be tagged via the drawer.
+ *  Idempotent — safe to call repeatedly. */
+export async function actSyncContributionsToCommitments(entity: any) {
+  checkOwner();
+  const db = getDb();
+  const rows = db.prepare(
+    `SELECT DISTINCT entity, person_id, MAX(amount_cents) as total
+     FROM cash_contributions WHERE entity = ?
+     GROUP BY entity, person_id`
+  ).all(entity) as any[];
+  for (const r of rows) {
+    const existing = db.prepare(
+      `SELECT id FROM funding_commitments WHERE entity = ? AND person_id = ? AND status = 'ACTIVE'`
+    ).get(r.entity, r.person_id);
+    if (existing) continue;
+    const id = crypto.randomUUID();
+    const now = Date.now();
+    db.prepare(
+      `INSERT INTO funding_commitments (id, entity, person_id, total_amount_cents, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)`
+    ).run(id, r.entity, r.person_id, r.total, now, now);
+  }
+  revalidateAll();
+}
+
+function checkOwner() {
+  const u = getCurrentUser();
+  if (!u || u.role !== 'OWNER') throw new Error('Owner only');
 }
 
 export async function actDeleteContribution(id: string) {
