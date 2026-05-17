@@ -33,7 +33,10 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
       role="button"
       tabIndex={0}
       onClick={() => setDetailOpen(true)}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailOpen(true); } }}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailOpen(true); }
+      }}
       className="border-t border-line/60 hover:bg-bg-2/40 grid items-center text-sm cursor-pointer"
       style={{ gridTemplateColumns: ROW_GRID }}
     >
