@@ -226,6 +226,7 @@ export interface UpdateTxPatch {
   sourceBusiness?: string | null;
   sourceAccountId?: string | null;
   budgetId?: string | null;
+  fundingCommitmentId?: string | null;
 }
 
 export function updateTransaction(id: string, patch: UpdateTxPatch): void {
@@ -249,7 +250,22 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   if (patch.sourcePersonId !== undefined) { fields.push('source_person_id = @source_person_id'); params.source_person_id = patch.sourcePersonId; }
   if (patch.sourceBusiness !== undefined) { fields.push('source_business = @source_business'); params.source_business = patch.sourceBusiness; }
   if (patch.sourceAccountId !== undefined) { fields.push('source_account_id = @source_account_id'); params.source_account_id = patch.sourceAccountId; }
-  if (patch.budgetId !== undefined) { fields.push('budget_id = @budget_id'); params.budget_id = patch.budgetId; }
+  if (patch.budgetId !== undefined) {
+    fields.push('budget_id = @budget_id');
+    params.budget_id = patch.budgetId;
+    // Convenience: if the budget is linked to a funding commitment, mirror that link onto the transaction.
+    if (patch.budgetId) {
+      const linkedCommitment = db.prepare('SELECT funding_commitment_id FROM budgets WHERE id = ?').get(patch.budgetId) as any;
+      if (linkedCommitment?.funding_commitment_id && patch.fundingCommitmentId === undefined) {
+        fields.push('funding_commitment_id = @auto_commitment');
+        params.auto_commitment = linkedCommitment.funding_commitment_id;
+      }
+    }
+  }
+  if ((patch as any).fundingCommitmentId !== undefined) {
+    fields.push('funding_commitment_id = @funding_commitment_id');
+    params.funding_commitment_id = (patch as any).fundingCommitmentId;
+  }
   if (fields.length === 0) return;
   fields.push('updated_at = @updated_at');
   db.prepare(`UPDATE transactions SET ${fields.join(', ')} WHERE id = @id`).run(params);

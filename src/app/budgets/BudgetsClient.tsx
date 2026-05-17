@@ -25,7 +25,14 @@ function dollarsToCents(s: string): number | null {
   return Math.round(n * 100);
 }
 
-export default function BudgetsClient({ initial }: { initial: BudgetWithSpend[] }) {
+interface CommitmentOption {
+  id: string;
+  label: string;
+  entity: string;
+  monthlyAmountCents: number | null;
+}
+
+export default function BudgetsClient({ initial, commitments }: { initial: BudgetWithSpend[]; commitments: CommitmentOption[] }) {
   const { saveStart, saveEnd, saveError } = useToast();
   const [, startTx] = useTransition();
   const [addOpen, setAddOpen] = useState(false);
@@ -41,6 +48,8 @@ export default function BudgetsClient({ initial }: { initial: BudgetWithSpend[] 
           entity: (form.get('entity') as EntityType) || null,
           kind: (form.get('kind') as BudgetKind) || 'EXPENSE',
           monthlyAmountCents: dollarsToCents(String(form.get('monthly') || '')),
+          periodMonth: (form.get('periodMonth') as string) || null,
+          fundingCommitmentId: (form.get('commitmentId') as string) || null,
           notes: (form.get('notes') as string) || null,
         });
         saveEnd(tid);
@@ -101,6 +110,19 @@ export default function BudgetsClient({ initial }: { initial: BudgetWithSpend[] 
               <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Monthly cap ($, optional)</div>
               <input name="monthly" placeholder="5000" className="w-full" />
             </label>
+            <label className="block">
+              <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Specific month (optional)</div>
+              <input name="periodMonth" type="month" className="w-full" />
+              <div className="text-[10px] text-ink-mute mt-1">Leave blank for ongoing. Set to scope this budget to one month (e.g. &ldquo;May 2026&rdquo;).</div>
+            </label>
+            <label className="block col-span-2">
+              <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Link to investor commitment (optional)</div>
+              <select name="commitmentId" defaultValue="" className="w-full">
+                <option value="">— not linked to an investment —</option>
+                {commitments.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+              <div className="text-[10px] text-ink-mute mt-1">When linked, tagging a transaction to this budget also counts it toward the commitment&apos;s overall funding progress. Manage commitments on the Cap Table page for each entity.</div>
+            </label>
             <label className="block col-span-2">
               <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Notes</div>
               <input name="notes" placeholder="What does this cover?" className="w-full" />
@@ -153,11 +175,15 @@ function BudgetList({
                     {b.name}
                     <span className={`ml-2 pill text-[10px] ${b.kind === 'EXPENSE' ? 'bg-expense/10 text-expense border border-expense/30' : 'bg-income/10 text-income border border-income/30'}`}>{b.kind === 'EXPENSE' ? 'expense' : 'income'}</span>
                     {b.entity ? <span className="ml-2 pill text-[10px] bg-bg-2 text-ink-dim border border-line">{b.entity.replace(/_/g, ' ').toLowerCase()}</span> : null}
+                    {b.periodMonth ? <span className="ml-2 pill text-[10px] bg-entity-bytes/10 text-entity-bytes border border-entity-bytes/30">{b.periodMonth}</span> : null}
                   </div>
+                  {b.commitmentLabel ? (
+                    <div className="text-[11px] mt-1 text-warn">↳ Investment: {b.commitmentLabel}</div>
+                  ) : null}
                   {b.notes ? <div className="text-[11px] text-ink-mute mt-1">{b.notes}</div> : null}
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-[10px] uppercase tracking-wider text-ink-mute">This month</div>
+                  <div className="text-[10px] uppercase tracking-wider text-ink-mute">{b.periodMonth ? b.periodMonth : 'This month'}</div>
                   <div className="mono tabnum text-base">{fmtCents(b.spentThisMonthCents)}</div>
                   {cap ? <div className="text-[10px] text-ink-mute">of {fmtCents(cap)} ({pct.toFixed(0)}%)</div> : null}
                 </div>
