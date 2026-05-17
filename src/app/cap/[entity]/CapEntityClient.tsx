@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useMemo } from 'react';
 import Link from 'next/link';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Pencil, Check, X } from 'lucide-react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import type { EntityType } from '@/types';
 import type { Person, EquityHolding, CashContribution, SafeNote, EntityValuation, HolderType } from '@/types/cap';
@@ -242,6 +242,35 @@ function EquityTab({
     });
   }
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<Partial<EquityHolding> | null>(null);
+
+  function startEdit(h: EquityHolding) {
+    setEditingId(h.id);
+    setEditDraft({
+      percent: h.percent,
+      holderType: h.holderType,
+      vestingCliffMonths: h.vestingCliffMonths,
+      vestingTotalMonths: h.vestingTotalMonths,
+      vestingStart: h.vestingStart,
+      notes: h.notes,
+    });
+  }
+  function cancelEdit() { setEditingId(null); setEditDraft(null); }
+  async function saveEdit(id: string) {
+    if (!editDraft) return;
+    const tId = saveStart();
+    startTx(async () => {
+      try {
+        await actUpdateHolding(id, editDraft as any);
+        setHoldings((cur) => cur.map((x) => (x.id === id ? { ...x, ...editDraft } as EquityHolding : x)));
+        saveEnd(tId);
+        setEditingId(null);
+        setEditDraft(null);
+      } catch (e: any) { saveError(tId, e?.message); }
+    });
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -326,8 +355,74 @@ function EquityTab({
                 const hasVesting = !!(h.vestingTotalMonths && h.vestingStart);
                 const vestedValue = currentValuation != null ? Math.round(((vestedPct) / 100) * currentValuation) : null;
                 const hc = holderConfig(h.holderType);
+                const isEditing = editingId === h.id;
+                if (isEditing && editDraft) {
+                  return (
+                    <tr key={h.id} className="border-t border-line/60 bg-bg-2/30">
+                      <td className="px-3 py-2">
+                        <Link href={`/team/${h.personId}`} className="hover:text-entity-bytes">{peopleById.get(h.personId)?.name || '?'}</Link>
+                      </td>
+                      <td className="px-3 py-2">
+                        <select
+                          value={editDraft.holderType || 'PARTNER'}
+                          onChange={(e) => setEditDraft({ ...editDraft, holderType: e.target.value as any })}
+                          className="w-full"
+                        >
+                          {HOLDER_TYPES.map((h) => <option key={h.value} value={h.value}>{h.label}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editDraft.percent ?? 0}
+                          onChange={(e) => setEditDraft({ ...editDraft, percent: Number(e.target.value) })}
+                          className="w-full text-right"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-right text-2xs text-ink-mute">computed</td>
+                      <td className="px-3 py-2 text-right text-2xs text-ink-mute">computed</td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              placeholder="cliff mo"
+                              value={editDraft.vestingCliffMonths ?? ''}
+                              onChange={(e) => setEditDraft({ ...editDraft, vestingCliffMonths: e.target.value === '' ? null : Number(e.target.value) })}
+                              className="w-1/2"
+                            />
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              placeholder="total mo"
+                              value={editDraft.vestingTotalMonths ?? ''}
+                              onChange={(e) => setEditDraft({ ...editDraft, vestingTotalMonths: e.target.value === '' ? null : Number(e.target.value) })}
+                              className="w-1/2"
+                            />
+                          </div>
+                          <input
+                            type="date"
+                            value={editDraft.vestingStart ?? ''}
+                            onChange={(e) => setEditDraft({ ...editDraft, vestingStart: e.target.value || null })}
+                            placeholder="start date"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <div className="inline-flex gap-1">
+                          <button onClick={() => saveEdit(h.id)} className="btn btn-ghost !p-1.5 text-income" title="Save"><Check size={13} /></button>
+                          <button onClick={cancelEdit} className="btn btn-ghost !p-1.5 text-ink-mute" title="Cancel"><X size={13} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
                 return (
-                  <tr key={h.id} className="border-t border-line/60">
+                  <tr key={h.id} className="border-t border-line/60 hover:bg-bg-2/30 transition">
                     <td className="px-3 py-2">
                       <Link href={`/team/${h.personId}`} className="hover:text-entity-bytes">{peopleById.get(h.personId)?.name || '?'}</Link>
                     </td>
@@ -352,7 +447,10 @@ function EquityTab({
                         : 'no vesting'}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <button onClick={() => remove(h)} className="btn btn-ghost !p-1.5 text-expense" title="Delete"><Trash2 size={13} /></button>
+                      <div className="inline-flex gap-1">
+                        <button onClick={() => startEdit(h)} className="btn btn-ghost !p-1.5 hover:text-entity-bytes" title="Edit"><Pencil size={13} /></button>
+                        <button onClick={() => remove(h)} className="btn btn-ghost !p-1.5 text-expense" title="Delete"><Trash2 size={13} /></button>
+                      </div>
                     </td>
                   </tr>
                 );
