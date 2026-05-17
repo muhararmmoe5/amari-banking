@@ -62,7 +62,8 @@ const MAX_DEPTH = 2;
  * avoid re-scanning the account history for every outflow.
  */
 export function traceAllExpensesOnAccount(
-  accountId: string
+  accountId: string,
+  onlyTxIds?: Set<string>
 ): Map<string, { sources: TraceSource[]; uncovered: number; totalAttributed: number }> {
   const db = getDb();
   const all = db.prepare(`
@@ -131,8 +132,10 @@ export function traceAllExpensesOnAccount(
         toCover -= take;
         if (head.remaining < 0.001) queue.shift();
       }
-      const totalAttributed = consumed.reduce((s, c) => s + c.amount, 0);
-      out.set(t.id, { sources: consumed, uncovered: toCover, totalAttributed });
+      if (!onlyTxIds || onlyTxIds.has(t.id)) {
+        const totalAttributed = consumed.reduce((s, c) => s + c.amount, 0);
+        out.set(t.id, { sources: consumed, uncovered: toCover, totalAttributed });
+      }
     }
   }
   return out;

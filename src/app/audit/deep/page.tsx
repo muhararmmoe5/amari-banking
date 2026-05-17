@@ -23,7 +23,7 @@ export default function DeepAuditPage({ searchParams }: { searchParams: Search }
   const dateFrom = searchParams.from || '';
   const dateTo = searchParams.to || '';
   const minAmount = Number(searchParams.minAmount || '0') || 0;
-  const limit = Math.min(Number(searchParams.limit || '500') || 500, 5000);
+  const limit = Math.min(Number(searchParams.limit || '25') || 25, 500);
 
   return (
     <div className="p-8 space-y-5">
@@ -86,8 +86,7 @@ function DeepAuditBody({
 }) {
   const db = getDb();
   const acct = getAccount(accountId);
-
-  const traces = traceAllExpensesOnAccount(accountId);
+  const t0 = Date.now();
 
   const clauses: string[] = ['account_id = ?', 'amount < 0'];
   const args: any[] = [accountId];
@@ -104,6 +103,10 @@ function DeepAuditBody({
     ORDER BY posting_date DESC, id DESC
     LIMIT ?
   `).all(...args, limit) as any[];
+
+  const visibleIds = new Set<string>(rows.map((r) => r.id));
+  const traces = traceAllExpensesOnAccount(accountId, visibleIds);
+  const elapsedMs = Date.now() - t0;
 
   const totalOut = rows.reduce((s, r) => s + Math.abs(r.amount), 0);
   let tracedSum = 0;
@@ -141,6 +144,7 @@ function DeepAuditBody({
           <div className="text-[11px] uppercase tracking-wider text-ink-mute">Untraced (pre-import)</div>
           <div className="mono tabnum text-warn">{fmtMoney(uncoveredSum)}</div>
         </div>
+        <div className="ml-auto text-[11px] text-ink-mute self-end">computed in {elapsedMs}ms</div>
       </div>
 
       <div className="space-y-3">
