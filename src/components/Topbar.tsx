@@ -32,18 +32,18 @@ export default function Topbar({ title }: { title: string }) {
   };
 
   return (
-    <div className="border-b border-line bg-bg-1 sticky top-0 z-20">
-      <div className="max-w-[1320px] mx-auto px-6 py-3 flex items-center justify-between gap-4">
-        <h1 className="text-base font-medium">{title}</h1>
+    <div className="border-b border-line surface-glass sticky top-0 z-20">
+      <div className="max-w-[1320px] mx-auto px-6 py-3.5 flex items-center justify-between gap-4">
+        <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
         <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-0.5 bg-bg-2 border border-line rounded-full p-0.5 text-[12px]">
+          <div className="hidden md:flex items-center gap-0.5 bg-bg-2/70 border border-line rounded-full p-1 text-xs">
             {MONTHS.slice(0, 6).map((m) => (
               <button
                 key={m.v}
                 type="button"
                 onClick={() => set(m.v)}
-                className={`px-2.5 py-1 rounded-full transition ${
-                  period === m.v ? 'bg-bg-0 text-ink' : 'text-ink-dim hover:text-ink'
+                className={`px-3 py-1 rounded-full transition font-medium ${
+                  period === m.v ? 'bg-bg-0 text-ink shadow-elev-1' : 'text-ink-mute hover:text-ink'
                 }`}
               >
                 {m.label}
@@ -52,19 +52,19 @@ export default function Topbar({ title }: { title: string }) {
             <button
               type="button"
               onClick={() => set('ytd')}
-              className={`px-2.5 py-1 rounded-full transition ${
-                period === 'ytd' ? 'bg-bg-0 text-ink' : 'text-ink-dim hover:text-ink'
+              className={`px-3 py-1 rounded-full transition font-medium ${
+                period === 'ytd' ? 'bg-bg-0 text-ink shadow-elev-1' : 'text-ink-mute hover:text-ink'
               }`}
             >
               YTD
             </button>
           </div>
           <Link href="/import" className="btn btn-primary text-sm">
-            <Upload size={14} strokeWidth={2} />
+            <Upload size={14} strokeWidth={2.25} />
             Import CSV
           </Link>
           <Link href="/cpa" className="btn text-sm">
-            <Download size={14} strokeWidth={2} />
+            <Download size={14} strokeWidth={2.25} />
             Export CPA
           </Link>
         </div>

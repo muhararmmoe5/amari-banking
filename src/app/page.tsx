@@ -91,29 +91,33 @@ export default function DashboardPage({ searchParams }: { searchParams: { period
             {/* Alerts strip — only renders if there's something to act on */}
             {ALERT_CARDS.length > 0 ? (
               <section>
-                <div className="flex items-center gap-2 mb-2 text-[11px] uppercase tracking-wider text-ink-mute">
+                <div className="flex items-center gap-2 mb-3 section-label">
                   <AlertTriangle size={12} className="text-warn" />
                   Needs your attention
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                   {ALERT_CARDS.map((a) => {
                     const colors = {
-                      crit: { bg: 'rgba(239,68,68,0.10)', border: '#EF4444', text: '#F87171' },
-                      high: { bg: 'rgba(240,160,96,0.10)', border: '#F0A060', text: '#FBBF24' },
-                      med:  { bg: 'rgba(245,200,90,0.10)', border: '#FCD34D', text: '#EAB308' },
+                      crit: { bg: 'rgba(248,113,113,0.06)', border: 'rgba(248,113,113,0.25)', text: '#F87171', glow: 'rgba(248,113,113,0.15)' },
+                      high: { bg: 'rgba(240,160,96,0.06)', border: 'rgba(240,160,96,0.25)', text: '#FBBF24', glow: 'rgba(240,160,96,0.15)' },
+                      med:  { bg: 'rgba(252,211,77,0.05)', border: 'rgba(252,211,77,0.25)', text: '#EAB308', glow: 'rgba(252,211,77,0.12)' },
                     }[a.tone];
                     return (
                       <Link
                         key={a.key}
                         href={a.href}
-                        className="rounded-lg p-3 border transition hover:opacity-90"
-                        style={{ background: colors.bg, borderColor: `${colors.border}40` }}
+                        className="group rounded-xl p-3.5 border transition-all duration-150 hover-lift relative overflow-hidden"
+                        style={{
+                          background: `linear-gradient(180deg, ${colors.bg} 0%, transparent 100%)`,
+                          borderColor: colors.border,
+                          boxShadow: `0 1px 0 rgba(255,255,255,0.04) inset, 0 4px 16px ${colors.glow}`,
+                        }}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="mono tabnum text-2xl font-semibold" style={{ color: colors.text }}>{a.count}</div>
-                          <ArrowRight size={14} className="text-ink-mute" />
+                          <div className="num-display text-3xl font-bold" style={{ color: colors.text }}>{a.count}</div>
+                          <ArrowRight size={14} className="text-ink-mute group-hover:text-ink group-hover:translate-x-0.5 transition" />
                         </div>
-                        <div className="text-[11px] text-ink-dim mt-1 leading-snug">{a.label}</div>
+                        <div className="text-2xs text-ink-dim mt-1.5 leading-snug">{a.label}</div>
                       </Link>
                     );
                   })}
@@ -290,10 +294,13 @@ export default function DashboardPage({ searchParams }: { searchParams: { period
 function Kpi({ label, value, tone, sub, accent }: { label: string; value: string; tone: 'income' | 'expense' | 'neutral' | 'warn'; sub?: string; accent?: boolean }) {
   const colorMap = { income: 'text-income', expense: 'text-expense', neutral: 'text-ink', warn: 'text-warn' };
   return (
-    <div className={`card p-4 ${accent ? 'border-entity-bytes/40' : ''}`}>
-      <div className="text-[11px] uppercase tracking-wider text-ink-mute">{label}</div>
-      <div className={`mt-2 text-xl font-semibold mono tabnum ${colorMap[tone]}`}>{value}</div>
-      {sub ? <div className="text-[11px] text-ink-mute mt-1">{sub}</div> : null}
+    <div className={`card p-4 hover-lift relative overflow-hidden ${accent ? 'border-entity-bytes/40' : ''}`}>
+      {accent ? (
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-entity-bytes/60 to-transparent" />
+      ) : null}
+      <div className="section-label">{label}</div>
+      <div className={`mt-2 text-2xl font-semibold num-display ${colorMap[tone]}`}>{value}</div>
+      {sub ? <div className="text-2xs text-ink-mute mt-1.5">{sub}</div> : null}
     </div>
   );
 }

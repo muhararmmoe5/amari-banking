@@ -141,18 +141,21 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-md animate-fade-in" onClick={onClose}>
         <div
-          className="absolute top-0 right-0 bottom-0 w-[min(640px,100vw)] bg-bg-1 border-l border-line flex flex-col shadow-soft"
+          className="absolute top-0 right-0 bottom-0 w-[min(680px,100vw)] bg-bg-1 border-l border-line-strong flex flex-col shadow-elev-3 animate-slide-in-right"
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           onKeyUp={(e) => e.stopPropagation()}
           onKeyPress={(e) => e.stopPropagation()}
         >
           {/* Header (fixed at top) */}
-          <div className="shrink-0 bg-bg-1 border-b border-line px-5 py-3 flex items-center justify-between">
-            <div className="text-sm font-medium">Transaction details</div>
-            <button onClick={onClose} className="text-ink-mute hover:text-ink p-1"><X size={16} /></button>
+          <div className="shrink-0 surface-glass border-b border-line px-5 py-3.5 flex items-center justify-between">
+            <div className="text-sm font-semibold tracking-tight">Transaction details</div>
+            <button
+              onClick={onClose}
+              className="text-ink-mute hover:text-ink p-1.5 rounded-md hover:bg-bg-2 transition"
+            ><X size={16} /></button>
           </div>
 
           {/* Body (scrollable, fills remaining space) */}

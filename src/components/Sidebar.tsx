@@ -19,7 +19,6 @@ import {
   Users,
   PieChart as PieChartIcon,
   LogOut,
-  User as UserIcon,
   Waves,
 } from 'lucide-react';
 
@@ -64,16 +63,18 @@ export default function Sidebar({
   }
 
   return (
-    <aside className="w-[68px] shrink-0 border-r border-line bg-bg-1 min-h-screen flex flex-col items-center py-4 sticky top-0 z-30">
+    <aside className="w-[72px] shrink-0 border-r border-line bg-bg-1/80 backdrop-blur-xl min-h-screen flex flex-col items-center py-5 sticky top-0 z-30">
+      {/* Logo */}
       <Link
         href="/"
-        className="w-10 h-10 rounded-full inline-flex items-center justify-center mb-6"
+        className="relative w-11 h-11 rounded-xl inline-flex items-center justify-center mb-7 transition-transform hover:scale-105"
         style={{
           background: 'linear-gradient(135deg, #C060F0 0%, #7c3aed 100%)',
           color: '#fff',
           fontWeight: 800,
-          fontSize: 14,
-          letterSpacing: 0.5,
+          fontSize: 15,
+          letterSpacing: 0.3,
+          boxShadow: '0 1px 0 rgba(255,255,255,0.2) inset, 0 8px 20px rgba(124,58,237,0.35)',
         }}
         title="Amari Ventures"
       >
@@ -82,7 +83,11 @@ export default function Sidebar({
 
       <nav className="flex-1 flex flex-col items-center gap-1 w-full">
         {items.map((n, idx) => {
-          if ('divider' in n) return <div key={`d-${idx}`} className="w-8 h-px bg-line my-2" />;
+          if ('divider' in n) {
+            return (
+              <div key={`d-${idx}`} className="w-7 h-px my-3 bg-gradient-to-r from-transparent via-line-strong to-transparent" />
+            );
+          }
           const Icon = n.icon;
           const isActive = n.href === '/' ? path === '/' : path?.startsWith(n.href!);
           return (
@@ -91,17 +96,23 @@ export default function Sidebar({
               href={n.href!}
               title={n.label}
               className={clsx(
-                'relative w-11 h-11 inline-flex items-center justify-center rounded-lg transition group',
-                isActive ? 'bg-bg-3 text-entity-bytes' : 'text-ink-dim hover:text-ink hover:bg-bg-2'
+                'relative w-11 h-11 inline-flex items-center justify-center rounded-xl transition-all duration-150 group',
+                isActive
+                  ? 'text-bg-0 bg-entity-bytes shadow-glow-bytes'
+                  : 'text-ink-mute hover:text-ink hover:bg-bg-2'
               )}
+              style={isActive ? {
+                background: 'linear-gradient(135deg, #D4F470 0%, #A5DE3F 100%)',
+              } : undefined}
             >
-              <Icon size={18} strokeWidth={1.75} />
+              <Icon size={19} strokeWidth={isActive ? 2.25 : 1.75} />
               {n.flagBadge && openFlags ? (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold inline-flex items-center justify-center bg-flag-critText/90 text-bg-0">
+                <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] px-1 rounded-full text-[10px] font-bold inline-flex items-center justify-center bg-expense text-white ring-2 ring-bg-1">
                   {openFlags > 99 ? '99+' : openFlags}
                 </span>
               ) : null}
-              <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap px-2 py-1 rounded-md bg-bg-3 border border-line text-[12px] text-ink opacity-0 group-hover:opacity-100 transition shadow-soft z-50">
+              {/* Tooltip */}
+              <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap px-2.5 py-1.5 rounded-lg surface-glass border border-line-strong text-xs font-medium text-ink opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-elev-2">
                 {n.label}
               </span>
             </Link>
@@ -109,29 +120,29 @@ export default function Sidebar({
         })}
       </nav>
 
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-2 mt-3">
         <div
-          className="w-9 h-9 rounded-full inline-flex items-center justify-center text-[11px] font-semibold bg-bg-3 text-ink relative group"
+          className="relative w-10 h-10 rounded-xl inline-flex items-center justify-center text-xs font-semibold bg-bg-3 text-ink border border-line group cursor-default"
           title={`${userName || ''} (${userEmail || ''}) · ${role || ''}`}
         >
           {initials}
-          <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap px-2 py-1 rounded-md bg-bg-3 border border-line text-[12px] text-ink opacity-0 group-hover:opacity-100 transition shadow-soft z-50">
+          <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap px-2.5 py-1.5 rounded-lg surface-glass border border-line-strong text-xs text-ink opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-elev-2">
             {userName || userEmail}{role ? ` · ${role.toLowerCase().replace('_', ' ')}` : ''}
           </span>
         </div>
         <button
           onClick={logout}
-          className="w-11 h-11 inline-flex items-center justify-center rounded-lg text-ink-mute hover:text-expense hover:bg-bg-2 group relative"
+          className="w-11 h-11 inline-flex items-center justify-center rounded-xl text-ink-mute hover:text-expense hover:bg-bg-2 transition group relative"
           title="Sign out"
           type="button"
         >
           <LogOut size={18} strokeWidth={1.75} />
-          <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap px-2 py-1 rounded-md bg-bg-3 border border-line text-[12px] text-ink opacity-0 group-hover:opacity-100 transition shadow-soft z-50">
+          <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap px-2.5 py-1.5 rounded-lg surface-glass border border-line-strong text-xs text-ink opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-elev-2">
             Sign out
           </span>
         </button>
-        <div className="mt-3 text-[9px] mono text-ink-mute opacity-50" title="Build stamp — if you don't see this number, you're on a stale bundle">
-          v.hier-cats
+        <div className="mt-2 text-[9px] mono text-ink-ghost" title="Build stamp">
+          v.ui-modern
         </div>
       </div>
     </aside>
