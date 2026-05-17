@@ -130,6 +130,9 @@ export default function Sidebar({
             Sign out
           </span>
         </button>
+        <div className="mt-3 text-[9px] mono text-ink-mute opacity-50" title="Build stamp — if you don't see this number, you're on a stale bundle">
+          v.budgets+opts
+        </div>
       </div>
     </aside>
   );
