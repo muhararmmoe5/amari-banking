@@ -74,19 +74,41 @@ export async function actSyncContributionsToCommitments(entity: any) {
      FROM cash_contributions WHERE entity = ?
      GROUP BY entity, person_id`
   ).all(entity) as any[];
+  let totalLinked = 0;
   for (const r of rows) {
+    let commitmentId: string;
     const existing = db.prepare(
       `SELECT id FROM funding_commitments WHERE entity = ? AND person_id = ? AND status = 'ACTIVE'`
-    ).get(r.entity, r.person_id);
-    if (existing) continue;
-    const id = crypto.randomUUID();
-    const now = Date.now();
-    db.prepare(
-      `INSERT INTO funding_commitments (id, entity, person_id, total_amount_cents, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)`
-    ).run(id, r.entity, r.person_id, r.total, now, now);
+    ).get(r.entity, r.person_id) as any;
+    if (existing) {
+      commitmentId = existing.id;
+    } else {
+      commitmentId = crypto.randomUUID();
+      const now = Date.now();
+      db.prepare(
+        `INSERT INTO funding_commitments (id, entity, person_id, total_amount_cents, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)`
+      ).run(commitmentId, r.entity, r.person_id, r.total, now, now);
+    }
+    // Get the person's name so we can pattern-match incoming wires by description
+    const person = db.prepare('SELECT name FROM people WHERE id = ?').get(r.person_id) as any;
+    const personName = (person?.name || '').toUpperCase();
+    // Auto-link all inflow transactions where the source_person_id matches, OR description
+    // contains the person name, OR income_source matches a known investor code (SPACETEL,
+    // OMAR_ALGHAZALI). Never overwrites a transaction that's already tagged to a commitment.
+    const result = db.prepare(
+      `UPDATE transactions
+       SET funding_commitment_id = ?, updated_at = ?
+       WHERE amount > 0
+         AND funding_commitment_id IS NULL
+         AND (source_person_id = ?
+              OR upper(description) LIKE ?
+              OR income_source IN ('SPACETEL', 'OMAR_ALGHAZALI'))`
+    ).run(commitmentId, Date.now(), r.person_id, `%${personName}%`);
+    totalLinked += Number(result.changes || 0);
   }
   revalidateAll();
+  return { linked: totalLinked };
 }
 
 function checkOwner() {

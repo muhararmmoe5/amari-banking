@@ -81,8 +81,19 @@ export default function CommitmentsPanel({
       {addOpen ? <AddForm entity={entity} people={people} onDone={() => setAddOpen(false)} /> : null}
 
       {commitments.length === 0 ? (
-        <div className="card p-6 text-sm text-ink-dim">
-          No funding commitments recorded for this entity. A commitment captures pledged investment money (e.g. "$900k for 20%, paid $75k/month") so we can track how much has been wired vs. still owed.
+        <div className="card p-6 text-sm text-ink-dim space-y-3">
+          <div>
+            No funding commitments recorded for this entity yet. A commitment captures pledged investment money (e.g. &ldquo;$900k for 20%, paid $75k/month&rdquo;) so we can track how much has been wired vs. still owed.
+          </div>
+          {showSeed ? (
+            <button type="button" onClick={onSeed} className="btn btn-primary inline-flex items-center gap-1 text-sm">
+              <Sparkles size={12} /> Set up Omar&apos;s $900k / 20% pledge now
+            </button>
+          ) : (
+            <div className="text-2xs text-ink-mute">
+              Click &ldquo;Add commitment&rdquo; above, or if you already logged a contribution row below, click <strong className="text-ink">↻ Sync to commitments</strong> to convert it into a tracked pledge.
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-3">

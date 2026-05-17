@@ -636,9 +636,13 @@ function CashTab({
     startTx(async () => {
       try {
         const { actSyncContributionsToCommitments } = await import('../actions');
-        await actSyncContributionsToCommitments(entity);
+        const result = await actSyncContributionsToCommitments(entity);
         saveEnd(tId);
-        toast({ kind: 'ok', title: 'Synced to commitments', body: 'Contributions are now reflected as commitments — wires can be tagged from the drawer.' });
+        toast({
+          kind: 'ok',
+          title: 'Synced to commitments',
+          body: `${result?.linked || 0} existing wire${(result?.linked || 0) === 1 ? '' : 's'} auto-linked. Reload to see the Investment progress card update.`,
+        });
       } catch (e: any) { saveError(tId, e?.message); }
     });
   }
