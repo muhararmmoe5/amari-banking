@@ -37,7 +37,14 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
       className="border-t border-line/60 hover:bg-bg-2/40 grid items-center text-sm cursor-pointer"
       style={{ gridTemplateColumns: ROW_GRID }}
     >
-      <div className="px-3 py-2 mono text-xs whitespace-nowrap text-ink-dim">{fmtDateShort(tx.postingDate)}</div>
+      <div className="px-3 py-1.5 mono text-xs whitespace-nowrap leading-tight">
+        <div className="text-ink-dim">{fmtDateShort(tx.postingDate)}</div>
+        {tx.transactionDate && tx.transactionDate !== tx.postingDate ? (
+          <div className="text-[10px] text-ink-mute italic mt-0.5">
+            charged {fmtDateShort(tx.transactionDate)}
+          </div>
+        ) : null}
+      </div>
       <div className="px-3 py-2 whitespace-nowrap">
         <span className="inline-flex items-center gap-1.5">
           {acct ? <EntityDot entity={acct.entity} /> : null}
