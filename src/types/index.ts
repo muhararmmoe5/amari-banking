@@ -123,6 +123,7 @@ export interface Transaction {
   sourceBusiness: string | null;
   sourceAccountId: string | null;
   budgetId: string | null;
+  fundingCommitmentId: string | null;
   isSalary: boolean;
   salaryEntity: string | null;
   salaryPersonId: string | null;

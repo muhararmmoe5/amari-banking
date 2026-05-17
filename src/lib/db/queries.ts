@@ -46,6 +46,7 @@ function rowToTransaction(r: any): Transaction {
     sourceBusiness: r.source_business ?? null,
     sourceAccountId: r.source_account_id ?? null,
     budgetId: r.budget_id ?? null,
+    fundingCommitmentId: r.funding_commitment_id ?? null,
     isSalary: !!r.is_salary,
     salaryEntity: r.salary_entity ?? null,
     salaryPersonId: r.salary_person_id ?? null,

@@ -42,6 +42,7 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
   const [sourceBusiness, setSourceBusiness] = useState(tx.sourceBusiness || '');
   const [sourceAccountId, setSourceAccountId] = useState(tx.sourceAccountId || '');
   const [budgetId, setBudgetId] = useState(tx.budgetId || '');
+  const [fundingCommitmentId, setFundingCommitmentId] = useState(tx.fundingCommitmentId || '');
   const [isSalary, setIsSalary] = useState(tx.isSalary);
   const [salaryEntity, setSalaryEntity] = useState(tx.salaryEntity || '');
   const [salaryPersonId, setSalaryPersonId] = useState(tx.salaryPersonId || '');
@@ -372,6 +373,28 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                           </option>
                         ))}
                         <option value="EXTERNAL">External / N/A (outside account)</option>
+                      </select>
+                    </Field>
+                    <Field
+                      label="Investor contribution"
+                      className="md:col-span-2"
+                      hint={commitments && commitments.length === 0 ? 'no active commitments — record one on the Cap Table' : 'count this wire toward an investor’s commitment'}
+                    >
+                      <select
+                        value={fundingCommitmentId}
+                        onChange={(e) => {
+                          setFundingCommitmentId(e.target.value);
+                          persist({ fundingCommitmentId: e.target.value || null } as any);
+                        }}
+                        className="w-full"
+                        disabled={!commitments || commitments.length === 0}
+                      >
+                        <option value="">— not an investor contribution —</option>
+                        {(commitments || []).map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.personName || 'Unknown investor'} → {ENTITY_LABELS[c.entity as keyof typeof ENTITY_LABELS] || c.entity}
+                          </option>
+                        ))}
                       </select>
                     </Field>
                   </>

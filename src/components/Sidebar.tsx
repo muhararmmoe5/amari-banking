@@ -142,7 +142,7 @@ export default function Sidebar({
           </span>
         </button>
         <div className="mt-2 text-[9px] mono text-ink-ghost" title="Build stamp">
-          v.investor-pick
+          v.investor-tag
         </div>
       </div>
     </aside>
