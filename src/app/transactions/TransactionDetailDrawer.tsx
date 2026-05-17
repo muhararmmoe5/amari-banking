@@ -9,6 +9,7 @@ import { saveTransaction } from './actions';
 import { useToast } from '@/components/Toast';
 import SplitEditor from '../audit/SplitEditor';
 import SourceTraceContent from './SourceTraceContent';
+import DownstreamTraceContent from './DownstreamTraceContent';
 import SameDayPanel from './SameDayPanel';
 import Portal from '@/components/Portal';
 import { ArrowDownToLine } from 'lucide-react';
@@ -216,6 +217,17 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                 accent="income"
               >
                 <SourceTraceContent txId={tx.id} compact />
+              </SectionCard>
+            ) : null}
+
+            {/* Section 2b — What this money funded (inflows only, downstream trace) */}
+            {tx.amount > 0 ? (
+              <SectionCard
+                title="What this money funded"
+                subtitle="FIFO downstream trace — every expense that drew from this inflow"
+                accent="warn"
+              >
+                <DownstreamTraceContent txId={tx.id} />
               </SectionCard>
             ) : null}
 

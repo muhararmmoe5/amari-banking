@@ -51,17 +51,6 @@ export interface SourceTraceResult {
 const MAX_DEPTH = 2;
 const MAX_QUERIES_PER_TRACE = 200;
 
-/**
- * Batch FIFO source trace for every expense on a single account.
- * Walks the account's posted history in chronological order ONCE,
- * pushing each inflow onto a queue and draining it for each outflow.
- *
- * Returns a Map of outflow txId -> attributed sources (no upstream recursion;
- * for the deep-audit page we render each row's sources flat for speed).
- *
- * Returns far quicker than calling traceFundingSource() per-tx because we
- * avoid re-scanning the account history for every outflow.
- */
 export function traceAllExpensesOnAccount(
   accountId: string,
   onlyTxIds?: Set<string>
@@ -314,6 +303,112 @@ export interface SameDayTx {
   auditStatus: string;
   confirmedEntity: string | null;
   entityTag: string;
+}
+
+// ===== Downstream / forward trace =====
+// Given an inflow (income) transaction, walk forward through the same
+// account's history and identify every expense that drew (any) portion of
+// its remaining balance under FIFO.
+
+export interface DownstreamConsumer {
+  txId: string;
+  postingDate: string;
+  description: string;
+  merchant: string | null;
+  expenseAmount: number;          // total expense (negative)
+  amountFromThisInflow: number;   // how much of this inflow funded that expense
+  pctOfThisInflow: number;        // amountFromThisInflow / inflow.amount * 100
+  pctOfExpense: number;           // amountFromThisInflow / |expenseAmount| * 100
+  confirmedEntity: string | null;
+  category: string;
+}
+
+export interface DownstreamTraceResult {
+  inflow: {
+    id: string;
+    accountId: string;
+    postingDate: string;
+    description: string;
+    merchant: string | null;
+    amount: number;
+  };
+  consumers: DownstreamConsumer[];
+  totalSpent: number;
+  remaining: number;
+  pctSpent: number;
+}
+
+export function traceDownstreamFromInflow(txId: string): DownstreamTraceResult | null {
+  const db = getDb();
+  const seed = db.prepare(`
+    SELECT id, account_id, posting_date, description, merchant_name, amount
+    FROM transactions WHERE id = ?
+  `).get(txId) as any;
+  if (!seed || seed.amount <= 0) return null;
+
+  // Walk every transaction on this account from oldest to newest, replaying FIFO.
+  // For each inflow we push it on a queue (with remaining balance). For each
+  // outflow we drain from queue head. When the outflow takes some of OUR
+  // target inflow's slot, we record it as a consumer.
+  const all = db.prepare(`
+    SELECT id, posting_date, description, merchant_name, amount,
+      confirmed_entity, entity_tag, category
+    FROM transactions
+    WHERE account_id = ?
+    ORDER BY posting_date ASC, id ASC
+  `).all(seed.account_id) as any[];
+
+  interface Slot { txId: string; remaining: number; original: number }
+  const queue: Slot[] = [];
+  const consumers: DownstreamConsumer[] = [];
+  for (const t of all) {
+    if (t.amount > 0) {
+      queue.push({ txId: t.id, remaining: t.amount, original: t.amount });
+      continue;
+    }
+    if (t.amount < 0) {
+      let toCover = Math.abs(t.amount);
+      while (toCover > 0.001 && queue.length > 0) {
+        const head = queue[0];
+        const take = Math.min(toCover, head.remaining);
+        if (head.txId === txId) {
+          consumers.push({
+            txId: t.id,
+            postingDate: t.posting_date,
+            description: t.description,
+            merchant: t.merchant_name,
+            expenseAmount: t.amount,
+            amountFromThisInflow: take,
+            pctOfThisInflow: (take / seed.amount) * 100,
+            pctOfExpense: (take / Math.abs(t.amount)) * 100,
+            confirmedEntity: t.confirmed_entity,
+            category: t.category,
+          });
+        }
+        head.remaining -= take;
+        toCover -= take;
+        if (head.remaining < 0.001) queue.shift();
+      }
+    }
+  }
+
+  const totalSpent = consumers.reduce((s, c) => s + c.amountFromThisInflow, 0);
+  const remaining = Math.max(0, seed.amount - totalSpent);
+  const pctSpent = seed.amount > 0 ? (totalSpent / seed.amount) * 100 : 0;
+  return {
+    inflow: {
+      id: seed.id,
+      accountId: seed.account_id,
+      postingDate: seed.posting_date,
+      description: seed.description,
+      merchant: seed.merchant_name,
+      amount: seed.amount,
+    },
+    consumers,
+    totalSpent,
+    remaining,
+    pctSpent,
+  };
 }
 
 export function getSameDayTransactions(txId: string): SameDayTx[] {
