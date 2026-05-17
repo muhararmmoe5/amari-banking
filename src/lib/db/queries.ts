@@ -228,39 +228,66 @@ function chainSameDayByBalance(rows: any[], orderDir: 'ASC' | 'DESC'): any[] {
 }
 
 function chainGroup(group: any[], orderDir: 'ASC' | 'DESC'): any[] {
-  // Build a map: prevBalance (rounded to cents) -> row
-  const EPS = 0.005;
-  const byPrev = new Map<string, any[]>();
+  // Same-day rows from Chase can form MULTIPLE separate chains within one day
+  // (e.g. a main chain of credits/debits, plus orphan end-of-day bank fees
+  // that chain to the previous day's closing balance). Approach:
+  //   1. Build a map balance(of cents) -> row.
+  //   2. From each row, hop forward via the "next row's prev_balance equals
+  //      my balance" rule. Collect each chain.
+  //   3. For DESC display, reverse each chain internally (latest tx on top).
+  //   4. Sort chains by their TOP balance descending, so the chain ending at
+  //      the highest balance shows first.
+  const balToRow = new Map<string, any>();
   for (const r of group) {
-    const prev = Math.round((r.balance - r.amount) * 100) / 100;
-    const key = prev.toFixed(2);
-    const arr = byPrev.get(key) || [];
-    arr.push(r);
-    byPrev.set(key, arr);
+    const key = (Math.round(r.balance * 100) / 100).toFixed(2);
+    if (!balToRow.has(key)) balToRow.set(key, r);
   }
-  const balances = new Set(group.map((r) => (Math.round(r.balance * 100) / 100).toFixed(2)));
-  // The chronologically-first tx of the day has prev_balance NOT in this day's balances
-  // (because the prev balance was carried over from the previous day).
-  const starts = group.filter((r) => {
+  // For each row, compute the row that comes AFTER it (whose prev_balance == my balance)
+  const nextOf = new Map<string, any | null>();
+  for (const r of group) {
+    const myKey = (Math.round(r.balance * 100) / 100).toFixed(2);
+    const candidate = group.find((other) => {
+      if (other.id === r.id) return false;
+      const otherPrev = Math.round((other.balance - other.amount) * 100) / 100;
+      return otherPrev.toFixed(2) === myKey;
+    });
+    nextOf.set(r.id, candidate || null);
+  }
+  // Find chain heads: rows whose prev_balance is NOT any other row's balance in this day.
+  const balancesInDay = new Set(group.map((r) => (Math.round(r.balance * 100) / 100).toFixed(2)));
+  const heads = group.filter((r) => {
     const prev = Math.round((r.balance - r.amount) * 100) / 100;
-    return !balances.has(prev.toFixed(2));
+    return !balancesInDay.has(prev.toFixed(2));
   });
-  if (starts.length !== 1) {
-    // Multiple candidates or none — chain ambiguous, keep original order.
-    return group;
+  if (heads.length === 0) return group;  // Cycle — bail out to insertion order
+
+  // Walk each head forward to build chains
+  const chains: any[][] = [];
+  const used = new Set<string>();
+  for (const head of heads) {
+    if (used.has(head.id)) continue;
+    const chain: any[] = [];
+    let cur: any | null = head;
+    while (cur && !used.has(cur.id)) {
+      chain.push(cur);
+      used.add(cur.id);
+      cur = nextOf.get(cur.id) || null;
+    }
+    chains.push(chain);
   }
-  const chronological: any[] = [];
-  const seen = new Set<string>();
-  let cur: any | undefined = starts[0];
-  while (cur && !seen.has(cur.id)) {
-    chronological.push(cur);
-    seen.add(cur.id);
-    const key = (Math.round(cur.balance * 100) / 100).toFixed(2);
-    const next = (byPrev.get(key) || []).find((r) => !seen.has(r.id));
-    cur = next;
+  // Any rows not in a chain (shouldn't happen with valid data) — append in insertion order
+  const leftover = group.filter((r) => !used.has(r.id));
+
+  // Order chains: for DESC display, the chain whose LAST tx has the highest
+  // balance shows first (latest activity on top). For ASC, the chain whose
+  // FIRST tx has the lowest prev_balance shows first.
+  if (orderDir === 'DESC') {
+    chains.sort((a, b) => b[b.length - 1].balance - a[a.length - 1].balance);
+    return [...chains.flatMap((c) => [...c].reverse()), ...leftover];
+  } else {
+    chains.sort((a, b) => (a[0].balance - a[0].amount) - (b[0].balance - b[0].amount));
+    return [...chains.flatMap((c) => c), ...leftover];
   }
-  if (chronological.length !== group.length) return group;  // Couldn't fully chain
-  return orderDir === 'DESC' ? chronological.reverse() : chronological;
 }
 
 export function getTransaction(id: string): Transaction | null {
