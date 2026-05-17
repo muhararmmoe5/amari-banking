@@ -71,13 +71,13 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
 
   return (
     <>
-      <div className="fixed inset-0 z-40 flex items-stretch justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={onClose}>
         <div
-          className="w-[min(640px,100vw)] h-full bg-bg-1 border-l border-line overflow-y-auto"
+          className="absolute top-0 right-0 bottom-0 w-[min(640px,100vw)] bg-bg-1 border-l border-line flex flex-col shadow-soft"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className="sticky top-0 bg-bg-1 border-b border-line px-5 py-3 flex items-center justify-between z-10">
+          {/* Header (fixed at top) */}
+          <div className="shrink-0 bg-bg-1 border-b border-line px-5 py-3 flex items-center justify-between">
             <div className="text-sm font-medium">Transaction details</div>
             <div className="flex items-center gap-2">
               <button
@@ -92,7 +92,8 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
             </div>
           </div>
 
-          <div className="p-5 space-y-5">
+          {/* Body (scrollable, fills remaining space) */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-5">
             {/* Summary */}
             <div className="card p-4 space-y-2" style={{ borderColor: `${entityColor}40` }}>
               <div className="flex items-start justify-between gap-3">
@@ -267,6 +268,7 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
               <div className="text-[11px] text-ink-mute ml-auto">Esc to close · changes save automatically</div>
             </div>
           </div>
+          {/* Body close */}
         </div>
       </div>
       {traceOpen ? <SourceTraceModal txId={tx.id} onClose={() => setTraceOpen(false)} /> : null}

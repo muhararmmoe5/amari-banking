@@ -90,17 +90,17 @@ export default function SourceTraceModal({ txId, onClose }: { txId: string; onCl
   const totalAttributed = data ? data.sources.reduce((s, x) => s + x.amount, 0) : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-[min(560px,100vw)] h-full bg-bg-1 border-l border-line overflow-y-auto"
+        className="absolute top-0 right-0 bottom-0 w-[min(560px,100vw)] bg-bg-1 border-l border-line flex flex-col shadow-soft"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-bg-1 border-b border-line px-5 py-3 flex items-center justify-between z-10">
+        <div className="shrink-0 bg-bg-1 border-b border-line px-5 py-3 flex items-center justify-between">
           <div className="text-sm font-medium">Source trace</div>
           <button onClick={onClose} className="text-ink-mute hover:text-ink p-1"><X size={16} /></button>
         </div>
 
-        <div className="p-5 space-y-6">
+        <div className="flex-1 overflow-y-auto p-5 space-y-6">
           {loading ? <div className="text-sm text-ink-mute">Tracing…</div> : null}
           {err ? <div className="text-sm text-flag-critText">Failed to trace: {err}</div> : null}
 
