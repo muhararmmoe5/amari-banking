@@ -1,14 +1,13 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
-import { X, Search, Check } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import type { Transaction, EntityType, AuditStatus } from '@/types';
 import { ACCOUNTS, ENTITY_LABELS, ENTITY_COLORS, getAccount } from '@/constants/accounts';
 import { fmtMoney, fmtDate } from '@/lib/format';
 import { saveTransaction } from './actions';
 import { useToast } from '@/components/Toast';
 import SplitEditor from '../audit/SplitEditor';
-import SourceTraceModal from './SourceTraceModal';
 import SourceTraceContent from './SourceTraceContent';
 import SameDayPanel from './SameDayPanel';
 import Portal from '@/components/Portal';
@@ -40,7 +39,6 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
   const [taggedDate, setTaggedDate] = useState(tx.taggedDate || '');
   const [sourcePersonId, setSourcePersonId] = useState(tx.sourcePersonId || '');
   const [people, setPeople] = useState<{ id: string; name: string; role: string }[] | null>(null);
-  const [traceOpen, setTraceOpen] = useState(false);
   const [, startTx] = useTransition();
   const { saveStart, saveEnd, saveError } = useToast();
   const acct = getAccount(tx.accountId);
@@ -94,17 +92,7 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
           {/* Header (fixed at top) */}
           <div className="shrink-0 bg-bg-1 border-b border-line px-5 py-3 flex items-center justify-between">
             <div className="text-sm font-medium">Transaction details</div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setTraceOpen(true)}
-                className="btn btn-ghost text-xs"
-                title="Trace where this money came from"
-              >
-                <Search size={12} /> Trace source
-              </button>
-              <button onClick={onClose} className="text-ink-mute hover:text-ink p-1"><X size={16} /></button>
-            </div>
+            <button onClick={onClose} className="text-ink-mute hover:text-ink p-1"><X size={16} /></button>
           </div>
 
           {/* Body (scrollable, fills remaining space) */}
@@ -345,7 +333,6 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
           {/* Body close */}
         </div>
       </div>
-      {traceOpen ? <SourceTraceModal txId={tx.id} onClose={() => setTraceOpen(false)} /> : null}
     </Portal>
   );
 }

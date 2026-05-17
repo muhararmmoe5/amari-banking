@@ -49,6 +49,7 @@ export interface SourceTraceResult {
 }
 
 const MAX_DEPTH = 2;
+const MAX_QUERIES_PER_TRACE = 200;
 
 /**
  * Batch FIFO source trace for every expense on a single account.
@@ -141,7 +142,14 @@ export function traceAllExpensesOnAccount(
   return out;
 }
 
-export function traceFundingSource(txId: string, depth: number = 0): SourceTraceResult | null {
+export function traceFundingSource(
+  txId: string,
+  depth: number = 0,
+  ctx: { visited: Set<string>; queries: { n: number } } = { visited: new Set(), queries: { n: 0 } }
+): SourceTraceResult | null {
+  if (ctx.visited.has(txId)) return null;
+  ctx.visited.add(txId);
+  if (ctx.queries.n++ > MAX_QUERIES_PER_TRACE) return null;
   const db = getDb();
   const target = db.prepare(`
     SELECT id, account_id, posting_date, description, merchant_name, amount, balance,
@@ -246,7 +254,7 @@ export function traceFundingSource(txId: string, depth: number = 0): SourceTrace
         };
         // Recursive: if this source is an internal-transfer inflow, walk up through the linked outflow on the source account.
         if (head.isInternal && head.internalLinkedId && depth < MAX_DEPTH) {
-          source.upstream = traceFundingSource(head.internalLinkedId, depth + 1) || null;
+          source.upstream = traceFundingSource(head.internalLinkedId, depth + 1, ctx) || null;
         }
         consumed.push(source);
         head.remaining -= take;
