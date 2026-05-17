@@ -50,6 +50,7 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
   const [passthroughPersonId, setPassthroughPersonId] = useState(tx.passthroughPersonId || '');
   const [passthroughNotes, setPassthroughNotes] = useState(tx.passthroughNotes || '');
   const [budgets, setBudgets] = useState<{ id: string; name: string; kind: string; entity: string | null }[] | null>(null);
+  const [commitments, setCommitments] = useState<{ id: string; entity: string; personName: string | null }[] | null>(null);
   const [optionLists, setOptionLists] = useState<Record<string, string[]>>({
     individual: [], sub_category_1: [], sub_category_2: [], business_purpose: [], source_of_money: [], need_to_get_from: [],
   });
@@ -84,6 +85,10 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
       .then((r) => r.json())
       .then((d) => { if (!cancelled) setBudgets(d.budgets || []); })
       .catch(() => { if (!cancelled) setBudgets([]); });
+    fetch('/api/commitments', { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setCommitments(d.commitments || []); })
+      .catch(() => { if (!cancelled) setCommitments([]); });
     fetch('/api/options', { credentials: 'same-origin' })
       .then((r) => r.json())
       .then((d) => {
@@ -315,7 +320,15 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                       field="source_of_money"
                       value={sourceOfMoney}
                       options={optionLists.source_of_money || []}
-                      builtInOptions={{ label: 'Your businesses', values: BUSINESS_ENTITIES.map((e) => ENTITY_LABELS[e]) }}
+                      builtInOptions={{
+                        label: 'Money pools (entity · type)',
+                        values: [
+                          ...BUSINESS_ENTITIES.map((e) => `${ENTITY_LABELS[e]} revenue`),
+                          ...(commitments || []).map((c) =>
+                            `${ENTITY_LABELS[c.entity as keyof typeof ENTITY_LABELS] || c.entity} investment income — ${c.personName || 'unknown investor'}`
+                          ),
+                        ],
+                      }}
                       onChange={(v) => { setSourceOfMoney(v); persist({ sourceOfMoney: v || null }); }}
                       onOptionAdded={(v) => addToList('source_of_money', v)}
                     />
