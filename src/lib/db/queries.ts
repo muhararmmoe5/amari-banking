@@ -46,6 +46,9 @@ function rowToTransaction(r: any): Transaction {
     sourceBusiness: r.source_business ?? null,
     sourceAccountId: r.source_account_id ?? null,
     budgetId: r.budget_id ?? null,
+    isSalary: !!r.is_salary,
+    salaryEntity: r.salary_entity ?? null,
+    salaryPersonId: r.salary_person_id ?? null,
     importedAt: r.imported_at,
     updatedAt: r.updated_at,
     importBatchId: r.import_batch_id,
@@ -227,6 +230,9 @@ export interface UpdateTxPatch {
   sourceAccountId?: string | null;
   budgetId?: string | null;
   fundingCommitmentId?: string | null;
+  isSalary?: boolean;
+  salaryEntity?: string | null;
+  salaryPersonId?: string | null;
 }
 
 export function updateTransaction(id: string, patch: UpdateTxPatch): void {
@@ -266,6 +272,9 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
     fields.push('funding_commitment_id = @funding_commitment_id');
     params.funding_commitment_id = (patch as any).fundingCommitmentId;
   }
+  if (patch.isSalary !== undefined) { fields.push('is_salary = @is_salary'); params.is_salary = patch.isSalary ? 1 : 0; }
+  if (patch.salaryEntity !== undefined) { fields.push('salary_entity = @salary_entity'); params.salary_entity = patch.salaryEntity; }
+  if (patch.salaryPersonId !== undefined) { fields.push('salary_person_id = @salary_person_id'); params.salary_person_id = patch.salaryPersonId; }
   if (fields.length === 0) return;
   fields.push('updated_at = @updated_at');
   db.prepare(`UPDATE transactions SET ${fields.join(', ')} WHERE id = @id`).run(params);

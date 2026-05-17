@@ -42,6 +42,9 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
   const [sourceBusiness, setSourceBusiness] = useState(tx.sourceBusiness || '');
   const [sourceAccountId, setSourceAccountId] = useState(tx.sourceAccountId || '');
   const [budgetId, setBudgetId] = useState(tx.budgetId || '');
+  const [isSalary, setIsSalary] = useState(tx.isSalary);
+  const [salaryEntity, setSalaryEntity] = useState(tx.salaryEntity || '');
+  const [salaryPersonId, setSalaryPersonId] = useState(tx.salaryPersonId || '');
   const [budgets, setBudgets] = useState<{ id: string; name: string; kind: string; entity: string | null }[] | null>(null);
   const [optionLists, setOptionLists] = useState<Record<string, string[]>>({
     individual: [], sub_category_1: [], sub_category_2: [], business_purpose: [], source_of_money: [], need_to_get_from: [],
@@ -350,6 +353,57 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                   ))}
                 </select>
               </Field>
+              <Field label="Is this a salary?" className="md:col-span-2">
+                <select
+                  value={isSalary ? '1' : '0'}
+                  onChange={(e) => {
+                    const v = e.target.value === '1';
+                    setIsSalary(v);
+                    if (!v) {
+                      setSalaryEntity('');
+                      setSalaryPersonId('');
+                      persist({ isSalary: false, salaryEntity: null, salaryPersonId: null });
+                    } else {
+                      persist({ isSalary: true });
+                    }
+                  }}
+                  className="w-full"
+                >
+                  <option value="0">No</option>
+                  <option value="1">Yes — this is a salary / wage payment</option>
+                </select>
+              </Field>
+              {isSalary ? (
+                <>
+                  <Field label="Salary · for which entity">
+                    <select
+                      value={salaryEntity}
+                      onChange={(e) => { setSalaryEntity(e.target.value); persist({ salaryEntity: e.target.value || null }); }}
+                      className="w-full"
+                    >
+                      <option value="">— pick —</option>
+                      {ENTITY_OPTIONS.map((e) => (
+                        <option key={e} value={e}>{ENTITY_LABELS[e]}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Salary · who is it for">
+                    <select
+                      value={salaryPersonId}
+                      onChange={(e) => { setSalaryPersonId(e.target.value); persist({ salaryPersonId: e.target.value || null }); }}
+                      className="w-full"
+                    >
+                      <option value="">— pick —</option>
+                      {(people || []).map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}{p.role ? ` (${p.role.toLowerCase()})` : ''}</option>
+                      ))}
+                    </select>
+                    {people && people.length === 0 ? (
+                      <div className="text-[10px] text-ink-mute mt-1">No people yet — add them on the <a href="/team" className="text-entity-bytes hover:underline">Team page</a>.</div>
+                    ) : null}
+                  </Field>
+                </>
+              ) : null}
               <Field label="Business purpose" className="md:col-span-2">
                 <OptionSelect
                   field="business_purpose"

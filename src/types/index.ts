@@ -123,6 +123,9 @@ export interface Transaction {
   sourceBusiness: string | null;
   sourceAccountId: string | null;
   budgetId: string | null;
+  isSalary: boolean;
+  salaryEntity: string | null;
+  salaryPersonId: string | null;
   importedAt: number;
   updatedAt: number;
   importBatchId: string;
