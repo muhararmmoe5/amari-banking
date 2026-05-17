@@ -159,422 +159,457 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
           </div>
 
           {/* Body (scrollable, fills remaining space) */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-5">
-            {/* Summary */}
-            <div className="card p-4 space-y-2" style={{ borderColor: `${entityColor}40` }}>
+          <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-bg-0/40">
+            {/* Section 1 — Summary */}
+            <div className="card p-5 space-y-3" style={{ borderColor: `${entityColor}40` }}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-medium text-base">{tx.merchantName || tx.description.slice(0, 80)}</div>
-                  <div className="text-[11px] text-ink-mute mt-1 break-words">{tx.description}</div>
+                  <div className="font-semibold text-lg tracking-tight">{tx.merchantName || tx.description.slice(0, 80)}</div>
+                  <div className="text-xs text-ink-mute mt-1 break-words">{tx.description}</div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className={`mono tabnum text-2xl font-semibold ${tx.amount >= 0 ? 'text-income' : 'text-expense'}`}>
+                  <div className={`num-display text-3xl font-bold ${tx.amount >= 0 ? 'text-income' : 'text-expense'}`}>
                     {fmtMoney(tx.amount)}
                   </div>
                   {tx.balance != null ? (
-                    <div className="mono tabnum text-[11px] text-ink-mute">balance after: {fmtMoney(tx.balance)}</div>
+                    <div className="num-display text-2xs text-ink-mute mt-0.5">balance after: {fmtMoney(tx.balance)}</div>
                   ) : null}
                 </div>
               </div>
-              <div className="text-[11px] text-ink-dim flex flex-wrap gap-x-3 gap-y-1 pt-2 border-t border-line">
+              <div className="text-2xs text-ink-dim flex flex-wrap gap-x-3 gap-y-1 pt-3 border-t border-line">
                 {tx.transactionDate && tx.transactionDate !== tx.postingDate ? (
                   <span title="Extracted from description — when the charge/transfer actually happened.">
                     💳 Transaction: <span className="mono">{fmtDate(tx.transactionDate)}</span>
                   </span>
                 ) : null}
                 <span title="From Chase — when the bank processed this transaction. Cannot be changed.">
-                  🏦 Posted on bank: <span className="mono">{fmtDate(tx.postingDate)}</span>
+                  🏦 Posted: <span className="mono">{fmtDate(tx.postingDate)}</span>
                 </span>
                 <span>Paid from <span className="mono">···{tx.accountId}</span>{acct ? ` (${acct.label})` : ''}</span>
                 <span>Posted as {tx.category.replace(/^(EXPENSE_|INCOME_)/, '').replace(/_/g, ' ').toLowerCase()}</span>
               </div>
             </div>
 
-            {/* Source of money — loaded inline at the very top so it's always visible */}
+            {/* Section 2 — Source of money (expenses only) */}
             {tx.amount < 0 ? (
-              <section>
-                <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-2 inline-flex items-center gap-1.5">
-                  <ArrowDownToLine size={12} className="text-income" />
-                  Source of money for this expense
-                </div>
+              <SectionCard
+                title="Source of money"
+                subtitle="FIFO trace of which prior inflow funded this expense"
+                accent="income"
+              >
                 <SourceTraceContent txId={tx.id} compact />
-              </section>
+              </SectionCard>
             ) : null}
 
-            {/* Status + CPA reviewed + Tagged date */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Field label="Status">
-                <select value={status} onChange={(e) => { applyStatus(e.target.value as AuditStatus); }} className="w-full">
-                  {STATUS_OPTIONS.map((s) => (
-                    <option key={s} value={s}>{s.replace(/_/g, ' ').toLowerCase()}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="CPA reviewed">
-                <button
-                  type="button"
-                  onClick={() => { const v = !cpaReviewed; setCpaReviewed(v); persist({ cpaReviewed: v }); }}
-                  className={`w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border text-sm transition ${
-                    cpaReviewed
-                      ? 'bg-income/15 border-income/40 text-income'
-                      : 'bg-bg-2 border-line text-ink-dim hover:text-ink'
-                  }`}
-                >
-                  {cpaReviewed ? <><Check size={14} /> Yes — reviewed</> : 'No — not reviewed'}
-                </button>
-              </Field>
-              <Field label="Booking date" hint="the only editable date — when this should be booked for accounting; defaults blank if unset">
-                <input
-                  type="date"
-                  value={taggedDate}
-                  onChange={(e) => setTaggedDate(e.target.value)}
-                  onBlur={() => persist({ taggedDate: taggedDate || null })}
-                  className="w-full"
-                />
-              </Field>
-            </div>
+            {/* Section 3 — Review status */}
+            <SectionCard title="Review status" subtitle="Status, CPA sign-off, and the booking date for accounting">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Field label="Status">
+                  <select value={status} onChange={(e) => { applyStatus(e.target.value as AuditStatus); }} className="w-full">
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s} value={s}>{s.replace(/_/g, ' ').toLowerCase()}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="CPA reviewed">
+                  <button
+                    type="button"
+                    onClick={() => { const v = !cpaReviewed; setCpaReviewed(v); persist({ cpaReviewed: v }); }}
+                    className={`w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition ${
+                      cpaReviewed
+                        ? 'bg-income/15 border-income/40 text-income'
+                        : 'bg-bg-2 border-line text-ink-dim hover:text-ink'
+                    }`}
+                  >
+                    {cpaReviewed ? <><Check size={14} /> Yes — reviewed</> : 'No — not reviewed'}
+                  </button>
+                </Field>
+                <Field label="Booking date" hint="when this should be booked for accounting">
+                  <input
+                    type="date"
+                    value={taggedDate}
+                    onChange={(e) => setTaggedDate(e.target.value)}
+                    onBlur={() => persist({ taggedDate: taggedDate || null })}
+                    className="w-full"
+                  />
+                </Field>
+              </div>
+            </SectionCard>
 
-            {/* Audit fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Field label="Books to entity">
-                <select
-                  value={confirmedEntity}
-                  onChange={(e) => { const v = e.target.value as EntityType; setConfirmedEntity(v); persist({ confirmedEntity: v }); }}
-                  className="w-full"
+            {/* Section 4 — Categorization */}
+            <SectionCard title="Categorization" subtitle="Where it books, who it's about, and how it's classified">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="Books to entity">
+                  <select
+                    value={confirmedEntity}
+                    onChange={(e) => { const v = e.target.value as EntityType; setConfirmedEntity(v); persist({ confirmedEntity: v }); }}
+                    className="w-full"
+                  >
+                    {ENTITY_OPTIONS.map((o) => (
+                      <option key={o} value={o}>{ENTITY_LABELS[o]}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field
+                  label={tx.amount > 0 ? 'Source person (income)' : 'Counterparty person'}
+                  hint={tx.amount > 0 ? 'who this money came FROM' : 'who this money went TO, if applicable'}
                 >
-                  {ENTITY_OPTIONS.map((o) => (
-                    <option key={o} value={o}>{ENTITY_LABELS[o]}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field
-                label={tx.amount > 0 ? 'Source person (income)' : 'Source / counterparty person'}
-                hint={tx.amount > 0 ? 'who this money came FROM — investor, partner, etc.' : 'who this money went TO, if applicable'}
-              >
-                <select
-                  value={sourcePersonId}
-                  onChange={(e) => {
-                    setSourcePersonId(e.target.value);
-                    persist({ sourcePersonId: e.target.value || null });
-                  }}
-                  className="w-full"
-                >
-                  <option value="">— None —</option>
-                  {(people || []).map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.role.toLowerCase()})
-                    </option>
-                  ))}
-                </select>
-                {(people && people.length === 0) ? (
-                  <div className="text-[10px] text-ink-mute mt-1">No people yet — add them on the <a href="/team" className="text-entity-bytes hover:underline">Team page</a>.</div>
-                ) : null}
-              </Field>
-              <Field label="Individual" hint="who is this about">
-                <OptionSelect
-                  field="individual"
-                  value={individual}
-                  options={optionLists.individual || []}
-                  builtInOptions={{ label: 'People on the team', values: (people || []).map((p) => p.name) }}
-                  onChange={(v) => { setIndividual(v); persist({ individual: v || null }); }}
-                  onOptionAdded={(v) => addToList('individual', v)}
-                  placeholder="— pick a person / vendor —"
-                />
-              </Field>
-              <Field label="Sub category 1" hint="bucket — pick this first so Sub Category 2 filters">
-                <OptionSelect
-                  field="sub_category_1"
-                  value={sub1}
-                  options={optionLists.sub_category_1 || []}
-                  onChange={(v) => {
-                    setSub1(v);
-                    // If current sub2 is not under the new sub1 (and sub1 is set), clear it.
-                    if (v && sub2) {
-                      const validChildren = subCat2ByParent.get(v) || [];
-                      if (!validChildren.includes(sub2)) {
-                        setSub2('');
-                        persist({ subCategory1: v || null, subCategory2: null });
-                        return;
+                  <select
+                    value={sourcePersonId}
+                    onChange={(e) => {
+                      setSourcePersonId(e.target.value);
+                      persist({ sourcePersonId: e.target.value || null });
+                    }}
+                    className="w-full"
+                  >
+                    <option value="">— None —</option>
+                    {(people || []).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.role.toLowerCase()})
+                      </option>
+                    ))}
+                  </select>
+                  {(people && people.length === 0) ? (
+                    <div className="text-2xs text-ink-mute mt-1">No people yet — add them on the <a href="/team" className="text-entity-bytes hover:underline">Team page</a>.</div>
+                  ) : null}
+                </Field>
+                <Field label="Individual" hint="who is this about">
+                  <OptionSelect
+                    field="individual"
+                    value={individual}
+                    options={optionLists.individual || []}
+                    builtInOptions={{ label: 'People on the team', values: (people || []).map((p) => p.name) }}
+                    onChange={(v) => { setIndividual(v); persist({ individual: v || null }); }}
+                    onOptionAdded={(v) => addToList('individual', v)}
+                    placeholder="— pick a person / vendor —"
+                  />
+                </Field>
+                <Field label="Sub category 1" hint="bucket — pick first">
+                  <OptionSelect
+                    field="sub_category_1"
+                    value={sub1}
+                    options={optionLists.sub_category_1 || []}
+                    onChange={(v) => {
+                      setSub1(v);
+                      if (v && sub2) {
+                        const validChildren = subCat2ByParent.get(v) || [];
+                        if (!validChildren.includes(sub2)) {
+                          setSub2('');
+                          persist({ subCategory1: v || null, subCategory2: null });
+                          return;
+                        }
                       }
+                      persist({ subCategory1: v || null });
+                    }}
+                    onOptionAdded={(v) => addToList('sub_category_1', v)}
+                  />
+                </Field>
+                <Field label="Sub category 2" hint={sub1 ? `filtered to ${sub1}` : undefined}>
+                  <OptionSelect
+                    field="sub_category_2"
+                    value={sub2}
+                    options={sub1 ? (subCat2ByParent.get(sub1) || []) : subCat2NoParent}
+                    newOptionParent={sub1 || null}
+                    secondaryGroups={
+                      sub1
+                        ? Array.from(subCat2ByParent.entries())
+                            .filter(([parent]) => parent !== sub1)
+                            .map(([parent, values]) => ({ label: parent, values }))
+                        : undefined
                     }
-                    persist({ subCategory1: v || null });
-                  }}
-                  onOptionAdded={(v) => addToList('sub_category_1', v)}
-                />
-              </Field>
-              <Field label="Sub category 2" hint={sub1 ? `filtered to ${sub1}` : undefined}>
-                <OptionSelect
-                  field="sub_category_2"
-                  value={sub2}
-                  options={sub1 ? (subCat2ByParent.get(sub1) || []) : subCat2NoParent}
-                  newOptionParent={sub1 || null}
-                  secondaryGroups={
-                    sub1
-                      ? Array.from(subCat2ByParent.entries())
-                          .filter(([parent]) => parent !== sub1)
-                          .map(([parent, values]) => ({ label: parent, values }))
-                      : undefined
-                  }
-                  onChange={(v) => { setSub2(v); persist({ subCategory2: v || null }); }}
-                  onOptionAdded={(v) => {
-                    addToList('sub_category_2', v);
-                    if (sub1) {
-                      setSubCat2ByParent((prev) => {
-                        const next = new Map(prev);
-                        next.set(sub1, [...(next.get(sub1) || []), v]);
-                        return next;
-                      });
-                    } else {
-                      setSubCat2NoParent((prev) => prev.includes(v) ? prev : [...prev, v]);
-                    }
-                  }}
-                />
-              </Field>
-              {tx.amount > 0 ? (
-                <>
-                  <Field label="Source business · who sent this">
-                    <select
-                      value={sourceBusiness}
-                      onChange={(e) => { setSourceBusiness(e.target.value); persist({ sourceBusiness: e.target.value || null }); }}
-                      className="w-full"
-                    >
-                      <option value="">— pick —</option>
-                      <option value="BYTES_AI">Bytes AI</option>
-                      <option value="ROCKET_WIRELESS">Rocket Wireless</option>
-                      <option value="DELICIOUS_BYTES">Delicious Bytes LLC</option>
-                      <option value="AMARI_VENTURES">Amari Ventures</option>
-                      <option value="BYTES_REST_TECH">Bytes Restaurant Tech</option>
-                      <option value="PERSONAL">Personal</option>
-                      <option value="EXTERNAL">External / N/A (outside business)</option>
-                    </select>
-                  </Field>
-                  <Field label="Source account · which bank sent it">
-                    <select
-                      value={sourceAccountId}
-                      onChange={(e) => { setSourceAccountId(e.target.value); persist({ sourceAccountId: e.target.value || null }); }}
-                      className="w-full"
-                    >
-                      <option value="">— pick —</option>
-                      {ACCOUNTS.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {ENTITY_LABELS[a.entity]} — ···{a.last4}
-                        </option>
-                      ))}
-                      <option value="EXTERNAL">External / N/A (outside account)</option>
-                    </select>
-                  </Field>
-                </>
-              ) : (
-                <>
-                  <Field label="Source of money to pay">
-                    <OptionSelect
-                      field="source_of_money"
-                      value={sourceOfMoney}
-                      options={optionLists.source_of_money || []}
-                      builtInOptions={{
-                        label: 'Money pools (entity · type)',
-                        values: [
-                          ...BUSINESS_ENTITIES.map((e) => `${ENTITY_LABELS[e]} revenue`),
-                          ...(commitments || []).map((c) =>
-                            `${ENTITY_LABELS[c.entity as keyof typeof ENTITY_LABELS] || c.entity} investment income — ${c.personName || 'unknown investor'}`
-                          ),
-                        ],
-                      }}
-                      onChange={(v) => { setSourceOfMoney(v); persist({ sourceOfMoney: v || null }); }}
-                      onOptionAdded={(v) => addToList('source_of_money', v)}
-                    />
-                  </Field>
-                  <Field label="Need to get from">
-                    <OptionSelect
-                      field="need_to_get_from"
-                      value={needFrom}
-                      options={optionLists.need_to_get_from || []}
-                      builtInOptions={{
-                        label: 'Your businesses & people',
-                        values: [
-                          ...BUSINESS_ENTITIES.map((e) => ENTITY_LABELS[e]),
-                          ...(people || []).map((p) => p.name),
-                        ],
-                      }}
-                      onChange={(v) => { setNeedFrom(v); persist({ needToGetFrom: v || null }); }}
-                      onOptionAdded={(v) => addToList('need_to_get_from', v)}
-                    />
-                  </Field>
-                </>
-              )}
-              <Field
-                label={tx.amount < 0 ? 'Under an existing budget?' : 'Counts toward an income target?'}
-                className="md:col-span-2"
-                hint={budgets && budgets.length === 0 ? 'no budgets yet — create one at /budgets' : undefined}
-              >
-                <select
-                  value={budgetId}
-                  onChange={(e) => { setBudgetId(e.target.value); persist({ budgetId: e.target.value || null }); }}
-                  className="w-full"
-                  disabled={budgets === null}
+                    onChange={(v) => { setSub2(v); persist({ subCategory2: v || null }); }}
+                    onOptionAdded={(v) => {
+                      addToList('sub_category_2', v);
+                      if (sub1) {
+                        setSubCat2ByParent((prev) => {
+                          const next = new Map(prev);
+                          next.set(sub1, [...(next.get(sub1) || []), v]);
+                          return next;
+                        });
+                      } else {
+                        setSubCat2NoParent((prev) => prev.includes(v) ? prev : [...prev, v]);
+                      }
+                    }}
+                  />
+                </Field>
+              </div>
+            </SectionCard>
+
+            {/* Section 5 — Money flow */}
+            <SectionCard
+              title={tx.amount > 0 ? 'Inflow source' : 'Money flow'}
+              subtitle={tx.amount > 0 ? 'Which business + account sent the money' : 'Which pool paid for this and where funds need to come from'}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {tx.amount > 0 ? (
+                  <>
+                    <Field label="Source business · who sent this">
+                      <select
+                        value={sourceBusiness}
+                        onChange={(e) => { setSourceBusiness(e.target.value); persist({ sourceBusiness: e.target.value || null }); }}
+                        className="w-full"
+                      >
+                        <option value="">— pick —</option>
+                        <option value="BYTES_AI">Bytes AI</option>
+                        <option value="ROCKET_WIRELESS">Rocket Wireless</option>
+                        <option value="DELICIOUS_BYTES">Delicious Bytes LLC</option>
+                        <option value="AMARI_VENTURES">Amari Ventures</option>
+                        <option value="BYTES_REST_TECH">Bytes Restaurant Tech</option>
+                        <option value="PERSONAL">Personal</option>
+                        <option value="EXTERNAL">External / N/A (outside business)</option>
+                      </select>
+                    </Field>
+                    <Field label="Source account · which bank sent it">
+                      <select
+                        value={sourceAccountId}
+                        onChange={(e) => { setSourceAccountId(e.target.value); persist({ sourceAccountId: e.target.value || null }); }}
+                        className="w-full"
+                      >
+                        <option value="">— pick —</option>
+                        {ACCOUNTS.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {ENTITY_LABELS[a.entity]} — ···{a.last4}
+                          </option>
+                        ))}
+                        <option value="EXTERNAL">External / N/A (outside account)</option>
+                      </select>
+                    </Field>
+                  </>
+                ) : (
+                  <>
+                    <Field label="Source of money to pay">
+                      <OptionSelect
+                        field="source_of_money"
+                        value={sourceOfMoney}
+                        options={optionLists.source_of_money || []}
+                        builtInOptions={{
+                          label: 'Money pools (entity · type)',
+                          values: [
+                            ...BUSINESS_ENTITIES.map((e) => `${ENTITY_LABELS[e]} revenue`),
+                            ...(commitments || []).map((c) =>
+                              `${ENTITY_LABELS[c.entity as keyof typeof ENTITY_LABELS] || c.entity} investment income — ${c.personName || 'unknown investor'}`
+                            ),
+                          ],
+                        }}
+                        onChange={(v) => { setSourceOfMoney(v); persist({ sourceOfMoney: v || null }); }}
+                        onOptionAdded={(v) => addToList('source_of_money', v)}
+                      />
+                    </Field>
+                    <Field label="Need to get from">
+                      <OptionSelect
+                        field="need_to_get_from"
+                        value={needFrom}
+                        options={optionLists.need_to_get_from || []}
+                        builtInOptions={{
+                          label: 'Your businesses & people',
+                          values: [
+                            ...BUSINESS_ENTITIES.map((e) => ENTITY_LABELS[e]),
+                            ...(people || []).map((p) => p.name),
+                          ],
+                        }}
+                        onChange={(v) => { setNeedFrom(v); persist({ needToGetFrom: v || null }); }}
+                        onOptionAdded={(v) => addToList('need_to_get_from', v)}
+                      />
+                    </Field>
+                  </>
+                )}
+                <Field
+                  label={tx.amount < 0 ? 'Under an existing budget?' : 'Counts toward an income target?'}
+                  className="md:col-span-2"
+                  hint={budgets && budgets.length === 0 ? 'no budgets yet — create one at /budgets' : undefined}
                 >
-                  <option value="">No — not in any budget</option>
-                  {budgets?.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      Yes — {b.name}{b.entity ? ` (${b.entity.replace(/_/g, ' ').toLowerCase()})` : ''} · {b.kind === 'INCOME' ? 'income' : 'expense'}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Is this a salary?" className="md:col-span-2">
-                <select
-                  value={isSalary ? '1' : '0'}
-                  onChange={(e) => {
-                    const v = e.target.value === '1';
-                    setIsSalary(v);
-                    if (!v) {
-                      setSalaryEntity('');
-                      setSalaryPersonId('');
-                      persist({ isSalary: false, salaryEntity: null, salaryPersonId: null });
-                    } else {
-                      persist({ isSalary: true });
-                    }
-                  }}
-                  className="w-full"
-                >
-                  <option value="0">No</option>
-                  <option value="1">Yes — this is a salary / wage payment</option>
-                </select>
-              </Field>
-              <Field label="Was this passed onward? · sub-tag for another entity" className="md:col-span-2">
-                <select
-                  value={passthroughEntity ? '1' : '0'}
-                  onChange={(e) => {
-                    if (e.target.value === '0') {
-                      setPassthroughEntity('');
-                      setPassthroughPurpose('');
-                      setPassthroughPersonId('');
-                      setPassthroughNotes('');
-                      persist({ passthroughEntity: null, passthroughPurpose: null, passthroughPersonId: null, passthroughNotes: null });
-                    } else {
-                      // Show the fields; entity actually gets set when picked
-                      setPassthroughEntity('PENDING');
-                    }
-                  }}
-                  className="w-full"
-                >
-                  <option value="0">No — money stayed in this entity</option>
-                  <option value="1">Yes — funds were passed onward to another entity / debt</option>
-                </select>
-                <div className="text-[10px] text-ink-mute mt-1">
-                  Use this when e.g. Bytes AI pays you a salary, and you then take that money to fund Delicious Bytes LLC. The bank wire is on Bytes AI, but the economic hit lands on Delicious Bytes.
-                </div>
-              </Field>
-              {passthroughEntity ? (
-                <>
-                  <Field label="Onward · which entity ultimately pays">
-                    <select
-                      value={passthroughEntity === 'PENDING' ? '' : passthroughEntity}
-                      onChange={(e) => { setPassthroughEntity(e.target.value); persist({ passthroughEntity: e.target.value || null }); }}
-                      className="w-full"
-                    >
-                      <option value="">— pick —</option>
-                      {ENTITY_OPTIONS.map((en) => (
-                        <option key={en} value={en}>{ENTITY_LABELS[en]}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Onward · purpose">
-                    <input
-                      type="text"
-                      value={passthroughPurpose}
-                      onChange={(e) => setPassthroughPurpose(e.target.value)}
-                      onBlur={() => persist({ passthroughPurpose: passthroughPurpose || null })}
-                      placeholder="e.g. Pay restaurant owner debt, fund DB operating"
-                      className="w-full"
-                    />
-                  </Field>
-                  <Field label="Onward · recipient / person">
-                    <select
-                      value={passthroughPersonId}
-                      onChange={(e) => { setPassthroughPersonId(e.target.value); persist({ passthroughPersonId: e.target.value || null }); }}
-                      className="w-full"
-                    >
-                      <option value="">— none —</option>
-                      {(people || []).map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Onward · notes">
-                    <input
-                      type="text"
-                      value={passthroughNotes}
-                      onChange={(e) => setPassthroughNotes(e.target.value)}
-                      onBlur={() => persist({ passthroughNotes: passthroughNotes || null })}
-                      placeholder="optional context"
-                      className="w-full"
-                    />
-                  </Field>
-                </>
-              ) : null}
-              {isSalary ? (
-                <>
-                  <Field label="Salary · for which entity">
-                    <select
-                      value={salaryEntity}
-                      onChange={(e) => { setSalaryEntity(e.target.value); persist({ salaryEntity: e.target.value || null }); }}
-                      className="w-full"
-                    >
-                      <option value="">— pick —</option>
-                      {ENTITY_OPTIONS.map((e) => (
-                        <option key={e} value={e}>{ENTITY_LABELS[e]}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Salary · who is it for">
-                    <select
-                      value={salaryPersonId}
-                      onChange={(e) => { setSalaryPersonId(e.target.value); persist({ salaryPersonId: e.target.value || null }); }}
-                      className="w-full"
-                    >
-                      <option value="">— pick —</option>
-                      {(people || []).map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}{p.role ? ` (${p.role.toLowerCase()})` : ''}</option>
-                      ))}
-                    </select>
-                    {people && people.length === 0 ? (
-                      <div className="text-[10px] text-ink-mute mt-1">No people yet — add them on the <a href="/team" className="text-entity-bytes hover:underline">Team page</a>.</div>
-                    ) : null}
-                  </Field>
-                </>
-              ) : null}
-              <Field label="Business purpose" className="md:col-span-2">
-                <OptionSelect
-                  field="business_purpose"
-                  value={purpose}
-                  options={optionLists.business_purpose || []}
-                  onChange={(v) => { setPurpose(v); persist({ businessPurpose: v || null }); }}
-                  onOptionAdded={(v) => addToList('business_purpose', v)}
-                  placeholder="— pick a purpose —"
-                />
-              </Field>
-              <Field label="Doc reference" className="md:col-span-2">
-                <input
-                  type="text"
-                  value={docRef}
-                  onChange={(e) => setDocRef(e.target.value)}
-                  onBlur={() => persist({ receiptRef: docRef || null })}
-                  className="w-full"
-                  placeholder="INV-123 / link to file"
-                />
-              </Field>
-              <Field label="Notes" className="md:col-span-2">
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  onBlur={() => persist({ notes: notes || null })}
-                  className="w-full"
-                  rows={2}
-                  placeholder="anything else"
-                />
-              </Field>
-            </div>
+                  <select
+                    value={budgetId}
+                    onChange={(e) => { setBudgetId(e.target.value); persist({ budgetId: e.target.value || null }); }}
+                    className="w-full"
+                    disabled={budgets === null}
+                  >
+                    <option value="">No — not in any budget</option>
+                    {budgets?.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        Yes — {b.name}{b.entity ? ` (${b.entity.replace(/_/g, ' ').toLowerCase()})` : ''} · {b.kind === 'INCOME' ? 'income' : 'expense'}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+            </SectionCard>
+
+            {/* Section 6 — Salary & payroll */}
+            <SectionCard
+              title="Salary & payroll"
+              subtitle="Tag this as a salary / wage payment with entity + recipient"
+              collapsibleHidden={!isSalary}
+              accent={isSalary ? 'bytes' : undefined}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="Is this a salary?" className="md:col-span-2">
+                  <select
+                    value={isSalary ? '1' : '0'}
+                    onChange={(e) => {
+                      const v = e.target.value === '1';
+                      setIsSalary(v);
+                      if (!v) {
+                        setSalaryEntity('');
+                        setSalaryPersonId('');
+                        persist({ isSalary: false, salaryEntity: null, salaryPersonId: null });
+                      } else {
+                        persist({ isSalary: true });
+                      }
+                    }}
+                    className="w-full"
+                  >
+                    <option value="0">No</option>
+                    <option value="1">Yes — this is a salary / wage payment</option>
+                  </select>
+                </Field>
+                {isSalary ? (
+                  <>
+                    <Field label="Salary · for which entity">
+                      <select
+                        value={salaryEntity}
+                        onChange={(e) => { setSalaryEntity(e.target.value); persist({ salaryEntity: e.target.value || null }); }}
+                        className="w-full"
+                      >
+                        <option value="">— pick —</option>
+                        {ENTITY_OPTIONS.map((e) => (
+                          <option key={e} value={e}>{ENTITY_LABELS[e]}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Salary · who is it for">
+                      <select
+                        value={salaryPersonId}
+                        onChange={(e) => { setSalaryPersonId(e.target.value); persist({ salaryPersonId: e.target.value || null }); }}
+                        className="w-full"
+                      >
+                        <option value="">— pick —</option>
+                        {(people || []).map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}{p.role ? ` (${p.role.toLowerCase()})` : ''}</option>
+                        ))}
+                      </select>
+                    </Field>
+                  </>
+                ) : null}
+              </div>
+            </SectionCard>
+
+            {/* Section 7 — Passthrough / Sub-tag */}
+            <SectionCard
+              title="Passed onward · sub-tag for another entity"
+              subtitle="When the wire is on one entity but the economic hit belongs to another"
+              accent={passthroughEntity ? 'warn' : undefined}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="Was this passed onward?" className="md:col-span-2">
+                  <select
+                    value={passthroughEntity ? '1' : '0'}
+                    onChange={(e) => {
+                      if (e.target.value === '0') {
+                        setPassthroughEntity('');
+                        setPassthroughPurpose('');
+                        setPassthroughPersonId('');
+                        setPassthroughNotes('');
+                        persist({ passthroughEntity: null, passthroughPurpose: null, passthroughPersonId: null, passthroughNotes: null });
+                      } else {
+                        setPassthroughEntity('PENDING');
+                      }
+                    }}
+                    className="w-full"
+                  >
+                    <option value="0">No — money stayed in this entity</option>
+                    <option value="1">Yes — funds were passed onward to another entity / debt</option>
+                  </select>
+                  <div className="text-2xs text-ink-mute mt-2">
+                    Example: Bytes AI pays you a salary, you use that money to fund Delicious Bytes LLC. The bank wire is on Bytes AI, but the economic hit lands on Delicious Bytes.
+                  </div>
+                </Field>
+                {passthroughEntity ? (
+                  <>
+                    <Field label="Onward · which entity ultimately pays">
+                      <select
+                        value={passthroughEntity === 'PENDING' ? '' : passthroughEntity}
+                        onChange={(e) => { setPassthroughEntity(e.target.value); persist({ passthroughEntity: e.target.value || null }); }}
+                        className="w-full"
+                      >
+                        <option value="">— pick —</option>
+                        {ENTITY_OPTIONS.map((en) => (
+                          <option key={en} value={en}>{ENTITY_LABELS[en]}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Onward · purpose">
+                      <input
+                        type="text"
+                        value={passthroughPurpose}
+                        onChange={(e) => setPassthroughPurpose(e.target.value)}
+                        onBlur={() => persist({ passthroughPurpose: passthroughPurpose || null })}
+                        placeholder="e.g. Pay restaurant owner debt"
+                        className="w-full"
+                      />
+                    </Field>
+                    <Field label="Onward · recipient / person">
+                      <select
+                        value={passthroughPersonId}
+                        onChange={(e) => { setPassthroughPersonId(e.target.value); persist({ passthroughPersonId: e.target.value || null }); }}
+                        className="w-full"
+                      >
+                        <option value="">— none —</option>
+                        {(people || []).map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Onward · notes">
+                      <input
+                        type="text"
+                        value={passthroughNotes}
+                        onChange={(e) => setPassthroughNotes(e.target.value)}
+                        onBlur={() => persist({ passthroughNotes: passthroughNotes || null })}
+                        placeholder="optional context"
+                        className="w-full"
+                      />
+                    </Field>
+                  </>
+                ) : null}
+              </div>
+            </SectionCard>
+
+            {/* Section 8 — Notes & docs */}
+            <SectionCard title="Notes & documentation" subtitle="Business purpose, receipt link, and freeform notes">
+              <div className="grid grid-cols-1 gap-3">
+                <Field label="Business purpose">
+                  <OptionSelect
+                    field="business_purpose"
+                    value={purpose}
+                    options={optionLists.business_purpose || []}
+                    onChange={(v) => { setPurpose(v); persist({ businessPurpose: v || null }); }}
+                    onOptionAdded={(v) => addToList('business_purpose', v)}
+                    placeholder="— pick a purpose —"
+                  />
+                </Field>
+                <Field label="Doc reference">
+                  <input
+                    type="text"
+                    value={docRef}
+                    onChange={(e) => setDocRef(e.target.value)}
+                    onBlur={() => persist({ receiptRef: docRef || null })}
+                    className="w-full"
+                    placeholder="INV-123 / link to file"
+                  />
+                </Field>
+                <Field label="Notes">
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    onBlur={() => persist({ notes: notes || null })}
+                    className="w-full"
+                    rows={3}
+                    placeholder="anything else"
+                  />
+                </Field>
+              </div>
+            </SectionCard>
 
             <datalist id="acct-list">
               {ACCOUNT_NAME_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
@@ -612,13 +647,40 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
               <button className="btn" onClick={() => applyStatus('PERSONAL_NO_DEDUCT')}>
                 <kbd>3</kbd> ❌ Personal
               </button>
-              <div className="text-[11px] text-ink-mute ml-auto">Esc to close · changes save automatically</div>
+              <div className="text-2xs text-ink-mute ml-auto">Esc to close · changes save automatically</div>
             </div>
           </div>
           {/* Body close */}
         </div>
       </div>
     </Portal>
+  );
+}
+
+function SectionCard({
+  title, subtitle, accent, collapsibleHidden, children,
+}: {
+  title: string;
+  subtitle?: string;
+  accent?: 'bytes' | 'income' | 'warn';
+  collapsibleHidden?: boolean;
+  children: React.ReactNode;
+}) {
+  if (collapsibleHidden) return null;
+  const accentBorder =
+    accent === 'bytes' ? 'border-entity-bytes/30' :
+    accent === 'income' ? 'border-income/30' :
+    accent === 'warn' ? 'border-warn/30' : '';
+  return (
+    <div className={`card overflow-hidden ${accentBorder}`}>
+      <div className="px-5 pt-4 pb-3 border-b border-line/60">
+        <div className="text-sm font-semibold tracking-tight">{title}</div>
+        {subtitle ? <div className="text-2xs text-ink-mute mt-0.5">{subtitle}</div> : null}
+      </div>
+      <div className="p-5">
+        {children}
+      </div>
+    </div>
   );
 }
 
