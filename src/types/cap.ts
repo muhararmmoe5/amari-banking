@@ -8,7 +8,7 @@ export type PersonRole =
   | 'ADVISOR'
   | 'OTHER';
 
-export type HolderType = 'PARTNER' | 'TEAM_MEMBER' | 'OBSERVER';
+export type HolderType = 'PARTNER' | 'TEAM_MEMBER' | 'OBSERVER' | 'INVESTOR';
 
 export interface Person {
   id: string;

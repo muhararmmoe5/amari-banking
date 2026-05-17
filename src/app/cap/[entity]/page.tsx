@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { listPeople, listHoldings, listContributions, listSafes, listValuations, listHoldingsForPerson } from '@/lib/db/cap';
+import { listPeople, listHoldings, listContributions, listSafes, listValuations, listHoldingsForPerson, listCommitmentSummaries } from '@/lib/db/cap';
 import { ENTITY_LABELS, ENTITY_COLORS, BUSINESS_ENTITIES } from '@/constants/accounts';
 import type { EntityType } from '@/types';
 import { ArrowLeft } from 'lucide-react';
 import CapEntityClient from './CapEntityClient';
+import CommitmentsPanel from './CommitmentsPanel';
 import { requireUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 
@@ -30,6 +31,7 @@ export default function CapEntityPage({ params }: { params: { entity: string } }
   const contributions = listContributions(entity);
   const safes = listSafes(entity);
   const valuations = listValuations(entity);
+  const commitments = listCommitmentSummaries(entity);
 
   return (
     <div className="p-8 space-y-5 max-w-[1320px]">
@@ -50,14 +52,34 @@ export default function CapEntityPage({ params }: { params: { entity: string } }
           <Link href="/team" className="btn btn-primary inline-flex">Go to Team</Link>
         </div>
       ) : (
-        <CapEntityClient
-          entity={entity}
-          people={people}
-          initialHoldings={holdings}
-          initialContributions={contributions}
-          initialSafes={safes}
-          initialValuations={valuations}
-        />
+        <>
+          <CommitmentsPanel
+            entity={entity}
+            people={people}
+            commitments={commitments.map((c) => ({
+              id: c.id,
+              personId: c.personId,
+              totalAmountCents: c.totalAmountCents,
+              monthlyAmountCents: c.monthlyAmountCents,
+              equityPercent: c.equityPercent,
+              startDate: c.startDate,
+              status: c.status,
+              fundedCents: c.fundedCents,
+              remainingCents: c.remainingCents,
+              pctFunded: c.pctFunded,
+              linkedTxCount: c.linkedTxCount,
+              notes: c.notes,
+            }))}
+          />
+          <CapEntityClient
+            entity={entity}
+            people={people}
+            initialHoldings={holdings}
+            initialContributions={contributions}
+            initialSafes={safes}
+            initialValuations={valuations}
+          />
+        </>
       )}
     </div>
   );

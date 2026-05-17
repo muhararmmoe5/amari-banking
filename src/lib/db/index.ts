@@ -212,6 +212,24 @@ export function getDb(): Database.Database {
       updated_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_splits_tx ON transaction_splits(transaction_id);
+
+    CREATE TABLE IF NOT EXISTS funding_commitments (
+      id TEXT PRIMARY KEY,
+      entity TEXT NOT NULL,
+      person_id TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+      total_amount_cents INTEGER NOT NULL CHECK (total_amount_cents > 0),
+      monthly_amount_cents INTEGER,
+      equity_percent REAL,
+      equity_holding_id TEXT REFERENCES equity_holdings(id) ON DELETE SET NULL,
+      start_date TEXT,
+      end_date TEXT,
+      status TEXT NOT NULL DEFAULT 'ACTIVE',
+      notes TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_commit_entity ON funding_commitments(entity);
+    CREATE INDEX IF NOT EXISTS idx_commit_person ON funding_commitments(person_id);
   `);
 
   // Forward-compatible column adds (SQLite ALTER ignores if column exists in some versions; we catch)
@@ -228,6 +246,7 @@ export function getDb(): Database.Database {
     `ALTER TABLE transaction_splits ADD COLUMN period_end TEXT`,
     `ALTER TABLE transactions ADD COLUMN source_person_id TEXT REFERENCES people(id) ON DELETE SET NULL`,
     `ALTER TABLE transactions ADD COLUMN transaction_date TEXT`,
+    `ALTER TABLE transactions ADD COLUMN funding_commitment_id TEXT REFERENCES funding_commitments(id) ON DELETE SET NULL`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }

@@ -478,6 +478,179 @@ export function listHoldingsForPerson(personId: string): EquityHolding[] {
   return rows.map(rowToHolding);
 }
 
+// ===== Funding commitments =====
+
+export interface FundingCommitment {
+  id: string;
+  entity: EntityType;
+  personId: string;
+  totalAmountCents: number;
+  monthlyAmountCents: number | null;
+  equityPercent: number | null;
+  equityHoldingId: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  status: 'ACTIVE' | 'COMPLETE' | 'CANCELED';
+  notes: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+function rowToCommitment(r: any): FundingCommitment {
+  return {
+    id: r.id,
+    entity: r.entity,
+    personId: r.person_id,
+    totalAmountCents: r.total_amount_cents,
+    monthlyAmountCents: r.monthly_amount_cents,
+    equityPercent: r.equity_percent,
+    equityHoldingId: r.equity_holding_id,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    status: r.status,
+    notes: r.notes,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export interface CommitmentInput {
+  entity: EntityType;
+  personId: string;
+  totalAmountCents: number;
+  monthlyAmountCents?: number | null;
+  equityPercent?: number | null;
+  equityHoldingId?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  notes?: string | null;
+}
+
+export function createCommitment(input: CommitmentInput): FundingCommitment {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO funding_commitments (id, entity, person_id, total_amount_cents, monthly_amount_cents,
+       equity_percent, equity_holding_id, start_date, end_date, status, notes, created_at, updated_at)
+     VALUES (@id, @entity, @person_id, @total, @monthly, @pct, @holding, @start, @end, 'ACTIVE', @notes, @now, @now)`
+  ).run({
+    id,
+    entity: input.entity,
+    person_id: input.personId,
+    total: input.totalAmountCents,
+    monthly: input.monthlyAmountCents ?? null,
+    pct: input.equityPercent ?? null,
+    holding: input.equityHoldingId ?? null,
+    start: input.startDate ?? null,
+    end: input.endDate ?? null,
+    notes: input.notes?.trim() || null,
+    now,
+  });
+  return rowToCommitment(db.prepare('SELECT * FROM funding_commitments WHERE id = ?').get(id) as any);
+}
+
+export function listCommitments(entity?: EntityType): FundingCommitment[] {
+  const db = getDb();
+  const rows = entity
+    ? (db.prepare('SELECT * FROM funding_commitments WHERE entity = ? ORDER BY created_at DESC').all(entity) as any[])
+    : (db.prepare('SELECT * FROM funding_commitments ORDER BY created_at DESC').all() as any[]);
+  return rows.map(rowToCommitment);
+}
+
+export function getCommitment(id: string): FundingCommitment | null {
+  const db = getDb();
+  const r = db.prepare('SELECT * FROM funding_commitments WHERE id = ?').get(id) as any;
+  return r ? rowToCommitment(r) : null;
+}
+
+export function deleteCommitment(id: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM funding_commitments WHERE id = ?').run(id);
+}
+
+export function updateCommitmentStatus(id: string, status: 'ACTIVE' | 'COMPLETE' | 'CANCELED'): void {
+  const db = getDb();
+  db.prepare('UPDATE funding_commitments SET status = ?, updated_at = ? WHERE id = ?').run(status, Date.now(), id);
+}
+
+/** Sum of all transaction inflows linked to this commitment (in cents). */
+export function commitmentFundedCents(commitmentId: string): number {
+  const db = getDb();
+  const r = db.prepare(
+    `SELECT COALESCE(SUM(amount), 0) as s FROM transactions WHERE funding_commitment_id = ? AND amount > 0`
+  ).get(commitmentId) as any;
+  return Math.round((r.s || 0) * 100);
+}
+
+export interface CommitmentSummary extends FundingCommitment {
+  fundedCents: number;
+  remainingCents: number;
+  pctFunded: number;
+  linkedTxCount: number;
+}
+
+export function commitmentSummary(id: string): CommitmentSummary | null {
+  const c = getCommitment(id);
+  if (!c) return null;
+  const db = getDb();
+  const fundedCents = commitmentFundedCents(id);
+  const count = (db.prepare(
+    `SELECT COUNT(*) as n FROM transactions WHERE funding_commitment_id = ? AND amount > 0`
+  ).get(id) as any).n;
+  const remaining = Math.max(0, c.totalAmountCents - fundedCents);
+  const pct = c.totalAmountCents > 0 ? Math.min(100, (fundedCents / c.totalAmountCents) * 100) : 0;
+  return { ...c, fundedCents, remainingCents: remaining, pctFunded: pct, linkedTxCount: count };
+}
+
+export function listCommitmentSummaries(entity?: EntityType): CommitmentSummary[] {
+  return listCommitments(entity).map((c) => commitmentSummary(c.id)!).filter(Boolean);
+}
+
+/** Find active commitments for a given person (across entities). */
+export function activeCommitmentsForPerson(personId: string): FundingCommitment[] {
+  const db = getDb();
+  const rows = db.prepare(
+    `SELECT * FROM funding_commitments WHERE person_id = ? AND status = 'ACTIVE' ORDER BY created_at DESC`
+  ).all(personId) as any[];
+  return rows.map(rowToCommitment);
+}
+
+/** List the inflows linked to a commitment. */
+export interface CommitmentTranche {
+  txId: string;
+  accountId: string;
+  postingDate: string;
+  description: string;
+  merchant: string | null;
+  amountCents: number;
+}
+export function commitmentTranches(commitmentId: string): CommitmentTranche[] {
+  const db = getDb();
+  const rows = db.prepare(
+    `SELECT id, account_id, posting_date, description, merchant_name, amount
+     FROM transactions WHERE funding_commitment_id = ? AND amount > 0
+     ORDER BY posting_date DESC, id DESC`
+  ).all(commitmentId) as any[];
+  return rows.map((r) => ({
+    txId: r.id,
+    accountId: r.account_id,
+    postingDate: r.posting_date,
+    description: r.description,
+    merchant: r.merchant_name,
+    amountCents: Math.round(r.amount * 100),
+  }));
+}
+
+export function linkTransactionToCommitment(txId: string, commitmentId: string | null): void {
+  const db = getDb();
+  db.prepare('UPDATE transactions SET funding_commitment_id = ?, updated_at = ? WHERE id = ?').run(
+    commitmentId,
+    Date.now(),
+    txId,
+  );
+}
+
 export function portfolioByPerson(): Map<string, number> {
   // Returns map of person_id -> total vested portfolio value (cents)
   const db = getDb();
