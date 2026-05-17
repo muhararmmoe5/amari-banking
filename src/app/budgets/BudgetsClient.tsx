@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { Plus, Trash2, Archive, Pencil, Check, X } from 'lucide-react';
+import Link from 'next/link';
 import { useToast } from '@/components/Toast';
 import { fmtCents } from '@/lib/cap';
 import type { EntityType } from '@/types';
@@ -67,6 +68,8 @@ export default function BudgetsClient({
           kind: (form.get('kind') as BudgetKind) || 'EXPENSE',
           subKind: ((form.get('subKind') as string) || '') as BudgetSubKind || null,
           monthlyAmountCents: dollarsToCents(String(form.get('monthly') || '')),
+          totalAmountCents: dollarsToCents(String(form.get('total') || '')),
+          runwayMonths: form.get('runwayMonths') ? Number(form.get('runwayMonths')) : null,
           periodMonth: (form.get('periodMonth') as string) || null,
           fundingCommitmentId: commitmentId,
           personId,
@@ -162,8 +165,18 @@ function CreateForm({
           </select>
         </label>
         <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Master total ($, optional)</div>
+          <input name="total" placeholder="900000" className="w-full" />
+          <div className="text-[10px] text-ink-mute mt-1">The full cap, e.g. $900k. Leave blank for ongoing budgets.</div>
+        </label>
+        <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Runway (months, optional)</div>
+          <input name="runwayMonths" type="number" placeholder="12" className="w-full" />
+          <div className="text-[10px] text-ink-mute mt-1">How many months to spread total over.</div>
+        </label>
+        <label className="block">
           <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Monthly cap ($, optional)</div>
-          <input name="monthly" placeholder="5000" className="w-full" />
+          <input name="monthly" placeholder="75000" className="w-full" />
         </label>
         <label className="block">
           <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Specific month (optional)</div>
@@ -245,6 +258,8 @@ function BudgetRow({
   const [subKind, setSubKind] = useState<string>(b.subKind || '');
   const [entity, setEntity] = useState<string>(b.entity || '');
   const [monthly, setMonthly] = useState(b.monthlyAmountCents != null ? (b.monthlyAmountCents / 100).toString() : '');
+  const [total, setTotal] = useState(b.totalAmountCents != null ? (b.totalAmountCents / 100).toString() : '');
+  const [runwayMonths, setRunwayMonths] = useState(b.runwayMonths != null ? String(b.runwayMonths) : '');
   const [periodMonth, setPeriodMonth] = useState(b.periodMonth || '');
   const [commitmentId, setCommitmentId] = useState(b.fundingCommitmentId || '');
   const [personId, setPersonId] = useState(b.personId || '');
@@ -268,6 +283,8 @@ function BudgetRow({
           subKind: (subKind as BudgetSubKind) || null,
           entity: (entity as EntityType) || null,
           monthlyAmountCents: dollarsToCents(monthly),
+          totalAmountCents: dollarsToCents(total),
+          runwayMonths: runwayMonths ? Number(runwayMonths) : null,
           periodMonth: periodMonth || null,
           fundingCommitmentId: commitmentId || null,
           personId: effPersonId || null,
@@ -315,6 +332,14 @@ function BudgetRow({
             </select>
           </label>
           <label className="block">
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Master total ($)</div>
+            <input value={total} onChange={(e) => setTotal(e.target.value)} className="w-full" placeholder="900000" />
+          </label>
+          <label className="block">
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Runway (months)</div>
+            <input type="number" value={runwayMonths} onChange={(e) => setRunwayMonths(e.target.value)} className="w-full" placeholder="12" />
+          </label>
+          <label className="block">
             <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Monthly cap ($)</div>
             <input value={monthly} onChange={(e) => setMonthly(e.target.value)} className="w-full" placeholder="75000" />
           </label>
@@ -349,12 +374,17 @@ function BudgetRow({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-base font-medium">
-            {b.name}
+            <Link href={`/budgets/${b.id}`} className="hover:underline">{b.name}</Link>
             <span className={`ml-2 pill text-[10px] ${b.kind === 'EXPENSE' ? 'bg-expense/10 text-expense border border-expense/30' : 'bg-income/10 text-income border border-income/30'}`}>{b.kind === 'EXPENSE' ? 'expense' : 'income'}</span>
             {b.subKind ? <span className="ml-2 pill text-[10px] bg-entity-bytes/15 text-entity-bytes border border-entity-bytes/30">{BUDGET_SUB_KINDS[b.subKind]}</span> : null}
             {b.entity ? <span className="ml-2 pill text-[10px] bg-bg-2 text-ink-dim border border-line">{b.entity.replace(/_/g, ' ').toLowerCase()}</span> : null}
             {b.periodMonth ? <span className="ml-2 pill text-[10px] bg-entity-bytes/10 text-entity-bytes border border-entity-bytes/30">{b.periodMonth}</span> : null}
           </div>
+          {b.totalAmountCents ? (
+            <div className="text-[11px] mt-1 text-ink-dim">
+              💰 Master: {fmtCents(b.totalAmountCents)}{b.runwayMonths ? ` over ${b.runwayMonths} mo (~${fmtCents(Math.round(b.totalAmountCents / b.runwayMonths))}/mo target)` : ''}
+            </div>
+          ) : null}
           {b.personName ? (
             <div className="text-[11px] mt-1 text-ink-dim">👤 {b.personName}</div>
           ) : null}

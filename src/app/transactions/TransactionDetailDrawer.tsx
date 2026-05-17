@@ -343,9 +343,9 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                   disabled={budgets === null}
                 >
                   <option value="">No — not in any budget</option>
-                  {budgets?.filter((b) => (tx.amount < 0 ? b.kind === 'EXPENSE' : b.kind === 'INCOME')).map((b) => (
+                  {budgets?.map((b) => (
                     <option key={b.id} value={b.id}>
-                      Yes — {b.name}{b.entity ? ` (${b.entity.replace(/_/g, ' ').toLowerCase()})` : ''}
+                      Yes — {b.name}{b.entity ? ` (${b.entity.replace(/_/g, ' ').toLowerCase()})` : ''} · {b.kind === 'INCOME' ? 'income' : 'expense'}
                     </option>
                   ))}
                 </select>

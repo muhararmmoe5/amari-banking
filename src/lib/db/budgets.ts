@@ -13,6 +13,8 @@ export interface Budget {
   entity: EntityType | null;
   kind: BudgetKind;
   monthlyAmountCents: number | null;
+  totalAmountCents: number | null;     // master cap (e.g. $900k)
+  runwayMonths: number | null;          // how many months the total is spread over
   periodMonth: string | null;          // YYYY-MM — when set, this budget targets one specific month
   fundingCommitmentId: string | null;  // links to an investor's funding commitment
   subKind: BudgetSubKind | null;
@@ -30,6 +32,8 @@ function rowToBudget(r: any): Budget {
     entity: r.entity,
     kind: r.kind,
     monthlyAmountCents: r.monthly_amount_cents,
+    totalAmountCents: r.total_amount_cents ?? null,
+    runwayMonths: r.runway_months ?? null,
     periodMonth: r.period_month ?? null,
     fundingCommitmentId: r.funding_commitment_id ?? null,
     subKind: r.sub_kind ?? null,
@@ -46,6 +50,8 @@ export interface BudgetInput {
   entity?: EntityType | null;
   kind?: BudgetKind;
   monthlyAmountCents?: number | null;
+  totalAmountCents?: number | null;
+  runwayMonths?: number | null;
   periodMonth?: string | null;
   fundingCommitmentId?: string | null;
   subKind?: BudgetSubKind | null;
@@ -71,14 +77,16 @@ export function createBudget(input: BudgetInput): Budget {
   const id = crypto.randomUUID();
   const now = Date.now();
   db.prepare(
-    `INSERT INTO budgets (id, name, entity, kind, monthly_amount_cents, period_month, funding_commitment_id, sub_kind, person_id, notes, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)`
+    `INSERT INTO budgets (id, name, entity, kind, monthly_amount_cents, total_amount_cents, runway_months, period_month, funding_commitment_id, sub_kind, person_id, notes, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)`
   ).run(
     id,
     input.name.trim(),
     input.entity || null,
     input.kind || 'EXPENSE',
     input.monthlyAmountCents ?? null,
+    input.totalAmountCents ?? null,
+    input.runwayMonths ?? null,
     input.periodMonth || null,
     input.fundingCommitmentId || null,
     input.subKind || null,
@@ -98,6 +106,8 @@ export function updateBudget(id: string, patch: Partial<BudgetInput> & { status?
   if (patch.entity !== undefined) { fields.push('entity = @entity'); params.entity = patch.entity; }
   if (patch.kind !== undefined) { fields.push('kind = @kind'); params.kind = patch.kind; }
   if (patch.monthlyAmountCents !== undefined) { fields.push('monthly_amount_cents = @monthly'); params.monthly = patch.monthlyAmountCents; }
+  if (patch.totalAmountCents !== undefined) { fields.push('total_amount_cents = @total'); params.total = patch.totalAmountCents; }
+  if (patch.runwayMonths !== undefined) { fields.push('runway_months = @runway'); params.runway = patch.runwayMonths; }
   if (patch.periodMonth !== undefined) { fields.push('period_month = @period_month'); params.period_month = patch.periodMonth || null; }
   if (patch.fundingCommitmentId !== undefined) { fields.push('funding_commitment_id = @commitment_id'); params.commitment_id = patch.fundingCommitmentId || null; }
   if (patch.subKind !== undefined) { fields.push('sub_kind = @sub_kind'); params.sub_kind = patch.subKind || null; }
@@ -181,4 +191,139 @@ export function listBudgetsWithSpend(): BudgetWithSpend[] {
       personName,
     };
   });
+}
+
+export interface BudgetTransaction {
+  txId: string;
+  postingDate: string;
+  description: string;
+  merchant: string | null;
+  amountCents: number;        // positive for income, negative for expense
+  accountId: string;
+  entityTag: string;
+}
+
+export interface BudgetMonthBreakdown {
+  month: string;              // YYYY-MM
+  incomeCents: number;
+  expenseCents: number;
+  netCents: number;
+  txCount: number;
+  overMonthlyCap: boolean;
+}
+
+export interface BudgetDetail {
+  budget: Budget;
+  personName: string | null;
+  commitmentLabel: string | null;
+  totalIncomeCents: number;
+  totalExpenseCents: number;
+  netCents: number;
+  txCount: number;
+  pctOfMaster: number | null;   // (income / totalAmountCents) * 100, if total set
+  pctOfMonthlyCap: number | null;
+  effectiveMonthIncomeCents: number;
+  effectiveMonthExpenseCents: number;
+  effectiveMonth: string;
+  months: BudgetMonthBreakdown[];
+  transactions: BudgetTransaction[];
+}
+
+export function getBudgetDetail(id: string): BudgetDetail | null {
+  const b = getBudget(id);
+  if (!b) return null;
+  const db = getDb();
+
+  // Person + commitment labels (same logic as listBudgetsWithSpend)
+  let personName: string | null = null;
+  if (b.personId) {
+    const p = db.prepare('SELECT name FROM people WHERE id = ?').get(b.personId) as any;
+    personName = p?.name || null;
+  }
+  let commitmentLabel: string | null = null;
+  if (b.fundingCommitmentId) {
+    const c = db.prepare(`
+      SELECT fc.total_amount_cents, fc.monthly_amount_cents, fc.equity_percent, p.name
+      FROM funding_commitments fc
+      LEFT JOIN people p ON p.id = fc.person_id
+      WHERE fc.id = ?
+    `).get(b.fundingCommitmentId) as any;
+    if (c) {
+      const parts: string[] = [c.name || 'Unknown'];
+      if (c.monthly_amount_cents) parts.push(`$${(c.monthly_amount_cents / 100).toLocaleString()}/mo pledge`);
+      if (c.equity_percent != null) parts.push(`${c.equity_percent}% equity`);
+      commitmentLabel = parts.join(' · ');
+    }
+  }
+
+  const rows = db.prepare(`
+    SELECT id, posting_date, description, merchant_name, amount, account_id, entity_tag
+    FROM transactions
+    WHERE budget_id = ?
+    ORDER BY posting_date DESC, id DESC
+  `).all(id) as any[];
+
+  let totalIncomeCents = 0;
+  let totalExpenseCents = 0;
+  const monthMap = new Map<string, BudgetMonthBreakdown>();
+  const transactions: BudgetTransaction[] = rows.map((r) => {
+    const cents = Math.round(r.amount * 100);
+    if (cents > 0) totalIncomeCents += cents;
+    else totalExpenseCents += Math.abs(cents);
+    const month = r.posting_date.slice(0, 7);
+    if (!monthMap.has(month)) {
+      monthMap.set(month, { month, incomeCents: 0, expenseCents: 0, netCents: 0, txCount: 0, overMonthlyCap: false });
+    }
+    const m = monthMap.get(month)!;
+    if (cents > 0) m.incomeCents += cents;
+    else m.expenseCents += Math.abs(cents);
+    m.netCents = m.incomeCents - m.expenseCents;
+    m.txCount += 1;
+    return {
+      txId: r.id,
+      postingDate: r.posting_date,
+      description: r.description,
+      merchant: r.merchant_name,
+      amountCents: cents,
+      accountId: r.account_id,
+      entityTag: r.entity_tag,
+    };
+  });
+
+  if (b.monthlyAmountCents) {
+    for (const m of monthMap.values()) {
+      const measure = b.kind === 'INCOME' ? m.incomeCents : m.expenseCents;
+      m.overMonthlyCap = measure > b.monthlyAmountCents;
+    }
+  }
+
+  const months = Array.from(monthMap.values()).sort((a, b) => b.month.localeCompare(a.month));
+
+  const netCents = totalIncomeCents - totalExpenseCents;
+  const pctOfMaster = b.totalAmountCents && b.totalAmountCents > 0
+    ? ((b.kind === 'INCOME' ? totalIncomeCents : totalExpenseCents) / b.totalAmountCents) * 100
+    : null;
+
+  const effectiveMonth = b.periodMonth || new Date().toISOString().slice(0, 7);
+  const emRow = monthMap.get(effectiveMonth);
+  const pctOfMonthlyCap = b.monthlyAmountCents && b.monthlyAmountCents > 0 && emRow
+    ? ((b.kind === 'INCOME' ? emRow.incomeCents : emRow.expenseCents) / b.monthlyAmountCents) * 100
+    : null;
+
+  return {
+    budget: b,
+    personName,
+    commitmentLabel,
+    totalIncomeCents,
+    totalExpenseCents,
+    netCents,
+    txCount: transactions.length,
+    pctOfMaster,
+    pctOfMonthlyCap,
+    effectiveMonthIncomeCents: emRow?.incomeCents || 0,
+    effectiveMonthExpenseCents: emRow?.expenseCents || 0,
+    effectiveMonth,
+    months,
+    transactions,
+  };
 }

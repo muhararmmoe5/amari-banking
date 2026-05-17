@@ -278,6 +278,8 @@ export function getDb(): Database.Database {
     `ALTER TABLE budgets ADD COLUMN funding_commitment_id TEXT REFERENCES funding_commitments(id) ON DELETE SET NULL`,
     `ALTER TABLE budgets ADD COLUMN sub_kind TEXT`,
     `ALTER TABLE budgets ADD COLUMN person_id TEXT REFERENCES people(id) ON DELETE SET NULL`,
+    `ALTER TABLE budgets ADD COLUMN total_amount_cents INTEGER`,
+    `ALTER TABLE budgets ADD COLUMN runway_months INTEGER`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }
