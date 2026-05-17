@@ -3,25 +3,9 @@ import crypto from 'crypto';
 import { getDb } from './index';
 import type { EntityType } from '@/types';
 
-export type BudgetKind = 'EXPENSE' | 'INCOME';
-export type BudgetStatus = 'ACTIVE' | 'ARCHIVED';
-
-/** Optional refinement on top of Kind, mostly used for INCOME to distinguish
- *  investor money (counts toward a funding commitment) from operating
- *  revenue. */
-export const BUDGET_SUB_KINDS = {
-  INVESTMENT_INCOME: 'Investment income',
-  REVENUE: 'Operating revenue',
-  REFUND: 'Refund / reimbursement',
-  OTHER_INCOME: 'Other income',
-  OPERATING: 'Operating expense',
-  PAYROLL: 'Payroll',
-  MARKETING: 'Marketing',
-  COGS: 'Cost of goods sold',
-  TAXES: 'Taxes',
-  OTHER_EXPENSE: 'Other expense',
-} as const;
-export type BudgetSubKind = keyof typeof BUDGET_SUB_KINDS;
+export { BUDGET_SUB_KINDS } from '@/lib/budget-kinds';
+export type { BudgetKind, BudgetStatus, BudgetSubKind } from '@/lib/budget-kinds';
+import type { BudgetKind, BudgetStatus, BudgetSubKind } from '@/lib/budget-kinds';
 
 export interface Budget {
   id: string;

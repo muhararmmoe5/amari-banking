@@ -5,8 +5,9 @@ import { Plus, Trash2, Archive, Pencil, Check, X } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import { fmtCents } from '@/lib/cap';
 import type { EntityType } from '@/types';
-import type { BudgetWithSpend, BudgetKind, BudgetSubKind } from '@/lib/db/budgets';
-import { BUDGET_SUB_KINDS } from '@/lib/db/budgets';
+import type { BudgetWithSpend } from '@/lib/db/budgets';
+import type { BudgetKind, BudgetSubKind } from '@/lib/budget-kinds';
+import { BUDGET_SUB_KINDS } from '@/lib/budget-kinds';
 import { actCreateBudget, actUpdateBudget, actDeleteBudget } from './actions';
 
 const INCOME_SUB_KINDS: BudgetSubKind[] = ['INVESTMENT_INCOME', 'REVENUE', 'REFUND', 'OTHER_INCOME'];
