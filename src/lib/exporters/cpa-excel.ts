@@ -223,7 +223,8 @@ export function generateCpaWorkbook(opts: CpaExportOptions = {}): Buffer {
 
   const splitRows = db.prepare(`
     SELECT transaction_id, amount_cents, entity, category, individual,
-      sub_category_1, sub_category_2, business_purpose, notes, sort_order
+      sub_category_1, sub_category_2, business_purpose, notes,
+      period_start, period_end, sort_order
     FROM transaction_splits
     ORDER BY sort_order ASC, created_at ASC
   `).all() as any[];
@@ -237,7 +238,8 @@ export function generateCpaWorkbook(opts: CpaExportOptions = {}): Buffer {
   const ledgerHeader = [
     'Date', 'Account', 'Description', 'Amount', 'Entity', 'Category',
     'Sub 1', 'Sub 2', 'Individual', 'Source of Money', 'Need to Get From',
-    'Status', 'CPA Reviewed', 'Tagged Date', 'Purpose', 'Doc Ref', 'Split',
+    'Status', 'CPA Reviewed', 'Tagged Date', 'Period Start', 'Period End',
+    'Purpose', 'Doc Ref', 'Split',
   ];
   const ledgerAoa: any[][] = [ledgerHeader];
   for (const r of ledger) {
@@ -259,6 +261,8 @@ export function generateCpaWorkbook(opts: CpaExportOptions = {}): Buffer {
           r.audit_status,
           r.cpa_reviewed ? 'YES' : 'NO',
           r.tagged_date || '',
+          s.period_start || '',
+          s.period_end || '',
           s.business_purpose || r.business_purpose || '',
           r.receipt_ref || '',
           `${idx + 1}/${splits.length}`,
@@ -273,6 +277,7 @@ export function generateCpaWorkbook(opts: CpaExportOptions = {}): Buffer {
         r.audit_status,
         r.cpa_reviewed ? 'YES' : 'NO',
         r.tagged_date || '',
+        '', '',
         r.business_purpose || '', r.receipt_ref || '',
         '',
       ]);

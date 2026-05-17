@@ -13,6 +13,8 @@ export interface TransactionSplit {
   subCategory2: string | null;
   businessPurpose: string | null;
   notes: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
@@ -30,6 +32,8 @@ function rowToSplit(r: any): TransactionSplit {
     subCategory2: r.sub_category_2,
     businessPurpose: r.business_purpose,
     notes: r.notes,
+    periodStart: r.period_start ?? null,
+    periodEnd: r.period_end ?? null,
     sortOrder: r.sort_order,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -54,6 +58,8 @@ export interface SplitInput {
   subCategory2?: string | null;
   businessPurpose?: string | null;
   notes?: string | null;
+  periodStart?: string | null;
+  periodEnd?: string | null;
   sortOrder?: number;
 }
 
@@ -64,8 +70,9 @@ export function createSplit(input: SplitInput): TransactionSplit {
   db.prepare(
     `INSERT INTO transaction_splits
        (id, transaction_id, amount_cents, entity, category, individual,
-        sub_category_1, sub_category_2, business_purpose, notes, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        sub_category_1, sub_category_2, business_purpose, notes,
+        period_start, period_end, sort_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     input.transactionId,
@@ -77,6 +84,8 @@ export function createSplit(input: SplitInput): TransactionSplit {
     input.subCategory2?.trim() || null,
     input.businessPurpose?.trim() || null,
     input.notes?.trim() || null,
+    input.periodStart || null,
+    input.periodEnd || null,
     input.sortOrder ?? 0,
     now,
     now,
@@ -93,6 +102,8 @@ export interface UpdateSplitPatch {
   subCategory2?: string | null;
   businessPurpose?: string | null;
   notes?: string | null;
+  periodStart?: string | null;
+  periodEnd?: string | null;
   sortOrder?: number;
 }
 
@@ -109,6 +120,8 @@ export function updateSplit(id: string, patch: UpdateSplitPatch): void {
     subCategory2: 'sub_category_2',
     businessPurpose: 'business_purpose',
     notes: 'notes',
+    periodStart: 'period_start',
+    periodEnd: 'period_end',
     sortOrder: 'sort_order',
   };
   for (const [k, col] of Object.entries(map)) {
