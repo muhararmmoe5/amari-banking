@@ -49,11 +49,11 @@ export default function BudgetDetailPage({ params }: { params: { id: string } })
           hint={masterPct != null ? `${masterPct.toFixed(1)}% of total` : `${d.txCount} transactions`}
           tone={isIncome ? 'income' : 'expense'}
         />
-        <SummaryCard label="Monthly cap" value={monthlyCap ? fmtCents(monthlyCap) : '—'} hint={b.periodMonth ? `targeting ${b.periodMonth}` : 'ongoing'} />
+        <SummaryCard label="Monthly target" value={monthlyCap ? fmtCents(monthlyCap) : '—'} hint={b.periodMonth ? `targeting ${b.periodMonth}` : 'ongoing'} />
         <SummaryCard
           label={`${d.effectiveMonth} progress`}
           value={fmtCents(isIncome ? d.effectiveMonthIncomeCents : d.effectiveMonthExpenseCents)}
-          hint={d.pctOfMonthlyCap != null ? `${d.pctOfMonthlyCap.toFixed(0)}% of monthly cap` : undefined}
+          hint={d.pctOfMonthlyCap != null ? `${d.pctOfMonthlyCap.toFixed(0)}% of monthly target` : undefined}
         />
       </div>
 
@@ -92,7 +92,7 @@ export default function BudgetDetailPage({ params }: { params: { id: string } })
             </div>
             {d.months.map((m) => (
               <div key={m.month} className={`grid grid-cols-[120px_1fr_1fr_1fr_80px] px-4 py-2 border-t border-line/40 text-sm items-center ${m.overMonthlyCap ? 'bg-warn/5' : ''}`}>
-                <span className="mono">{m.month}{m.overMonthlyCap ? <span className="ml-1 pill text-[9px] bg-warn/20 text-warn border border-warn/40">over cap</span> : null}</span>
+                <span className="mono">{m.month}{m.overMonthlyCap ? <span className="ml-1 pill text-[9px] bg-warn/20 text-warn border border-warn/40">over target</span> : null}</span>
                 <span className="text-right mono tabnum text-income">{fmtCents(m.incomeCents)}</span>
                 <span className="text-right mono tabnum text-expense">{fmtCents(m.expenseCents)}</span>
                 <span className={`text-right mono tabnum ${m.netCents >= 0 ? 'text-income' : 'text-expense'}`}>{fmtCents(m.netCents)}</span>

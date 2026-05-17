@@ -175,7 +175,7 @@ function CreateForm({
           <div className="text-[10px] text-ink-mute mt-1">How many months to spread total over.</div>
         </label>
         <label className="block">
-          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Monthly cap ($, optional)</div>
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Monthly target ($, optional)</div>
           <input name="monthly" placeholder="75000" className="w-full" />
         </label>
         <label className="block">
@@ -340,7 +340,7 @@ function BudgetRow({
             <input type="number" value={runwayMonths} onChange={(e) => setRunwayMonths(e.target.value)} className="w-full" placeholder="12" />
           </label>
           <label className="block">
-            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Monthly cap ($)</div>
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Monthly target ($)</div>
             <input value={monthly} onChange={(e) => setMonthly(e.target.value)} className="w-full" placeholder="75000" />
           </label>
           <label className="block">
