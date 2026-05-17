@@ -9,6 +9,7 @@ import { saveTransaction } from './actions';
 import { useToast } from '@/components/Toast';
 import SplitEditor from '../audit/SplitEditor';
 import SourceTraceModal from './SourceTraceModal';
+import SameDayPanel from './SameDayPanel';
 import Portal from '@/components/Portal';
 
 const ENTITY_OPTIONS: EntityType[] = [
@@ -254,6 +255,24 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
 
             {/* Split editor */}
             <SplitEditor transactionId={tx.id} transactionAmount={tx.amount} />
+
+            {/* Same-day bulk apply */}
+            <SameDayPanel
+              txId={tx.id}
+              postingDate={tx.postingDate}
+              accountId={tx.accountId}
+              currentTags={{
+                confirmedEntity,
+                subCategory1: sub1 || null,
+                subCategory2: sub2 || null,
+                individual: individual || null,
+                sourceOfMoney: sourceOfMoney || null,
+                needToGetFrom: needFrom || null,
+                businessPurpose: purpose || null,
+                taggedDate: taggedDate || null,
+                cpaReviewed,
+              }}
+            />
 
             {/* Quick status buttons + hint */}
             <div className="border-t border-line pt-3 flex flex-wrap items-center gap-2">

@@ -3,6 +3,7 @@ import { getDb } from '@/lib/db';
 
 export interface TraceSource {
   txId: string;
+  accountId: string;
   date: string;
   description: string;
   merchant: string | null;
@@ -12,6 +13,17 @@ export interface TraceSource {
   counterpartyAccountId: string | null;
   incomeSource: string | null;
   category: string;
+  /** When this source is an internal transfer, the upstream trace from the source account */
+  upstream?: SourceTraceResult | null;
+}
+
+export interface ClearingInflow {
+  txId: string;
+  date: string;
+  description: string;
+  merchant: string | null;
+  amount: number;
+  incomeSource: string | null;
 }
 
 export interface SourceTraceResult {
@@ -27,40 +39,33 @@ export interface SourceTraceResult {
     entityTag: string;
     category: string;
     counterpartyAccountId: string | null;
+    balanceAfter: number | null;
   };
-  // Sources are populated only when the target is an outflow on the same account.
   sources: TraceSource[];
-  uncovered: number;           // amount we couldn't trace (no inflows left)
+  uncovered: number;
   notes: string[];
+  /** When the target made the account negative, the first inflow(s) that brought it back to zero or positive */
+  clearedBy?: ClearingInflow[];
 }
 
-/**
- * FIFO attribution: replay every transaction on this account chronologically.
- * Track a queue of un-spent inflows. When we hit an outflow, drain inflows
- * (oldest first) until the outflow is covered. When we hit the target tx,
- * return its attribution.
- *
- * Internal transfers are treated as inflows (when amount > 0) or outflows
- * (when amount < 0) like anything else, but tagged so the UI can hint
- * "money came from ···XXXX — trace it there for the original source".
- */
-export function traceFundingSource(txId: string): SourceTraceResult | null {
+const MAX_DEPTH = 4;
+
+export function traceFundingSource(txId: string, depth: number = 0): SourceTraceResult | null {
   const db = getDb();
   const target = db.prepare(`
-    SELECT id, account_id, posting_date, description, merchant_name, amount,
+    SELECT id, account_id, posting_date, description, merchant_name, amount, balance,
       is_internal, internal_linked_id, confirmed_entity, entity_tag, category
     FROM transactions WHERE id = ?
   `).get(txId) as any;
   if (!target) return null;
 
-  // Counterparty for internal transfers
   let counterpartyId: string | null = null;
   if (target.internal_linked_id) {
     const linked = db.prepare(`SELECT account_id FROM transactions WHERE id = ?`).get(target.internal_linked_id) as any;
     if (linked) counterpartyId = linked.account_id;
   }
 
-  const targetSummary = {
+  const targetSummary: SourceTraceResult['target'] = {
     id: target.id,
     accountId: target.account_id,
     postingDate: target.posting_date,
@@ -72,20 +77,19 @@ export function traceFundingSource(txId: string): SourceTraceResult | null {
     entityTag: target.entity_tag,
     category: target.category,
     counterpartyAccountId: counterpartyId,
+    balanceAfter: target.balance,
   };
 
   const notes: string[] = [];
 
-  // Only outflows have a "source" trace — inflows ARE the source.
   if (target.amount >= 0) {
     return { target: targetSummary, sources: [], uncovered: 0, notes };
   }
 
-  // Pull all transactions on this account up to and including the target.
-  // Order by posting_date, then by id for stable ordering within a day.
+  // Pull every transaction on this account up to and including the target.
   const all = db.prepare(`
     SELECT t.id, t.posting_date, t.description, t.merchant_name, t.amount,
-      t.is_internal, t.income_source, t.category,
+      t.is_internal, t.income_source, t.category, t.internal_linked_id,
       linked.account_id as counterparty_account_id
     FROM transactions t
     LEFT JOIN transactions linked ON linked.id = t.internal_linked_id
@@ -98,10 +102,12 @@ export function traceFundingSource(txId: string): SourceTraceResult | null {
 
   interface InflowSlot {
     txId: string;
+    accountId: string;
     date: string;
     description: string;
     merchant: string | null;
     isInternal: boolean;
+    internalLinkedId: string | null;
     counterpartyAccountId: string | null;
     incomeSource: string | null;
     category: string;
@@ -114,10 +120,12 @@ export function traceFundingSource(txId: string): SourceTraceResult | null {
     if (t.amount > 0) {
       queue.push({
         txId: t.id,
+        accountId: target.account_id,
         date: t.posting_date,
         description: t.description,
         merchant: t.merchant_name,
         isInternal: !!t.is_internal,
+        internalLinkedId: t.internal_linked_id,
         counterpartyAccountId: t.counterparty_account_id,
         incomeSource: t.income_source,
         category: t.category,
@@ -132,8 +140,9 @@ export function traceFundingSource(txId: string): SourceTraceResult | null {
       while (toCover > 0.001 && queue.length > 0) {
         const head = queue[0];
         const take = Math.min(toCover, head.remaining);
-        consumed.push({
+        const source: TraceSource = {
           txId: head.txId,
+          accountId: head.accountId,
           date: head.date,
           description: head.description,
           merchant: head.merchant,
@@ -143,7 +152,12 @@ export function traceFundingSource(txId: string): SourceTraceResult | null {
           counterpartyAccountId: head.counterpartyAccountId,
           incomeSource: head.incomeSource,
           category: head.category,
-        });
+        };
+        // Recursive: if this source is an internal-transfer inflow, walk up through the linked outflow on the source account.
+        if (head.isInternal && head.internalLinkedId && depth < MAX_DEPTH) {
+          source.upstream = traceFundingSource(head.internalLinkedId, depth + 1) || null;
+        }
+        consumed.push(source);
         head.remaining -= take;
         toCover -= take;
         if (head.remaining < 0.001) queue.shift();
@@ -151,18 +165,76 @@ export function traceFundingSource(txId: string): SourceTraceResult | null {
       if (t.id === target.id) {
         if (toCover > 0.001) {
           notes.push(
-            `${toCover.toFixed(2)} could not be traced — the account had no recorded inflows to cover this. Earlier balance from before the first import?`
+            `${toCover.toFixed(2)} could not be traced — the account had no recorded inflows on this account before this transaction. Likely from a balance that existed before your earliest CSV import.`
           );
         }
-        if (consumed.some((c) => c.isInternal)) {
-          notes.push(
-            'Some funding came from an internal transfer. Click into that transfer on the source account to trace one level deeper.'
-          );
+        // Look forward for clearing inflow if this transaction made the account negative.
+        let clearedBy: ClearingInflow[] | undefined;
+        if (target.balance != null && target.balance < 0) {
+          const next = db.prepare(`
+            SELECT id, posting_date, description, merchant_name, amount, balance, income_source
+            FROM transactions
+            WHERE account_id = ?
+              AND (posting_date > ? OR (posting_date = ? AND id > ?))
+            ORDER BY posting_date ASC, id ASC
+            LIMIT 50
+          `).all(target.account_id, target.posting_date, target.posting_date, target.id) as any[];
+          let running = target.balance;
+          const cleared: ClearingInflow[] = [];
+          for (const r of next) {
+            running = r.balance != null ? r.balance : running + r.amount;
+            if (r.amount > 0) {
+              cleared.push({
+                txId: r.id,
+                date: r.posting_date,
+                description: r.description,
+                merchant: r.merchant_name,
+                amount: r.amount,
+                incomeSource: r.income_source,
+              });
+            }
+            if (running >= 0) break;
+          }
+          if (cleared.length > 0) clearedBy = cleared;
         }
-        return { target: targetSummary, sources: consumed, uncovered: toCover, notes };
+        return { target: targetSummary, sources: consumed, uncovered: toCover, notes, clearedBy };
       }
     }
   }
 
   return { target: targetSummary, sources: [], uncovered: Math.abs(target.amount), notes };
+}
+
+// Same-day siblings (excluding the target)
+export interface SameDayTx {
+  id: string;
+  description: string;
+  merchant: string | null;
+  amount: number;
+  category: string;
+  auditStatus: string;
+  confirmedEntity: string | null;
+  entityTag: string;
+}
+
+export function getSameDayTransactions(txId: string): SameDayTx[] {
+  const db = getDb();
+  const target = db.prepare('SELECT account_id, posting_date FROM transactions WHERE id = ?').get(txId) as any;
+  if (!target) return [];
+  const rows = db.prepare(`
+    SELECT id, description, merchant_name, amount, category, audit_status, confirmed_entity, entity_tag
+    FROM transactions
+    WHERE account_id = ? AND posting_date = ? AND id != ?
+    ORDER BY id ASC
+  `).all(target.account_id, target.posting_date, txId) as any[];
+  return rows.map((r) => ({
+    id: r.id,
+    description: r.description,
+    merchant: r.merchant_name,
+    amount: r.amount,
+    category: r.category,
+    auditStatus: r.audit_status,
+    confirmedEntity: r.confirmed_entity,
+    entityTag: r.entity_tag,
+  }));
 }
