@@ -1,5 +1,5 @@
 import { listBudgetsWithSpend } from '@/lib/db/budgets';
-import { listCommitments, getPerson } from '@/lib/db/cap';
+import { listCommitments, getPerson, listPeople } from '@/lib/db/cap';
 import { requireOwner } from '@/lib/auth';
 import BudgetsClient from './BudgetsClient';
 
@@ -19,8 +19,11 @@ export default function BudgetsPage() {
       label: parts.join(' · '),
       entity: c.entity,
       monthlyAmountCents: c.monthlyAmountCents,
+      personId: c.personId,
+      personName: person?.name || null,
     };
   });
+  const people = listPeople().map((p) => ({ id: p.id, name: p.name }));
   return (
     <div className="p-8 space-y-5 max-w-[1100px]">
       <div>
@@ -29,7 +32,7 @@ export default function BudgetsPage() {
           Named buckets you can tag transactions to. Each budget tracks how much has been spent against it this month and all time. Link a budget to an investor commitment to track that month&apos;s tranche.
         </p>
       </div>
-      <BudgetsClient initial={budgets} commitments={commitments} />
+      <BudgetsClient initial={budgets} commitments={commitments} people={people} />
     </div>
   );
 }

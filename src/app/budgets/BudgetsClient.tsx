@@ -5,8 +5,12 @@ import { Plus, Trash2, Archive, Pencil, Check, X } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import { fmtCents } from '@/lib/cap';
 import type { EntityType } from '@/types';
-import type { BudgetWithSpend, BudgetKind } from '@/lib/db/budgets';
+import type { BudgetWithSpend, BudgetKind, BudgetSubKind } from '@/lib/db/budgets';
+import { BUDGET_SUB_KINDS } from '@/lib/db/budgets';
 import { actCreateBudget, actUpdateBudget, actDeleteBudget } from './actions';
+
+const INCOME_SUB_KINDS: BudgetSubKind[] = ['INVESTMENT_INCOME', 'REVENUE', 'REFUND', 'OTHER_INCOME'];
+const EXPENSE_SUB_KINDS: BudgetSubKind[] = ['OPERATING', 'PAYROLL', 'MARKETING', 'COGS', 'TAXES', 'OTHER_EXPENSE'];
 
 const ENTITY_OPTIONS: { v: EntityType | ''; l: string }[] = [
   { v: '', l: 'Any / unspecified' },
@@ -30,9 +34,15 @@ interface CommitmentOption {
   label: string;
   entity: string;
   monthlyAmountCents: number | null;
+  personId: string;
+  personName: string | null;
 }
 
-export default function BudgetsClient({ initial, commitments }: { initial: BudgetWithSpend[]; commitments: CommitmentOption[] }) {
+interface PersonOption { id: string; name: string }
+
+export default function BudgetsClient({
+  initial, commitments, people,
+}: { initial: BudgetWithSpend[]; commitments: CommitmentOption[]; people: PersonOption[] }) {
   const { saveStart, saveEnd, saveError } = useToast();
   const [, startTx] = useTransition();
   const [addOpen, setAddOpen] = useState(false);
@@ -43,13 +53,22 @@ export default function BudgetsClient({ initial, commitments }: { initial: Budge
     const tid = saveStart();
     startTx(async () => {
       try {
+        const commitmentId = (form.get('commitmentId') as string) || null;
+        // Auto-fill person from the commitment if a commitment is picked but person is not.
+        let personId = (form.get('personId') as string) || null;
+        if (!personId && commitmentId) {
+          const c = commitments.find((x) => x.id === commitmentId);
+          if (c?.personId) personId = c.personId;
+        }
         await actCreateBudget({
           name,
           entity: (form.get('entity') as EntityType) || null,
           kind: (form.get('kind') as BudgetKind) || 'EXPENSE',
+          subKind: ((form.get('subKind') as string) || '') as BudgetSubKind || null,
           monthlyAmountCents: dollarsToCents(String(form.get('monthly') || '')),
           periodMonth: (form.get('periodMonth') as string) || null,
-          fundingCommitmentId: (form.get('commitmentId') as string) || null,
+          fundingCommitmentId: commitmentId,
+          personId,
           notes: (form.get('notes') as string) || null,
         });
         saveEnd(tid);
@@ -87,68 +106,102 @@ export default function BudgetsClient({ initial, commitments }: { initial: Budge
       </div>
 
       {addOpen ? (
-        <form action={onCreate} className="card p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Name *</div>
-              <input name="name" required placeholder="e.g. Bytes AI Marketing" className="w-full" />
-            </label>
-            <label className="block">
-              <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Kind</div>
-              <select name="kind" defaultValue="EXPENSE" className="w-full">
-                <option value="EXPENSE">Expense budget (money going out)</option>
-                <option value="INCOME">Income target (money coming in)</option>
-              </select>
-            </label>
-            <label className="block">
-              <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Entity (optional)</div>
-              <select name="entity" defaultValue="" className="w-full">
-                {ENTITY_OPTIONS.map((o) => <option key={o.v || 'any'} value={o.v}>{o.l}</option>)}
-              </select>
-            </label>
-            <label className="block">
-              <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Monthly cap ($, optional)</div>
-              <input name="monthly" placeholder="5000" className="w-full" />
-            </label>
-            <label className="block">
-              <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Specific month (optional)</div>
-              <input name="periodMonth" type="month" className="w-full" />
-              <div className="text-[10px] text-ink-mute mt-1">Leave blank for ongoing. Set to scope this budget to one month (e.g. &ldquo;May 2026&rdquo;).</div>
-            </label>
-            <label className="block col-span-2">
-              <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Link to investor commitment (optional)</div>
-              <select name="commitmentId" defaultValue="" className="w-full">
-                <option value="">— not linked to an investment —</option>
-                {commitments.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
-              <div className="text-[10px] text-ink-mute mt-1">When linked, tagging a transaction to this budget also counts it toward the commitment&apos;s overall funding progress. Manage commitments on the Cap Table page for each entity.</div>
-            </label>
-            <label className="block col-span-2">
-              <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Notes</div>
-              <input name="notes" placeholder="What does this cover?" className="w-full" />
-            </label>
-          </div>
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setAddOpen(false)} className="btn">Cancel</button>
-            <button type="submit" className="btn btn-primary">Create</button>
-          </div>
-        </form>
+        <CreateForm
+          people={people}
+          commitments={commitments}
+          onSubmit={onCreate}
+          onCancel={() => setAddOpen(false)}
+        />
       ) : null}
 
-      <BudgetList title="Active" budgets={active} commitments={commitments} onArchive={onArchive} onDelete={onDelete} />
+      <BudgetList title="Active" budgets={active} commitments={commitments} people={people} onArchive={onArchive} onDelete={onDelete} />
       {archived.length > 0 ? (
-        <BudgetList title="Archived" budgets={archived} commitments={commitments} onArchive={onArchive} onDelete={onDelete} archived />
+        <BudgetList title="Archived" budgets={archived} commitments={commitments} people={people} onArchive={onArchive} onDelete={onDelete} archived />
       ) : null}
     </div>
   );
 }
 
+function CreateForm({
+  people, commitments, onSubmit, onCancel,
+}: {
+  people: PersonOption[];
+  commitments: CommitmentOption[];
+  onSubmit: (form: FormData) => void;
+  onCancel: () => void;
+}) {
+  const [kind, setKind] = useState<BudgetKind>('EXPENSE');
+  const subKindOpts = kind === 'INCOME' ? INCOME_SUB_KINDS : EXPENSE_SUB_KINDS;
+  return (
+    <form action={onSubmit} className="card p-4 space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Name *</div>
+          <input name="name" required placeholder="e.g. Bytes AI Marketing" className="w-full" />
+        </label>
+        <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Kind</div>
+          <select name="kind" value={kind} onChange={(e) => setKind(e.target.value as BudgetKind)} className="w-full">
+            <option value="EXPENSE">Expense budget (money going out)</option>
+            <option value="INCOME">Income target (money coming in)</option>
+          </select>
+        </label>
+        <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Sub kind</div>
+          <select name="subKind" defaultValue="" className="w-full">
+            <option value="">— general —</option>
+            {subKindOpts.map((sk) => <option key={sk} value={sk}>{BUDGET_SUB_KINDS[sk]}</option>)}
+          </select>
+          <div className="text-[10px] text-ink-mute mt-1">Picking &ldquo;Investment income&rdquo; below pairs with a commitment + investor.</div>
+        </label>
+        <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Entity (optional)</div>
+          <select name="entity" defaultValue="" className="w-full">
+            {ENTITY_OPTIONS.map((o) => <option key={o.v || 'any'} value={o.v}>{o.l}</option>)}
+          </select>
+        </label>
+        <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Monthly cap ($, optional)</div>
+          <input name="monthly" placeholder="5000" className="w-full" />
+        </label>
+        <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Specific month (optional)</div>
+          <input name="periodMonth" type="month" className="w-full" />
+        </label>
+        <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Person (e.g. the investor)</div>
+          <select name="personId" defaultValue="" className="w-full">
+            <option value="">— none / auto-fill from commitment —</option>
+            {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>
+        <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Link to investor commitment</div>
+          <select name="commitmentId" defaultValue="" className="w-full">
+            <option value="">— not linked —</option>
+            {commitments.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+          </select>
+        </label>
+        <label className="block col-span-2">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Notes</div>
+          <input name="notes" placeholder="What does this cover?" className="w-full" />
+        </label>
+      </div>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className="btn">Cancel</button>
+        <button type="submit" className="btn btn-primary">Create</button>
+      </div>
+    </form>
+  );
+}
+
 function BudgetList({
-  title, budgets, commitments, onArchive, onDelete, archived,
+  title, budgets, commitments, people, onArchive, onDelete, archived,
 }: {
   title: string;
   budgets: BudgetWithSpend[];
   commitments: CommitmentOption[];
+  people: PersonOption[];
   onArchive: (id: string, archive: boolean) => void;
   onDelete: (id: string) => void;
   archived?: boolean;
@@ -166,7 +219,7 @@ function BudgetList({
       <h2 className="text-sm font-medium uppercase tracking-wider text-ink-dim mb-2">{title}</h2>
       <div className="card divide-y divide-line/60 overflow-hidden">
         {budgets.map((b) => (
-          <BudgetRow key={b.id} budget={b} commitments={commitments} archived={archived} onArchive={onArchive} onDelete={onDelete} />
+          <BudgetRow key={b.id} budget={b} commitments={commitments} people={people} archived={archived} onArchive={onArchive} onDelete={onDelete} />
         ))}
       </div>
     </section>
@@ -174,10 +227,11 @@ function BudgetList({
 }
 
 function BudgetRow({
-  budget: b, commitments, archived, onArchive, onDelete,
+  budget: b, commitments, people, archived, onArchive, onDelete,
 }: {
   budget: BudgetWithSpend;
   commitments: CommitmentOption[];
+  people: PersonOption[];
   archived?: boolean;
   onArchive: (id: string, archive: boolean) => void;
   onDelete: (id: string) => void;
@@ -187,23 +241,35 @@ function BudgetRow({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(b.name);
   const [kind, setKind] = useState<BudgetKind>(b.kind);
+  const [subKind, setSubKind] = useState<string>(b.subKind || '');
   const [entity, setEntity] = useState<string>(b.entity || '');
   const [monthly, setMonthly] = useState(b.monthlyAmountCents != null ? (b.monthlyAmountCents / 100).toString() : '');
   const [periodMonth, setPeriodMonth] = useState(b.periodMonth || '');
   const [commitmentId, setCommitmentId] = useState(b.fundingCommitmentId || '');
+  const [personId, setPersonId] = useState(b.personId || '');
   const [notes, setNotes] = useState(b.notes || '');
+
+  const subKindOpts = kind === 'INCOME' ? INCOME_SUB_KINDS : EXPENSE_SUB_KINDS;
 
   function onSave() {
     const tid = saveStart();
     startTx(async () => {
       try {
+        // Auto-fill person from commitment if commitment set + person blank
+        let effPersonId = personId;
+        if (!effPersonId && commitmentId) {
+          const c = commitments.find((x) => x.id === commitmentId);
+          if (c?.personId) effPersonId = c.personId;
+        }
         await actUpdateBudget(b.id, {
           name: name.trim() || b.name,
           kind,
+          subKind: (subKind as BudgetSubKind) || null,
           entity: (entity as EntityType) || null,
           monthlyAmountCents: dollarsToCents(monthly),
           periodMonth: periodMonth || null,
           fundingCommitmentId: commitmentId || null,
+          personId: effPersonId || null,
           notes: notes || null,
         });
         saveEnd(tid);
@@ -222,15 +288,29 @@ function BudgetRow({
           </label>
           <label className="block">
             <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Kind</div>
-            <select value={kind} onChange={(e) => setKind(e.target.value as BudgetKind)} className="w-full">
+            <select value={kind} onChange={(e) => { setKind(e.target.value as BudgetKind); setSubKind(''); }} className="w-full">
               <option value="EXPENSE">Expense</option>
               <option value="INCOME">Income</option>
+            </select>
+          </label>
+          <label className="block">
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Sub kind</div>
+            <select value={subKind} onChange={(e) => setSubKind(e.target.value)} className="w-full">
+              <option value="">— general —</option>
+              {subKindOpts.map((sk) => <option key={sk} value={sk}>{BUDGET_SUB_KINDS[sk]}</option>)}
             </select>
           </label>
           <label className="block">
             <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Entity</div>
             <select value={entity} onChange={(e) => setEntity(e.target.value)} className="w-full">
               {ENTITY_OPTIONS.map((o) => <option key={o.v || 'any'} value={o.v}>{o.l}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Person (e.g. the investor)</div>
+            <select value={personId} onChange={(e) => setPersonId(e.target.value)} className="w-full">
+              <option value="">— none / auto from commitment —</option>
+              {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </label>
           <label className="block">
@@ -270,9 +350,13 @@ function BudgetRow({
           <div className="text-base font-medium">
             {b.name}
             <span className={`ml-2 pill text-[10px] ${b.kind === 'EXPENSE' ? 'bg-expense/10 text-expense border border-expense/30' : 'bg-income/10 text-income border border-income/30'}`}>{b.kind === 'EXPENSE' ? 'expense' : 'income'}</span>
+            {b.subKind ? <span className="ml-2 pill text-[10px] bg-entity-bytes/15 text-entity-bytes border border-entity-bytes/30">{BUDGET_SUB_KINDS[b.subKind]}</span> : null}
             {b.entity ? <span className="ml-2 pill text-[10px] bg-bg-2 text-ink-dim border border-line">{b.entity.replace(/_/g, ' ').toLowerCase()}</span> : null}
             {b.periodMonth ? <span className="ml-2 pill text-[10px] bg-entity-bytes/10 text-entity-bytes border border-entity-bytes/30">{b.periodMonth}</span> : null}
           </div>
+          {b.personName ? (
+            <div className="text-[11px] mt-1 text-ink-dim">👤 {b.personName}</div>
+          ) : null}
           {b.commitmentLabel ? (
             <div className="text-[11px] mt-1 text-warn">↳ Investment: {b.commitmentLabel}</div>
           ) : null}

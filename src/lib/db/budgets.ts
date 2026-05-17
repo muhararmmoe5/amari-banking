@@ -6,6 +6,23 @@ import type { EntityType } from '@/types';
 export type BudgetKind = 'EXPENSE' | 'INCOME';
 export type BudgetStatus = 'ACTIVE' | 'ARCHIVED';
 
+/** Optional refinement on top of Kind, mostly used for INCOME to distinguish
+ *  investor money (counts toward a funding commitment) from operating
+ *  revenue. */
+export const BUDGET_SUB_KINDS = {
+  INVESTMENT_INCOME: 'Investment income',
+  REVENUE: 'Operating revenue',
+  REFUND: 'Refund / reimbursement',
+  OTHER_INCOME: 'Other income',
+  OPERATING: 'Operating expense',
+  PAYROLL: 'Payroll',
+  MARKETING: 'Marketing',
+  COGS: 'Cost of goods sold',
+  TAXES: 'Taxes',
+  OTHER_EXPENSE: 'Other expense',
+} as const;
+export type BudgetSubKind = keyof typeof BUDGET_SUB_KINDS;
+
 export interface Budget {
   id: string;
   name: string;
@@ -14,6 +31,8 @@ export interface Budget {
   monthlyAmountCents: number | null;
   periodMonth: string | null;          // YYYY-MM — when set, this budget targets one specific month
   fundingCommitmentId: string | null;  // links to an investor's funding commitment
+  subKind: BudgetSubKind | null;
+  personId: string | null;             // person this budget tracks (e.g. the investor)
   notes: string | null;
   status: BudgetStatus;
   createdAt: number;
@@ -29,6 +48,8 @@ function rowToBudget(r: any): Budget {
     monthlyAmountCents: r.monthly_amount_cents,
     periodMonth: r.period_month ?? null,
     fundingCommitmentId: r.funding_commitment_id ?? null,
+    subKind: r.sub_kind ?? null,
+    personId: r.person_id ?? null,
     notes: r.notes,
     status: r.status,
     createdAt: r.created_at,
@@ -43,6 +64,8 @@ export interface BudgetInput {
   monthlyAmountCents?: number | null;
   periodMonth?: string | null;
   fundingCommitmentId?: string | null;
+  subKind?: BudgetSubKind | null;
+  personId?: string | null;
   notes?: string | null;
 }
 
@@ -64,8 +87,8 @@ export function createBudget(input: BudgetInput): Budget {
   const id = crypto.randomUUID();
   const now = Date.now();
   db.prepare(
-    `INSERT INTO budgets (id, name, entity, kind, monthly_amount_cents, period_month, funding_commitment_id, notes, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)`
+    `INSERT INTO budgets (id, name, entity, kind, monthly_amount_cents, period_month, funding_commitment_id, sub_kind, person_id, notes, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)`
   ).run(
     id,
     input.name.trim(),
@@ -74,6 +97,8 @@ export function createBudget(input: BudgetInput): Budget {
     input.monthlyAmountCents ?? null,
     input.periodMonth || null,
     input.fundingCommitmentId || null,
+    input.subKind || null,
+    input.personId || null,
     input.notes?.trim() || null,
     now,
     now,
@@ -91,6 +116,8 @@ export function updateBudget(id: string, patch: Partial<BudgetInput> & { status?
   if (patch.monthlyAmountCents !== undefined) { fields.push('monthly_amount_cents = @monthly'); params.monthly = patch.monthlyAmountCents; }
   if (patch.periodMonth !== undefined) { fields.push('period_month = @period_month'); params.period_month = patch.periodMonth || null; }
   if (patch.fundingCommitmentId !== undefined) { fields.push('funding_commitment_id = @commitment_id'); params.commitment_id = patch.fundingCommitmentId || null; }
+  if (patch.subKind !== undefined) { fields.push('sub_kind = @sub_kind'); params.sub_kind = patch.subKind || null; }
+  if (patch.personId !== undefined) { fields.push('person_id = @person_id'); params.person_id = patch.personId || null; }
   if (patch.notes !== undefined) { fields.push('notes = @notes'); params.notes = patch.notes?.trim() || null; }
   if (patch.status !== undefined) { fields.push('status = @status'); params.status = patch.status; }
   if (!fields.length) return;
@@ -111,6 +138,7 @@ export interface BudgetWithSpend extends Budget {
   /** Which month "this month" actually refers to — periodMonth if set, otherwise calendar month. */
   effectiveMonth: string;
   commitmentLabel: string | null;
+  personName: string | null;
 }
 
 function monthBounds(yyyyMm: string): { from: string; to: string } {
@@ -136,6 +164,12 @@ export function listBudgetsWithSpend(): BudgetWithSpend[] {
       `SELECT COALESCE(SUM(ABS(amount)), 0) as s, COUNT(*) as n FROM transactions WHERE budget_id = ?`
     ).get(b.id) as any;
 
+    let personName: string | null = null;
+    if (b.personId) {
+      const p = db.prepare('SELECT name FROM people WHERE id = ?').get(b.personId) as any;
+      personName = p?.name || null;
+    }
+
     let commitmentLabel: string | null = null;
     if (b.fundingCommitmentId) {
       const c = db.prepare(`
@@ -160,6 +194,7 @@ export function listBudgetsWithSpend(): BudgetWithSpend[] {
       txCountAllTime: all.n || 0,
       effectiveMonth,
       commitmentLabel,
+      personName,
     };
   });
 }
