@@ -90,6 +90,9 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
         <div
           className="absolute top-0 right-0 bottom-0 w-[min(640px,100vw)] bg-bg-1 border-l border-line flex flex-col shadow-soft"
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onKeyUp={(e) => e.stopPropagation()}
+          onKeyPress={(e) => e.stopPropagation()}
         >
           {/* Header (fixed at top) */}
           <div className="shrink-0 bg-bg-1 border-b border-line px-5 py-3 flex items-center justify-between">
