@@ -315,5 +315,12 @@ export function getDb(): Database.Database {
   }
 
   _db = db;
+  // One-time seed of default dropdown options. Idempotent via UNIQUE(field, value).
+  // Import lazily to avoid a circular dependency through options.ts -> getDb.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { seedDefaultOptions } = require('./seed-options');
+    seedDefaultOptions();
+  } catch { /* swallow — seeding is optional */ }
   return db;
 }

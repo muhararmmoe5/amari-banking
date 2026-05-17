@@ -257,7 +257,10 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   if (patch.individual !== undefined) { fields.push('individual = @individual'); params.individual = patch.individual; }
   if (patch.subCategory1 !== undefined) { fields.push('sub_category_1 = @sub_category_1'); params.sub_category_1 = patch.subCategory1; }
   if (patch.subCategory2 !== undefined) { fields.push('sub_category_2 = @sub_category_2'); params.sub_category_2 = patch.subCategory2; }
-  if (patch.sourceOfMoney !== undefined) { fields.push('source_of_money = @source_of_money'); params.source_of_money = patch.sourceOfMoney; }
+  if (patch.sourceOfMoney !== undefined) {
+    fields.push('source_of_money = @source_of_money');
+    params.source_of_money = patch.sourceOfMoney;
+  }
   if (patch.needToGetFrom !== undefined) { fields.push('need_to_get_from = @need_to_get_from'); params.need_to_get_from = patch.needToGetFrom; }
   if (patch.cpaReviewed !== undefined) { fields.push('cpa_reviewed = @cpa_reviewed'); params.cpa_reviewed = patch.cpaReviewed ? 1 : 0; }
   if (patch.taggedDate !== undefined) { fields.push('tagged_date = @tagged_date'); params.tagged_date = patch.taggedDate; }
@@ -290,6 +293,50 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   if (fields.length === 0) return;
   fields.push('updated_at = @updated_at');
   db.prepare(`UPDATE transactions SET ${fields.join(', ')} WHERE id = @id`).run(params);
+
+  // If sourceOfMoney was set on an inflow, cascade it forward to all untagged
+  // transactions on the same account up to (but not including) the next inflow
+  // that has its own source_of_money set. This is the "sticky source tag"
+  // behavior the user asked for.
+  if (patch.sourceOfMoney) {
+    propagateSourceOfMoneyForward(id, patch.sourceOfMoney);
+  }
+}
+
+/** Cascade a source_of_money value forward from an inflow to subsequent
+ *  untagged transactions on the same account. Only fills NULLs; never
+ *  overwrites a value the user has already chosen. Stops at the next inflow
+ *  that already carries its own source_of_money. */
+export function propagateSourceOfMoneyForward(txId: string, source: string): { updated: number } {
+  const db = getDb();
+  const seed = db.prepare(
+    'SELECT account_id, posting_date, amount FROM transactions WHERE id = ?'
+  ).get(txId) as any;
+  if (!seed || seed.amount <= 0) return { updated: 0 };  // only cascade from inflows
+
+  // All subsequent rows on this account, in chronological order.
+  const subsequent = db.prepare(`
+    SELECT id, amount, source_of_money
+    FROM transactions
+    WHERE account_id = ?
+      AND (posting_date > ? OR (posting_date = ? AND id > ?))
+    ORDER BY posting_date ASC, id ASC
+  `).all(seed.account_id, seed.posting_date, seed.posting_date, txId) as any[];
+
+  const upd = db.prepare(
+    'UPDATE transactions SET source_of_money = ?, updated_at = ? WHERE id = ? AND source_of_money IS NULL'
+  );
+  const now = Date.now();
+  let updated = 0;
+  for (const r of subsequent) {
+    // Stop when we hit a later inflow that already has its own source tag.
+    if (r.amount > 0 && r.source_of_money) break;
+    if (!r.source_of_money) {
+      const res = upd.run(source, now, r.id);
+      if (res.changes > 0) updated += 1;
+    }
+  }
+  return { updated };
 }
 
 // ===== Account / aggregate queries for dashboard =====
