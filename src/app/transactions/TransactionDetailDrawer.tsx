@@ -495,6 +495,72 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                     </Field>
                   </>
                 )}
+                {tx.amount < 0 ? (
+                  <div className="md:col-span-2 rounded-xl border border-line/60 p-3 bg-bg-2/30">
+                    <div className="section-label mb-2">
+                      Money chain · who got it next?
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <Field label="Hop 2 · pays to person (as salary)" hint="who personally received this money">
+                        <select
+                          value={salaryPersonId}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setSalaryPersonId(v);
+                            // Auto-set isSalary when a person is picked, clear it when blank
+                            if (v && !isSalary) {
+                              setIsSalary(true);
+                              persist({ salaryPersonId: v, isSalary: true, salaryEntity: salaryEntity || (tx.confirmedEntity || tx.entityTag) });
+                              if (!salaryEntity) setSalaryEntity((tx.confirmedEntity || tx.entityTag) as string);
+                            } else {
+                              persist({ salaryPersonId: v || null });
+                            }
+                          }}
+                          className="w-full"
+                        >
+                          <option value="">— stayed in entity, no person hop —</option>
+                          {(people || []).map((p) => (
+                            <option key={p.id} value={p.id}>{p.name}{p.role ? ` (${p.role.toLowerCase()})` : ''}</option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Hop 3 · then forwards to entity" hint="where the money ultimately lands">
+                        <select
+                          value={passthroughEntity === 'PENDING' ? '' : passthroughEntity}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setPassthroughEntity(v);
+                            if (!v) {
+                              setPassthroughPurpose('');
+                              setPassthroughPersonId('');
+                              persist({ passthroughEntity: null, passthroughPurpose: null, passthroughPersonId: null });
+                            } else {
+                              persist({ passthroughEntity: v });
+                            }
+                          }}
+                          className="w-full"
+                        >
+                          <option value="">— didn&apos;t flow onward —</option>
+                          {ENTITY_OPTIONS.map((en) => (
+                            <option key={en} value={en}>{ENTITY_LABELS[en]}</option>
+                          ))}
+                        </select>
+                      </Field>
+                      {passthroughEntity && passthroughEntity !== 'PENDING' ? (
+                        <Field label="Hop 3 · purpose" className="md:col-span-2">
+                          <input
+                            type="text"
+                            value={passthroughPurpose}
+                            onChange={(e) => setPassthroughPurpose(e.target.value)}
+                            onBlur={() => persist({ passthroughPurpose: passthroughPurpose || null })}
+                            placeholder="e.g. Pay restaurant owner debt"
+                            className="w-full"
+                          />
+                        </Field>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
                 <Field
                   label={tx.amount < 0 ? 'Under an existing budget?' : 'Counts toward an income target?'}
                   className="md:col-span-2"
