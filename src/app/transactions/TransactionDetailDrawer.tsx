@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react';
 import { X, Check } from 'lucide-react';
 import type { Transaction, EntityType, AuditStatus } from '@/types';
-import { ACCOUNTS, ENTITY_LABELS, ENTITY_COLORS, getAccount } from '@/constants/accounts';
+import { ACCOUNTS, ENTITY_LABELS, ENTITY_COLORS, BUSINESS_ENTITIES, getAccount } from '@/constants/accounts';
 import { fmtMoney, fmtDate } from '@/lib/format';
 import { saveTransaction } from './actions';
 import { useToast } from '@/components/Toast';
@@ -243,6 +243,7 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                   field="individual"
                   value={individual}
                   options={optionLists.individual || []}
+                  builtInOptions={{ label: 'People on the team', values: (people || []).map((p) => p.name) }}
                   onChange={(v) => { setIndividual(v); persist({ individual: v || null }); }}
                   onOptionAdded={(v) => addToList('individual', v)}
                   placeholder="— pick a person / vendor —"
@@ -307,6 +308,7 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                       field="source_of_money"
                       value={sourceOfMoney}
                       options={optionLists.source_of_money || []}
+                      builtInOptions={{ label: 'Your businesses', values: BUSINESS_ENTITIES.map((e) => ENTITY_LABELS[e]) }}
                       onChange={(v) => { setSourceOfMoney(v); persist({ sourceOfMoney: v || null }); }}
                       onOptionAdded={(v) => addToList('source_of_money', v)}
                     />
@@ -316,6 +318,13 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                       field="need_to_get_from"
                       value={needFrom}
                       options={optionLists.need_to_get_from || []}
+                      builtInOptions={{
+                        label: 'Your businesses & people',
+                        values: [
+                          ...BUSINESS_ENTITIES.map((e) => ENTITY_LABELS[e]),
+                          ...(people || []).map((p) => p.name),
+                        ],
+                      }}
                       onChange={(v) => { setNeedFrom(v); persist({ needToGetFrom: v || null }); }}
                       onOptionAdded={(v) => addToList('need_to_get_from', v)}
                     />

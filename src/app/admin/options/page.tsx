@@ -1,6 +1,12 @@
-import { listOptionsGrouped, OPTION_FIELDS, OPTION_FIELD_LABELS } from '@/lib/db/options';
+import { listOptionsGrouped, OPTION_FIELDS, OPTION_FIELD_LABELS, type OptionField } from '@/lib/db/options';
 import { requireOwner } from '@/lib/auth';
 import OptionsClient from './OptionsClient';
+
+const AUTO_NOTES: Partial<Record<OptionField, string>> = {
+  individual: 'Auto-populated from people on the Team page (/team). Add ad-hoc names below if a person is not on the team.',
+  source_of_money: 'Auto-populated from your business entities (Bytes AI, Rocket Wireless, etc.). Add ad-hoc sources below if the money came from somewhere else.',
+  need_to_get_from: 'Auto-populated from your business entities + Team page people. Add ad-hoc sources below.',
+};
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +22,12 @@ export default function AdminOptionsPage() {
         </p>
       </div>
       <OptionsClient
-        fields={OPTION_FIELDS.map((f) => ({ field: f, label: OPTION_FIELD_LABELS[f], options: grouped[f] }))}
+        fields={OPTION_FIELDS.map((f) => ({
+          field: f,
+          label: OPTION_FIELD_LABELS[f],
+          options: grouped[f],
+          autoNote: AUTO_NOTES[f],
+        }))}
       />
     </div>
   );

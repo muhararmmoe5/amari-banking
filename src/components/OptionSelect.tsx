@@ -7,6 +7,9 @@ interface Props {
   field: string;
   value: string;
   options: string[];
+  /** Read-only options sourced from somewhere else (people list, entity list, etc.).
+   *  Shown above the user-managed custom options under a group label. */
+  builtInOptions?: { label: string; values: string[] };
   onChange: (v: string) => void;
   onOptionAdded?: (v: string) => void;
   placeholder?: string;
@@ -19,7 +22,7 @@ interface Props {
  * to /api/options, and selects it.
  */
 export default function OptionSelect({
-  field, value, options, onChange, onOptionAdded, placeholder = '— pick —', disabled,
+  field, value, options, builtInOptions, onChange, onOptionAdded, placeholder = '— pick —', disabled,
 }: Props) {
   const [busy, setBusy] = useState(false);
 
@@ -61,10 +64,19 @@ export default function OptionSelect({
         disabled={disabled || busy}
       >
         <option value="">{placeholder}</option>
-        {value && !options.includes(value) ? (
+        {value && !options.includes(value) && !builtInOptions?.values.includes(value) ? (
           <option value={value}>{value} (custom)</option>
         ) : null}
-        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+        {builtInOptions && builtInOptions.values.length > 0 ? (
+          <optgroup label={builtInOptions.label}>
+            {builtInOptions.values.map((o) => <option key={`builtin-${o}`} value={o}>{o}</option>)}
+          </optgroup>
+        ) : null}
+        {options.length > 0 ? (
+          <optgroup label={builtInOptions ? 'Custom options' : 'Options'}>
+            {options.map((o) => <option key={o} value={o}>{o}</option>)}
+          </optgroup>
+        ) : null}
         <option value="__ADD_NEW__">＋ Add new option…</option>
       </select>
     </div>

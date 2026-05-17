@@ -9,18 +9,18 @@ import { actCreateOption, actDeleteOption, actRenameOption } from './actions';
 export default function OptionsClient({
   fields,
 }: {
-  fields: { field: OptionField; label: string; options: FieldOption[] }[];
+  fields: { field: OptionField; label: string; options: FieldOption[]; autoNote?: string }[];
 }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {fields.map((f) => (
-        <FieldCard key={f.field} field={f.field} label={f.label} options={f.options} />
+        <FieldCard key={f.field} field={f.field} label={f.label} options={f.options} autoNote={f.autoNote} />
       ))}
     </div>
   );
 }
 
-function FieldCard({ field, label, options }: { field: OptionField; label: string; options: FieldOption[] }) {
+function FieldCard({ field, label, options, autoNote }: { field: OptionField; label: string; options: FieldOption[]; autoNote?: string }) {
   const { saveStart, saveEnd, saveError } = useToast();
   const [, startTx] = useTransition();
   const [newValue, setNewValue] = useState('');
@@ -69,7 +69,10 @@ function FieldCard({ field, label, options }: { field: OptionField; label: strin
   return (
     <div className="card p-4">
       <div className="text-sm font-medium mb-2">{label}</div>
-      <div className="text-[11px] text-ink-mute mb-3">{options.length} option{options.length === 1 ? '' : 's'}</div>
+      {autoNote ? (
+        <div className="text-[11px] text-warn mb-2 bg-warn/5 border border-warn/20 rounded px-2 py-1.5">{autoNote}</div>
+      ) : null}
+      <div className="text-[11px] text-ink-mute mb-3">{options.length} custom option{options.length === 1 ? '' : 's'}</div>
       <form onSubmit={onAdd} className="flex items-center gap-2 mb-3">
         <input
           value={newValue}
