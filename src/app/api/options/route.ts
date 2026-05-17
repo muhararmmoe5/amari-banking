@@ -17,10 +17,11 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const field = body?.field as OptionField;
   const value = String(body?.value || '');
+  const parent = body?.parent ? String(body.parent) : null;
   if (!(OPTION_FIELDS as readonly string[]).includes(field)) {
     return NextResponse.json({ error: 'bad_field' }, { status: 400 });
   }
-  const o = createOption(field, value);
+  const o = createOption(field, value, parent);
   if (!o) return NextResponse.json({ error: 'invalid_value' }, { status: 400 });
   return NextResponse.json({ option: o });
 }

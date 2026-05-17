@@ -10,6 +10,11 @@ interface Props {
   /** Read-only options sourced from somewhere else (people list, entity list, etc.).
    *  Shown above the user-managed custom options under a group label. */
   builtInOptions?: { label: string; values: string[] };
+  /** Optional extra groups rendered AFTER the primary options. Use for the
+   *  "scroll past to find other categories" pattern. */
+  secondaryGroups?: { label: string; values: string[] }[];
+  /** Parent value to pass through when the user creates a new option inline. */
+  newOptionParent?: string | null;
   onChange: (v: string) => void;
   onOptionAdded?: (v: string) => void;
   placeholder?: string;
@@ -22,7 +27,7 @@ interface Props {
  * to /api/options, and selects it.
  */
 export default function OptionSelect({
-  field, value, options, builtInOptions, onChange, onOptionAdded, placeholder = '— pick —', disabled,
+  field, value, options, builtInOptions, secondaryGroups, newOptionParent, onChange, onOptionAdded, placeholder = '— pick —', disabled,
 }: Props) {
   const [busy, setBusy] = useState(false);
 
@@ -35,7 +40,7 @@ export default function OptionSelect({
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ field, value: v.trim() }),
+        body: JSON.stringify({ field, value: v.trim(), parent: newOptionParent || null }),
       });
       const d = await r.json();
       if (r.ok && d.option) {
@@ -76,6 +81,16 @@ export default function OptionSelect({
           <optgroup label={builtInOptions ? 'Custom options' : 'Options'}>
             {options.map((o) => <option key={o} value={o}>{o}</option>)}
           </optgroup>
+        ) : null}
+        {secondaryGroups && secondaryGroups.length > 0 ? (
+          <>
+            <option disabled>──── Other categories ────</option>
+            {secondaryGroups.map((g) => (
+              <optgroup key={g.label} label={g.label}>
+                {g.values.map((o) => <option key={`${g.label}-${o}`} value={o}>{o}</option>)}
+              </optgroup>
+            ))}
+          </>
         ) : null}
         <option value="__ADD_NEW__">＋ Add new option…</option>
       </select>

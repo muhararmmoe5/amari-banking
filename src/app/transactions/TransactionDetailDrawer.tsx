@@ -54,6 +54,9 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
   const [optionLists, setOptionLists] = useState<Record<string, string[]>>({
     individual: [], sub_category_1: [], sub_category_2: [], business_purpose: [], source_of_money: [], need_to_get_from: [],
   });
+  // sub_category_2 options grouped by parent (sub_category_1 value). Used to scope the Sub Category 2 dropdown.
+  const [subCat2ByParent, setSubCat2ByParent] = useState<Map<string, string[]>>(new Map());
+  const [subCat2NoParent, setSubCat2NoParent] = useState<string[]>([]);
   const [people, setPeople] = useState<{ id: string; name: string; role: string }[] | null>(null);
   const [, startTx] = useTransition();
   const { saveStart, saveEnd, saveError } = useToast();
@@ -99,6 +102,20 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
           next[k] = (grouped[k] || []).map((o: any) => o.value);
         }
         setOptionLists(next);
+        // Build sub_category_2 buckets keyed by parent
+        const byParent = new Map<string, string[]>();
+        const noParent: string[] = [];
+        for (const o of (grouped.sub_category_2 || []) as Array<{ value: string; parentValue: string | null }>) {
+          if (o.parentValue) {
+            const list = byParent.get(o.parentValue) || [];
+            list.push(o.value);
+            byParent.set(o.parentValue, list);
+          } else {
+            noParent.push(o.value);
+          }
+        }
+        setSubCat2ByParent(byParent);
+        setSubCat2NoParent(noParent);
       })
       .catch(() => { /* leave empty */ });
     return () => { cancelled = true; };
@@ -261,22 +278,53 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                   placeholder="— pick a person / vendor —"
                 />
               </Field>
-              <Field label="Sub category 1">
+              <Field label="Sub category 1" hint="bucket — pick this first so Sub Category 2 filters">
                 <OptionSelect
                   field="sub_category_1"
                   value={sub1}
                   options={optionLists.sub_category_1 || []}
-                  onChange={(v) => { setSub1(v); persist({ subCategory1: v || null }); }}
+                  onChange={(v) => {
+                    setSub1(v);
+                    // If current sub2 is not under the new sub1 (and sub1 is set), clear it.
+                    if (v && sub2) {
+                      const validChildren = subCat2ByParent.get(v) || [];
+                      if (!validChildren.includes(sub2)) {
+                        setSub2('');
+                        persist({ subCategory1: v || null, subCategory2: null });
+                        return;
+                      }
+                    }
+                    persist({ subCategory1: v || null });
+                  }}
                   onOptionAdded={(v) => addToList('sub_category_1', v)}
                 />
               </Field>
-              <Field label="Sub category 2">
+              <Field label="Sub category 2" hint={sub1 ? `filtered to ${sub1}` : undefined}>
                 <OptionSelect
                   field="sub_category_2"
                   value={sub2}
-                  options={optionLists.sub_category_2 || []}
+                  options={sub1 ? (subCat2ByParent.get(sub1) || []) : subCat2NoParent}
+                  newOptionParent={sub1 || null}
+                  secondaryGroups={
+                    sub1
+                      ? Array.from(subCat2ByParent.entries())
+                          .filter(([parent]) => parent !== sub1)
+                          .map(([parent, values]) => ({ label: parent, values }))
+                      : undefined
+                  }
                   onChange={(v) => { setSub2(v); persist({ subCategory2: v || null }); }}
-                  onOptionAdded={(v) => addToList('sub_category_2', v)}
+                  onOptionAdded={(v) => {
+                    addToList('sub_category_2', v);
+                    if (sub1) {
+                      setSubCat2ByParent((prev) => {
+                        const next = new Map(prev);
+                        next.set(sub1, [...(next.get(sub1) || []), v]);
+                        return next;
+                      });
+                    } else {
+                      setSubCat2NoParent((prev) => prev.includes(v) ? prev : [...prev, v]);
+                    }
+                  }}
                 />
               </Field>
               {tx.amount > 0 ? (

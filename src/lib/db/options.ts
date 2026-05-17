@@ -26,12 +26,13 @@ export interface FieldOption {
   id: string;
   field: OptionField;
   value: string;
+  parentValue: string | null;
   sortOrder: number;
   createdAt: number;
 }
 
 function rowToOption(r: any): FieldOption {
-  return { id: r.id, field: r.field, value: r.value, sortOrder: r.sort_order, createdAt: r.created_at };
+  return { id: r.id, field: r.field, value: r.value, parentValue: r.parent_value ?? null, sortOrder: r.sort_order, createdAt: r.created_at };
 }
 
 export function listOptions(field?: OptionField): FieldOption[] {
@@ -52,7 +53,7 @@ export function listOptionsGrouped(): Record<OptionField, FieldOption[]> {
   return out;
 }
 
-export function createOption(field: OptionField, value: string): FieldOption | null {
+export function createOption(field: OptionField, value: string, parentValue?: string | null): FieldOption | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
   const db = getDb();
@@ -60,8 +61,12 @@ export function createOption(field: OptionField, value: string): FieldOption | n
   const now = Date.now();
   const maxOrder = (db.prepare('SELECT COALESCE(MAX(sort_order), 0) as m FROM field_options WHERE field = ?').get(field) as any).m;
   db.prepare(
-    'INSERT INTO field_options (id, field, value, sort_order, created_at) VALUES (?, ?, ?, ?, ?)'
-  ).run(id, field, trimmed, maxOrder + 1, now);
+    'INSERT INTO field_options (id, field, value, parent_value, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(id, field, trimmed, parentValue || null, maxOrder + 1, now);
+  // Backfill parent_value when seeding existing rows (INSERT IGNORE silently skips if (field,value) already exists).
+  if (parentValue) {
+    db.prepare('UPDATE field_options SET parent_value = ? WHERE field = ? AND value = ? AND parent_value IS NULL').run(parentValue, field, trimmed);
+  }
   const r = db.prepare('SELECT * FROM field_options WHERE field = ? AND value = ?').get(field, trimmed) as any;
   return r ? rowToOption(r) : null;
 }
