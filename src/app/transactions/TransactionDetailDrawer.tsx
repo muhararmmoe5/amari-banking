@@ -191,6 +191,23 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
               </div>
             </div>
 
+            {/* Money flow chain — visual when salary and/or passthrough is set */}
+            {(isSalary || passthroughEntity) ? (
+              <MoneyFlowChain
+                payingEntity={(tx.confirmedEntity || tx.entityTag) as keyof typeof ENTITY_LABELS}
+                isSalary={isSalary}
+                salaryRecipientName={salaryPersonId ? (people || []).find((p) => p.id === salaryPersonId)?.name || null : null}
+                salaryEntityLabel={salaryEntity ? ENTITY_LABELS[salaryEntity as keyof typeof ENTITY_LABELS] : null}
+                passthroughEntityLabel={
+                  passthroughEntity && passthroughEntity !== 'PENDING'
+                    ? ENTITY_LABELS[passthroughEntity as keyof typeof ENTITY_LABELS] || passthroughEntity
+                    : null
+                }
+                passthroughPurpose={passthroughPurpose}
+                passthroughRecipientName={passthroughPersonId ? (people || []).find((p) => p.id === passthroughPersonId)?.name || null : null}
+              />
+            ) : null}
+
             {/* Section 2 — Source of money (expenses only) */}
             {tx.amount < 0 ? (
               <SectionCard
@@ -719,6 +736,63 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
         </div>
       </div>
     </Portal>
+  );
+}
+
+function MoneyFlowChain({
+  payingEntity, isSalary, salaryRecipientName, salaryEntityLabel, passthroughEntityLabel, passthroughPurpose, passthroughRecipientName,
+}: {
+  payingEntity: keyof typeof ENTITY_LABELS;
+  isSalary: boolean;
+  salaryRecipientName: string | null;
+  salaryEntityLabel: string | null;
+  passthroughEntityLabel: string | null;
+  passthroughPurpose: string;
+  passthroughRecipientName: string | null;
+}) {
+  const payerLabel = salaryEntityLabel || ENTITY_LABELS[payingEntity] || String(payingEntity);
+  const nodes: { kind: 'entity' | 'person'; label: string; sub?: string }[] = [];
+  nodes.push({ kind: 'entity', label: payerLabel, sub: 'pays from' });
+  if (isSalary) {
+    nodes.push({ kind: 'person', label: salaryRecipientName || 'Recipient', sub: 'salary / wages' });
+  }
+  if (passthroughEntityLabel) {
+    nodes.push({
+      kind: 'entity',
+      label: passthroughEntityLabel,
+      sub: passthroughPurpose || (passthroughRecipientName ? `pays ${passthroughRecipientName}` : 'economic hit lands here'),
+    });
+  }
+  return (
+    <div className="card overflow-hidden border-warn/30">
+      <div className="px-5 pt-4 pb-3 border-b border-line/60 flex items-center gap-2">
+        <span className="text-sm font-semibold tracking-tight">Money flow chain</span>
+        <span className="pill text-2xs bg-warn/15 text-warn border border-warn/30">multi-hop</span>
+      </div>
+      <div className="p-5">
+        <div className="flex items-stretch gap-2 overflow-x-auto pb-2">
+          {nodes.map((n, i) => (
+            <div key={i} className="flex items-stretch gap-2 shrink-0">
+              <div className={`flex-1 min-w-[140px] rounded-xl border p-3 ${n.kind === 'entity' ? 'border-entity-bytes/30 bg-entity-bytes/5' : 'border-entity-amari/30 bg-entity-amari/5'}`}>
+                <div className="text-2xs uppercase tracking-wider text-ink-mute">
+                  {n.kind === 'entity' ? '🏢 Entity' : '👤 Person'}
+                </div>
+                <div className="text-sm font-semibold mt-0.5 truncate">{n.label}</div>
+                {n.sub ? <div className="text-2xs text-ink-mute mt-1">{n.sub}</div> : null}
+              </div>
+              {i < nodes.length - 1 ? (
+                <div className="flex items-center text-ink-mute text-xl select-none">→</div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+        <div className="text-2xs text-ink-mute mt-2">
+          The cash wire is on <span className="text-ink">{payerLabel}</span>&apos;s books.
+          {isSalary && salaryRecipientName ? <> It&apos;s booked as salary to <span className="text-ink">{salaryRecipientName}</span>.</> : null}
+          {passthroughEntityLabel ? <> The economic hit ultimately lands on <span className="text-ink">{passthroughEntityLabel}</span>.</> : null}
+        </div>
+      </div>
+    </div>
   );
 }
 
