@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Plus, Trash2, Archive } from 'lucide-react';
+import { Plus, Trash2, Archive, Pencil, Check, X } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import { fmtCents } from '@/lib/cap';
 import type { EntityType } from '@/types';
@@ -135,19 +135,20 @@ export default function BudgetsClient({ initial, commitments }: { initial: Budge
         </form>
       ) : null}
 
-      <BudgetList title="Active" budgets={active} onArchive={onArchive} onDelete={onDelete} />
+      <BudgetList title="Active" budgets={active} commitments={commitments} onArchive={onArchive} onDelete={onDelete} />
       {archived.length > 0 ? (
-        <BudgetList title="Archived" budgets={archived} onArchive={onArchive} onDelete={onDelete} archived />
+        <BudgetList title="Archived" budgets={archived} commitments={commitments} onArchive={onArchive} onDelete={onDelete} archived />
       ) : null}
     </div>
   );
 }
 
 function BudgetList({
-  title, budgets, onArchive, onDelete, archived,
+  title, budgets, commitments, onArchive, onDelete, archived,
 }: {
   title: string;
   budgets: BudgetWithSpend[];
+  commitments: CommitmentOption[];
   onArchive: (id: string, archive: boolean) => void;
   onDelete: (id: string) => void;
   archived?: boolean;
@@ -164,50 +165,144 @@ function BudgetList({
     <section>
       <h2 className="text-sm font-medium uppercase tracking-wider text-ink-dim mb-2">{title}</h2>
       <div className="card divide-y divide-line/60 overflow-hidden">
-        {budgets.map((b) => {
-          const cap = b.monthlyAmountCents;
-          const pct = cap && cap > 0 ? (b.spentThisMonthCents / cap) * 100 : 0;
-          return (
-            <div key={b.id} className="p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-base font-medium">
-                    {b.name}
-                    <span className={`ml-2 pill text-[10px] ${b.kind === 'EXPENSE' ? 'bg-expense/10 text-expense border border-expense/30' : 'bg-income/10 text-income border border-income/30'}`}>{b.kind === 'EXPENSE' ? 'expense' : 'income'}</span>
-                    {b.entity ? <span className="ml-2 pill text-[10px] bg-bg-2 text-ink-dim border border-line">{b.entity.replace(/_/g, ' ').toLowerCase()}</span> : null}
-                    {b.periodMonth ? <span className="ml-2 pill text-[10px] bg-entity-bytes/10 text-entity-bytes border border-entity-bytes/30">{b.periodMonth}</span> : null}
-                  </div>
-                  {b.commitmentLabel ? (
-                    <div className="text-[11px] mt-1 text-warn">↳ Investment: {b.commitmentLabel}</div>
-                  ) : null}
-                  {b.notes ? <div className="text-[11px] text-ink-mute mt-1">{b.notes}</div> : null}
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="text-[10px] uppercase tracking-wider text-ink-mute">{b.periodMonth ? b.periodMonth : 'This month'}</div>
-                  <div className="mono tabnum text-base">{fmtCents(b.spentThisMonthCents)}</div>
-                  {cap ? <div className="text-[10px] text-ink-mute">of {fmtCents(cap)} ({pct.toFixed(0)}%)</div> : null}
-                </div>
-              </div>
-              {cap ? (
-                <div className="mt-2 h-1.5 bg-bg-2 rounded overflow-hidden">
-                  <div className={`h-full ${pct > 100 ? 'bg-flag-critText' : pct > 80 ? 'bg-warn' : b.kind === 'EXPENSE' ? 'bg-expense' : 'bg-income'}`} style={{ width: `${Math.min(100, pct)}%` }} />
-                </div>
-              ) : null}
-              <div className="mt-2 flex items-center justify-between text-[11px] text-ink-mute">
-                <span>{b.txCountThisMonth} this month · {b.txCountAllTime} all time · {fmtCents(b.spentAllTimeCents)} total</span>
-                <span className="flex items-center gap-3">
-                  <button type="button" onClick={() => onArchive(b.id, !archived)} className="hover:text-ink inline-flex items-center gap-1">
-                    <Archive size={11} /> {archived ? 'Unarchive' : 'Archive'}
-                  </button>
-                  <button type="button" onClick={() => onDelete(b.id)} className="text-flag-critText hover:underline inline-flex items-center gap-1">
-                    <Trash2 size={11} /> Delete
-                  </button>
-                </span>
-              </div>
-            </div>
-          );
-        })}
+        {budgets.map((b) => (
+          <BudgetRow key={b.id} budget={b} commitments={commitments} archived={archived} onArchive={onArchive} onDelete={onDelete} />
+        ))}
       </div>
     </section>
+  );
+}
+
+function BudgetRow({
+  budget: b, commitments, archived, onArchive, onDelete,
+}: {
+  budget: BudgetWithSpend;
+  commitments: CommitmentOption[];
+  archived?: boolean;
+  onArchive: (id: string, archive: boolean) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { saveStart, saveEnd, saveError } = useToast();
+  const [, startTx] = useTransition();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(b.name);
+  const [kind, setKind] = useState<BudgetKind>(b.kind);
+  const [entity, setEntity] = useState<string>(b.entity || '');
+  const [monthly, setMonthly] = useState(b.monthlyAmountCents != null ? (b.monthlyAmountCents / 100).toString() : '');
+  const [periodMonth, setPeriodMonth] = useState(b.periodMonth || '');
+  const [commitmentId, setCommitmentId] = useState(b.fundingCommitmentId || '');
+  const [notes, setNotes] = useState(b.notes || '');
+
+  function onSave() {
+    const tid = saveStart();
+    startTx(async () => {
+      try {
+        await actUpdateBudget(b.id, {
+          name: name.trim() || b.name,
+          kind,
+          entity: (entity as EntityType) || null,
+          monthlyAmountCents: dollarsToCents(monthly),
+          periodMonth: periodMonth || null,
+          fundingCommitmentId: commitmentId || null,
+          notes: notes || null,
+        });
+        saveEnd(tid);
+        setEditing(false);
+      } catch (e: any) { saveError(tid, e?.message || 'failed'); }
+    });
+  }
+
+  if (editing) {
+    return (
+      <div className="p-4 space-y-3 bg-bg-2/30">
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block col-span-2">
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Name</div>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full" />
+          </label>
+          <label className="block">
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Kind</div>
+            <select value={kind} onChange={(e) => setKind(e.target.value as BudgetKind)} className="w-full">
+              <option value="EXPENSE">Expense</option>
+              <option value="INCOME">Income</option>
+            </select>
+          </label>
+          <label className="block">
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Entity</div>
+            <select value={entity} onChange={(e) => setEntity(e.target.value)} className="w-full">
+              {ENTITY_OPTIONS.map((o) => <option key={o.v || 'any'} value={o.v}>{o.l}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Monthly cap ($)</div>
+            <input value={monthly} onChange={(e) => setMonthly(e.target.value)} className="w-full" placeholder="75000" />
+          </label>
+          <label className="block">
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Specific month</div>
+            <input type="month" value={periodMonth} onChange={(e) => setPeriodMonth(e.target.value)} className="w-full" />
+          </label>
+          <label className="block col-span-2">
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Link to investor commitment</div>
+            <select value={commitmentId} onChange={(e) => setCommitmentId(e.target.value)} className="w-full">
+              <option value="">— not linked —</option>
+              {commitments.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select>
+          </label>
+          <label className="block col-span-2">
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Notes</div>
+            <input value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full" />
+          </label>
+        </div>
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={() => setEditing(false)} className="btn inline-flex items-center gap-1"><X size={12} /> Cancel</button>
+          <button type="button" onClick={onSave} className="btn btn-primary inline-flex items-center gap-1"><Check size={12} /> Save</button>
+        </div>
+      </div>
+    );
+  }
+
+  const cap = b.monthlyAmountCents;
+  const pct = cap && cap > 0 ? (b.spentThisMonthCents / cap) * 100 : 0;
+  return (
+    <div className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-base font-medium">
+            {b.name}
+            <span className={`ml-2 pill text-[10px] ${b.kind === 'EXPENSE' ? 'bg-expense/10 text-expense border border-expense/30' : 'bg-income/10 text-income border border-income/30'}`}>{b.kind === 'EXPENSE' ? 'expense' : 'income'}</span>
+            {b.entity ? <span className="ml-2 pill text-[10px] bg-bg-2 text-ink-dim border border-line">{b.entity.replace(/_/g, ' ').toLowerCase()}</span> : null}
+            {b.periodMonth ? <span className="ml-2 pill text-[10px] bg-entity-bytes/10 text-entity-bytes border border-entity-bytes/30">{b.periodMonth}</span> : null}
+          </div>
+          {b.commitmentLabel ? (
+            <div className="text-[11px] mt-1 text-warn">↳ Investment: {b.commitmentLabel}</div>
+          ) : null}
+          {b.notes ? <div className="text-[11px] text-ink-mute mt-1">{b.notes}</div> : null}
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-[10px] uppercase tracking-wider text-ink-mute">{b.periodMonth ? b.periodMonth : 'This month'}</div>
+          <div className="mono tabnum text-base">{fmtCents(b.spentThisMonthCents)}</div>
+          {cap ? <div className="text-[10px] text-ink-mute">of {fmtCents(cap)} ({pct.toFixed(0)}%)</div> : null}
+        </div>
+      </div>
+      {cap ? (
+        <div className="mt-2 h-1.5 bg-bg-2 rounded overflow-hidden">
+          <div className={`h-full ${pct > 100 ? 'bg-flag-critText' : pct > 80 ? 'bg-warn' : b.kind === 'EXPENSE' ? 'bg-expense' : 'bg-income'}`} style={{ width: `${Math.min(100, pct)}%` }} />
+        </div>
+      ) : null}
+      <div className="mt-2 flex items-center justify-between text-[11px] text-ink-mute">
+        <span>{b.txCountThisMonth} this month · {b.txCountAllTime} all time · {fmtCents(b.spentAllTimeCents)} total</span>
+        <span className="flex items-center gap-3">
+          <button type="button" onClick={() => setEditing(true)} className="hover:text-ink inline-flex items-center gap-1">
+            <Pencil size={11} /> Edit
+          </button>
+          <button type="button" onClick={() => onArchive(b.id, !archived)} className="hover:text-ink inline-flex items-center gap-1">
+            <Archive size={11} /> {archived ? 'Unarchive' : 'Archive'}
+          </button>
+          <button type="button" onClick={() => onDelete(b.id)} className="text-flag-critText hover:underline inline-flex items-center gap-1">
+            <Trash2 size={11} /> Delete
+          </button>
+        </span>
+      </div>
+    </div>
   );
 }
