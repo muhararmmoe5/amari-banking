@@ -78,6 +78,15 @@ export default function CapEntityPage({ params }: { params: { entity: string } }
             initialContributions={contributions}
             initialSafes={safes}
             initialValuations={valuations}
+            commitmentTotals={{
+              totalCommittedCents: commitments
+                .filter((c) => c.status === 'ACTIVE')
+                .reduce((s, c) => s + (c.totalAmountCents || 0), 0),
+              receivedFromCommitmentsCents: commitments
+                .filter((c) => c.status === 'ACTIVE')
+                .reduce((s, c) => s + c.fundedCents, 0),
+              activeCount: commitments.filter((c) => c.status === 'ACTIVE').length,
+            }}
           />
         </>
       )}
