@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { listPeople, listHoldings, listContributions, listSafes, listValuations, listHoldingsForPerson, listCommitmentSummaries } from '@/lib/db/cap';
+import { ensureCommitmentsForEntity } from '@/lib/db/cap-sync';
 import { ENTITY_LABELS, ENTITY_COLORS, BUSINESS_ENTITIES } from '@/constants/accounts';
 import type { EntityType } from '@/types';
 import { ArrowLeft } from 'lucide-react';
@@ -31,6 +32,13 @@ export default function CapEntityPage({ params }: { params: { entity: string } }
   const contributions = listContributions(entity);
   const safes = listSafes(entity);
   const valuations = listValuations(entity);
+  // Silent backfill: if there are contributions but no commitments for a
+  // (entity, person) pair, create the commitment and auto-link existing wires.
+  // This way the rest of the page (Investment progress, drawer's investor
+  // picker, etc.) always sees a consistent commitment state.
+  if (contributions.length > 0) {
+    ensureCommitmentsForEntity(entity);
+  }
   const commitments = listCommitmentSummaries(entity);
 
   return (
