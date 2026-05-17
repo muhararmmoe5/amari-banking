@@ -9,6 +9,7 @@ import { saveTransaction } from './actions';
 import { useToast } from '@/components/Toast';
 import SplitEditor from '../audit/SplitEditor';
 import SourceTraceModal from './SourceTraceModal';
+import Portal from '@/components/Portal';
 
 const ENTITY_OPTIONS: EntityType[] = [
   'BYTES_AI', 'ROCKET_WIRELESS', 'DELICIOUS_BYTES', 'AMARI_VENTURES',
@@ -70,7 +71,7 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
   }, []);
 
   return (
-    <>
+    <Portal>
       <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={onClose}>
         <div
           className="absolute top-0 right-0 bottom-0 w-[min(640px,100vw)] bg-bg-1 border-l border-line flex flex-col shadow-soft"
@@ -272,7 +273,7 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
         </div>
       </div>
       {traceOpen ? <SourceTraceModal txId={tx.id} onClose={() => setTraceOpen(false)} /> : null}
-    </>
+    </Portal>
   );
 }
 

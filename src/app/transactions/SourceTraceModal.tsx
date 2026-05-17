@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ENTITY_COLORS, ENTITY_LABELS, getAccount } from '@/constants/accounts';
 import { fmtMoney, fmtDate } from '@/lib/format';
 import type { EntityType } from '@/types';
+import Portal from '@/components/Portal';
 
 interface TraceSource {
   txId: string;
@@ -90,6 +91,7 @@ export default function SourceTraceModal({ txId, onClose }: { txId: string; onCl
   const totalAttributed = data ? data.sources.reduce((s, x) => s + x.amount, 0) : 0;
 
   return (
+    <Portal>
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
         className="absolute top-0 right-0 bottom-0 w-[min(560px,100vw)] bg-bg-1 border-l border-line flex flex-col shadow-soft"
@@ -242,5 +244,6 @@ export default function SourceTraceModal({ txId, onClose }: { txId: string; onCl
         </div>
       </div>
     </div>
+    </Portal>
   );
 }
