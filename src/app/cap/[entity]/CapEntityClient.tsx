@@ -105,10 +105,11 @@ export default function CapEntityClient(props: Props) {
           {(() => {
             const ct = props.commitmentTotals;
             const contributionsSum = contributions.reduce((s, c) => s + c.amountCents, 0);
-            // Use the larger of contribution sum vs commitment-funded amount as the "received" measure,
-            // since the same money can be recorded either way without double-counting.
-            const receivedCents = Math.max(contributionsSum, ct?.receivedFromCommitmentsCents || 0);
             const committedCents = ct?.totalCommittedCents || 0;
+            // "Received" is ALWAYS the sum of real bank wires linked to the commitment.
+            // The cash_contributions table is a manual log and may include the full pledge
+            // amount as a single placeholder row — we don't trust it for the received total.
+            const receivedCents = ct?.receivedFromCommitmentsCents || 0;
             const remainingCents = Math.max(0, committedCents - receivedCents);
             const pct = committedCents > 0 ? Math.min(100, (receivedCents / committedCents) * 100) : 0;
             if (committedCents > 0) {
@@ -117,7 +118,7 @@ export default function CapEntityClient(props: Props) {
                   <div className="text-xs text-ink-mute uppercase tracking-wider">Investment progress</div>
                   <div className="mono tabnum text-2xl mt-2 text-income">{fmtCents(receivedCents)}</div>
                   <div className="text-[11px] text-ink-mute mt-1">
-                    of <span className="mono">{fmtCents(committedCents)}</span> committed
+                    actually wired of <span className="mono">{fmtCents(committedCents)}</span> committed
                     {ct!.activeCount > 0 ? ` · ${ct!.activeCount} active pledge${ct!.activeCount === 1 ? '' : 's'}` : ''}
                   </div>
                   <div className="mt-2 h-1.5 bg-bg-2 rounded overflow-hidden">
@@ -127,6 +128,11 @@ export default function CapEntityClient(props: Props) {
                     <span className="text-ink-mute">{pct.toFixed(1)}% received</span>
                     <span className="mono text-warn">−{fmtCents(remainingCents)} remaining</span>
                   </div>
+                  {contributionsSum > 0 && Math.abs(contributionsSum - receivedCents) > 1 ? (
+                    <div className="text-[10px] text-ink-mute mt-2 pt-2 border-t border-line/40">
+                      Manual contribution log: <span className="mono">{fmtCents(contributionsSum)}</span> ({contributions.length} {contributions.length === 1 ? 'entry' : 'entries'})
+                    </div>
+                  ) : null}
                 </>
               );
             }
