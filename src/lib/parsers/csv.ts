@@ -1,5 +1,6 @@
 import Papa from 'papaparse';
 import { categorize } from './categorizer';
+import { extractTransactionDate } from './extract-tx-date';
 import type { ParsedTransaction } from '@/types';
 
 export function detectAccountFromFilename(filename: string): string | null {
@@ -88,9 +89,11 @@ export function parseChaseCsv(csvText: string, filename: string, overrideAccount
     if (!accountId) continue;
 
     const cat = categorize(description, amount, accountId, type);
+    const transactionDate = extractTransactionDate(description, postingDate);
     rows.push({
       accountId,
       postingDate,
+      transactionDate,
       description,
       amount,
       type,

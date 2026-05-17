@@ -119,6 +119,7 @@ export interface Transaction {
   cpaReviewed: boolean;
   taggedDate: string | null;
   sourcePersonId: string | null;
+  transactionDate: string | null;
   importedAt: number;
   updatedAt: number;
   importBatchId: string;
@@ -150,6 +151,7 @@ export interface ImportBatch {
 export interface ParsedTransaction {
   accountId: string;
   postingDate: string;
+  transactionDate: string | null;
   description: string;
   amount: number;
   type: string;

@@ -124,6 +124,11 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                 </div>
               </div>
               <div className="text-[11px] text-ink-dim flex flex-wrap gap-x-3 gap-y-1 pt-2 border-t border-line">
+                {tx.transactionDate && tx.transactionDate !== tx.postingDate ? (
+                  <span title="Extracted from description — when the charge/transfer actually happened.">
+                    💳 Transaction: <span className="mono">{fmtDate(tx.transactionDate)}</span>
+                  </span>
+                ) : null}
                 <span title="From Chase — when the bank processed this transaction. Cannot be changed.">
                   🏦 Posted on bank: <span className="mono">{fmtDate(tx.postingDate)}</span>
                 </span>

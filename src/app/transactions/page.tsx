@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { listTransactions, countTransactions } from '@/lib/db/queries';
 import { ACCOUNTS } from '@/constants/accounts';
 import VirtualTable from './VirtualTable';
+import RescanDatesButton from './RescanDatesButton';
 import type { EntityType, AuditStatus } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -95,7 +96,10 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
             </p>
           ) : null}
         </div>
-        <Link href="/import" className="btn btn-primary">⬆ Import more</Link>
+        <div className="flex items-center gap-2">
+          <RescanDatesButton />
+          <Link href="/import" className="btn btn-primary">⬆ Import more</Link>
+        </div>
       </div>
 
       <form className="card p-4 space-y-3 text-xs" method="GET">

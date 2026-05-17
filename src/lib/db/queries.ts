@@ -42,6 +42,7 @@ function rowToTransaction(r: any): Transaction {
     cpaReviewed: !!r.cpa_reviewed,
     taggedDate: r.tagged_date ?? null,
     sourcePersonId: r.source_person_id ?? null,
+    transactionDate: r.transaction_date ?? null,
     importedAt: r.imported_at,
     updatedAt: r.updated_at,
     importBatchId: r.import_batch_id,
@@ -80,13 +81,13 @@ export function saveImportBatch(
   );
   const insertTx = db.prepare(
     `INSERT OR IGNORE INTO transactions (
-      id, account_id, posting_date, description, amount, type, balance,
+      id, account_id, posting_date, transaction_date, description, amount, type, balance,
       merchant_name, category, entity_tag, is_internal, internal_linked_id,
       income_source, confirmed_entity, confirmed_category, business_purpose,
       receipt_ref, audit_status, audit_flags, audit_score, notes,
       zelle_person, zelle_type, imported_at, updated_at, import_batch_id, hash
     ) VALUES (
-      @id, @account_id, @posting_date, @description, @amount, @type, @balance,
+      @id, @account_id, @posting_date, @transaction_date, @description, @amount, @type, @balance,
       @merchant_name, @category, @entity_tag, @is_internal, NULL,
       @income_source, NULL, NULL, NULL,
       NULL, 'UNREVIEWED', @audit_flags, @audit_score, NULL,
@@ -105,6 +106,7 @@ export function saveImportBatch(
         id,
         account_id: r.accountId,
         posting_date: r.postingDate,
+        transaction_date: r.transactionDate,
         description: r.description,
         amount: r.amount,
         type: r.type,
