@@ -48,7 +48,95 @@ export interface SourceTraceResult {
   clearedBy?: ClearingInflow[];
 }
 
-const MAX_DEPTH = 4;
+const MAX_DEPTH = 2;
+
+/**
+ * Batch FIFO source trace for every expense on a single account.
+ * Walks the account's posted history in chronological order ONCE,
+ * pushing each inflow onto a queue and draining it for each outflow.
+ *
+ * Returns a Map of outflow txId -> attributed sources (no upstream recursion;
+ * for the deep-audit page we render each row's sources flat for speed).
+ *
+ * Returns far quicker than calling traceFundingSource() per-tx because we
+ * avoid re-scanning the account history for every outflow.
+ */
+export function traceAllExpensesOnAccount(
+  accountId: string
+): Map<string, { sources: TraceSource[]; uncovered: number; totalAttributed: number }> {
+  const db = getDb();
+  const all = db.prepare(`
+    SELECT t.id, t.posting_date, t.description, t.merchant_name, t.amount,
+      t.is_internal, t.income_source, t.category, t.internal_linked_id,
+      linked.account_id as counterparty_account_id
+    FROM transactions t
+    LEFT JOIN transactions linked ON linked.id = t.internal_linked_id
+    WHERE t.account_id = ?
+    ORDER BY t.posting_date ASC, t.id ASC
+  `).all(accountId) as any[];
+
+  interface InflowSlot {
+    txId: string;
+    accountId: string;
+    date: string;
+    description: string;
+    merchant: string | null;
+    isInternal: boolean;
+    counterpartyAccountId: string | null;
+    incomeSource: string | null;
+    category: string;
+    originalAmount: number;
+    remaining: number;
+  }
+  const queue: InflowSlot[] = [];
+  const out = new Map<string, { sources: TraceSource[]; uncovered: number; totalAttributed: number }>();
+
+  for (const t of all) {
+    if (t.amount > 0) {
+      queue.push({
+        txId: t.id,
+        accountId: accountId,
+        date: t.posting_date,
+        description: t.description,
+        merchant: t.merchant_name,
+        isInternal: !!t.is_internal,
+        counterpartyAccountId: t.counterparty_account_id,
+        incomeSource: t.income_source,
+        category: t.category,
+        originalAmount: t.amount,
+        remaining: t.amount,
+      });
+      continue;
+    }
+    if (t.amount < 0) {
+      let toCover = Math.abs(t.amount);
+      const consumed: TraceSource[] = [];
+      while (toCover > 0.001 && queue.length > 0) {
+        const head = queue[0];
+        const take = Math.min(toCover, head.remaining);
+        consumed.push({
+          txId: head.txId,
+          accountId: head.accountId,
+          date: head.date,
+          description: head.description,
+          merchant: head.merchant,
+          amount: take,
+          totalInflow: head.originalAmount,
+          isInternal: head.isInternal,
+          counterpartyAccountId: head.counterpartyAccountId,
+          incomeSource: head.incomeSource,
+          category: head.category,
+        });
+        head.remaining -= take;
+        toCover -= take;
+        if (head.remaining < 0.001) queue.shift();
+      }
+      const totalAttributed = consumed.reduce((s, c) => s + c.amount, 0);
+      out.set(t.id, { sources: consumed, uncovered: toCover, totalAttributed });
+    }
+  }
+  return out;
+}
 
 export function traceFundingSource(txId: string, depth: number = 0): SourceTraceResult | null {
   const db = getDb();

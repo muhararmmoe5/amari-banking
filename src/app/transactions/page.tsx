@@ -97,6 +97,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
           ) : null}
         </div>
         <div className="flex items-center gap-2">
+          <Link href={`/audit/deep${searchParams.account ? `?account=${searchParams.account}` : ''}`} className="btn">🔍 Deep source audit</Link>
           <RescanDatesButton />
           <Link href="/import" className="btn btn-primary">⬆ Import more</Link>
         </div>
