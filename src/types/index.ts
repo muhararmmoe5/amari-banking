@@ -122,6 +122,7 @@ export interface Transaction {
   transactionDate: string | null;
   sourceBusiness: string | null;
   sourceAccountId: string | null;
+  budgetId: string | null;
   importedAt: number;
   updatedAt: number;
   importBatchId: string;

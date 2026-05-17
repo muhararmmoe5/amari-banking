@@ -40,6 +40,8 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
   const [sourcePersonId, setSourcePersonId] = useState(tx.sourcePersonId || '');
   const [sourceBusiness, setSourceBusiness] = useState(tx.sourceBusiness || '');
   const [sourceAccountId, setSourceAccountId] = useState(tx.sourceAccountId || '');
+  const [budgetId, setBudgetId] = useState(tx.budgetId || '');
+  const [budgets, setBudgets] = useState<{ id: string; name: string; kind: string; entity: string | null }[] | null>(null);
   const [people, setPeople] = useState<{ id: string; name: string; role: string }[] | null>(null);
   const [, startTx] = useTransition();
   const { saveStart, saveEnd, saveError } = useToast();
@@ -67,6 +69,10 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
       .then((r) => r.json())
       .then((d) => { if (!cancelled) setPeople(d.people || []); })
       .catch(() => { if (!cancelled) setPeople([]); });
+    fetch('/api/budgets', { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setBudgets(d.budgets || []); })
+      .catch(() => { if (!cancelled) setBudgets([]); });
     return () => { cancelled = true; };
   }, []);
 
@@ -302,6 +308,25 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                   </Field>
                 </>
               )}
+              <Field
+                label={tx.amount < 0 ? 'Under an existing budget?' : 'Counts toward an income target?'}
+                className="md:col-span-2"
+                hint={budgets && budgets.length === 0 ? 'no budgets yet — create one at /budgets' : undefined}
+              >
+                <select
+                  value={budgetId}
+                  onChange={(e) => { setBudgetId(e.target.value); persist({ budgetId: e.target.value || null }); }}
+                  className="w-full"
+                  disabled={budgets === null}
+                >
+                  <option value="">No — not in any budget</option>
+                  {budgets?.filter((b) => (tx.amount < 0 ? b.kind === 'EXPENSE' : b.kind === 'INCOME')).map((b) => (
+                    <option key={b.id} value={b.id}>
+                      Yes — {b.name}{b.entity ? ` (${b.entity.replace(/_/g, ' ').toLowerCase()})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </Field>
               <Field label="Business purpose" className="md:col-span-2">
                 <input
                   type="text"

@@ -230,6 +230,20 @@ export function getDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_commit_entity ON funding_commitments(entity);
     CREATE INDEX IF NOT EXISTS idx_commit_person ON funding_commitments(person_id);
+
+    CREATE TABLE IF NOT EXISTS budgets (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      entity TEXT,
+      kind TEXT NOT NULL DEFAULT 'EXPENSE',
+      monthly_amount_cents INTEGER,
+      notes TEXT,
+      status TEXT NOT NULL DEFAULT 'ACTIVE',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_budgets_status ON budgets(status);
+    CREATE INDEX IF NOT EXISTS idx_budgets_entity ON budgets(entity);
   `);
 
   // Forward-compatible column adds (SQLite ALTER ignores if column exists in some versions; we catch)
@@ -249,6 +263,7 @@ export function getDb(): Database.Database {
     `ALTER TABLE transactions ADD COLUMN funding_commitment_id TEXT REFERENCES funding_commitments(id) ON DELETE SET NULL`,
     `ALTER TABLE transactions ADD COLUMN source_business TEXT`,
     `ALTER TABLE transactions ADD COLUMN source_account_id TEXT`,
+    `ALTER TABLE transactions ADD COLUMN budget_id TEXT REFERENCES budgets(id) ON DELETE SET NULL`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }
