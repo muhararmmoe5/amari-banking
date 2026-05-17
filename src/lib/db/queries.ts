@@ -203,7 +203,33 @@ export function listTransactions(filters: ListFilters = {}): Transaction[] {
   // chronological row's balance + this row's amount. We use that to chain
   // same-day rows into Chase's true order so "Balance after" reads sensibly.
   const ordered = chainSameDayByBalance(rows, orderDir);
+
+  // When the user filters to a SINGLE account and hides internal transfers,
+  // Chase's balance column has gaps (internal transfers affect the balance
+  // but aren't shown). Replace it with a synthetic running balance computed
+  // over the displayed rows only, so it always chains.
+  if (filters.accountId && filters.hideInternal) {
+    applyRunningBalance(ordered, orderDir);
+  }
+
   return ordered.map(rowToTransaction);
+}
+
+/** Mutate rows to carry a `balance` value that chains over the visible
+ *  rows only. Computed by walking oldest -> newest, anchored on the first
+ *  row's (Chase balance - amount) as the starting account balance. */
+function applyRunningBalance(rows: any[], orderDir: 'ASC' | 'DESC'): void {
+  if (rows.length === 0) return;
+  // Walk chronologically (oldest first)
+  const chrono = orderDir === 'DESC' ? [...rows].reverse() : rows;
+  // Anchor: opening balance = first chronological row's (balance - amount), if available
+  let running = chrono[0].balance != null
+    ? Math.round((chrono[0].balance - chrono[0].amount) * 100) / 100
+    : 0;
+  for (const r of chrono) {
+    running = Math.round((running + r.amount) * 100) / 100;
+    r.balance = running;
+  }
 }
 
 /** Reorder rows within each (account_id, posting_date) group so that the

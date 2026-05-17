@@ -25,7 +25,7 @@ export default function VirtualTable({ rows }: { rows: Transaction[] }) {
         <Cell title="The Chase account this transaction posted on">Paid from</Cell>
         <Cell>Merchant / Description</Cell>
         <Cell className="text-right">Amount</Cell>
-        <Cell className="text-right">Balance after</Cell>
+        <Cell className="text-right" title="Running balance over the visible rows. When a single account is filtered with internal transfers hidden, this is a synthetic chain; otherwise it's Chase's reported balance.">Balance after</Cell>
         <Cell title="Which business this expense is booked to">Books to</Cell>
         <Cell>Sub category</Cell>
         <Cell>Status</Cell>
