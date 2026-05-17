@@ -221,6 +221,21 @@ export function createContribution(input: ContributionInput): CashContribution {
   return rowToContribution(db.prepare('SELECT * FROM cash_contributions WHERE id = ?').get(id) as any);
 }
 
+export function updateContribution(id: string, patch: Partial<ContributionInput>): void {
+  const db = getDb();
+  const fields: string[] = [];
+  const params: Record<string, unknown> = { id };
+  if (patch.entity !== undefined) { fields.push('entity = @entity'); params.entity = patch.entity; }
+  if (patch.personId !== undefined) { fields.push('person_id = @person_id'); params.person_id = patch.personId; }
+  if (patch.amountCents !== undefined) { fields.push('amount_cents = @amount_cents'); params.amount_cents = patch.amountCents; }
+  if (patch.contributionDate !== undefined) { fields.push('contribution_date = @contribution_date'); params.contribution_date = patch.contributionDate; }
+  if (patch.type !== undefined) { fields.push('type = @type'); params.type = patch.type; }
+  if (patch.linkedTransactionId !== undefined) { fields.push('linked_transaction_id = @linked_transaction_id'); params.linked_transaction_id = patch.linkedTransactionId || null; }
+  if (patch.notes !== undefined) { fields.push('notes = @notes'); params.notes = patch.notes?.trim() || null; }
+  if (!fields.length) return;
+  db.prepare(`UPDATE cash_contributions SET ${fields.join(', ')} WHERE id = @id`).run(params);
+}
+
 export function deleteContribution(id: string): void {
   const db = getDb();
   db.prepare('DELETE FROM cash_contributions WHERE id = ?').run(id);

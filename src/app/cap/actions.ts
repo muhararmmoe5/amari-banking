@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import {
   createPerson, updatePerson, deletePerson, getPerson, listPeople,
   createHolding, updateHolding, deleteHolding,
-  createContribution, deleteContribution,
+  createContribution, updateContribution, deleteContribution,
   createSafe, updateSafeStatus, deleteSafe,
   createValuation, deleteValuation,
   createCommitment, deleteCommitment, updateCommitmentStatus, listCommitments,
@@ -57,6 +57,11 @@ export async function actCreateContribution(input: ContributionInput) {
   revalidateAll();
   return c;
 }
+export async function actUpdateContribution(id: string, patch: Partial<ContributionInput>) {
+  updateContribution(id, patch);
+  revalidateAll();
+}
+
 export async function actDeleteContribution(id: string) {
   deleteContribution(id);
   revalidateAll();

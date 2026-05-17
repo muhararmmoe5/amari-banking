@@ -10,7 +10,7 @@ import { parseAmountToCents, fmtCents, fmtPct, vestedFraction } from '@/lib/cap'
 import { useToast } from '@/components/Toast';
 import {
   actCreateHolding, actUpdateHolding, actDeleteHolding,
-  actCreateContribution, actDeleteContribution,
+  actCreateContribution, actUpdateContribution, actDeleteContribution,
   actCreateSafe, actUpdateSafeStatus, actDeleteSafe,
   actCreateValuation, actDeleteValuation,
 } from '../actions';
@@ -524,6 +524,69 @@ function CashTab({
     });
   }
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{
+    personId: string;
+    amount: string;
+    contributionDate: string;
+    type: string;
+    linkedTransactionId: string;
+    notes: string;
+  } | null>(null);
+  const [txSearch, setTxSearch] = useState('');
+  const [txResults, setTxResults] = useState<Array<{ id: string; postingDate: string; description: string; merchant: string | null; amount: number; accountId: string }> | null>(null);
+
+  function startEdit(c: CashContribution) {
+    setEditingId(c.id);
+    setEditDraft({
+      personId: c.personId,
+      amount: (c.amountCents / 100).toFixed(2),
+      contributionDate: c.contributionDate,
+      type: c.type,
+      linkedTransactionId: c.linkedTransactionId || '',
+      notes: c.notes || '',
+    });
+    setTxSearch('');
+    setTxResults(null);
+  }
+  function cancelEdit() { setEditingId(null); setEditDraft(null); setTxResults(null); }
+  async function saveEdit(c: CashContribution) {
+    if (!editDraft) return;
+    const cents = parseAmountToCents(editDraft.amount);
+    if (!cents) { saveError(saveStart(), 'Invalid amount'); return; }
+    const tId = saveStart();
+    startTx(async () => {
+      try {
+        await actUpdateContribution(c.id, {
+          personId: editDraft.personId,
+          amountCents: cents,
+          contributionDate: editDraft.contributionDate,
+          type: editDraft.type as any,
+          linkedTransactionId: editDraft.linkedTransactionId || null,
+          notes: editDraft.notes || null,
+        });
+        setContributions((cur) => cur.map((x) => (x.id === c.id ? {
+          ...x,
+          personId: editDraft.personId,
+          amountCents: cents,
+          contributionDate: editDraft.contributionDate,
+          type: editDraft.type as any,
+          linkedTransactionId: editDraft.linkedTransactionId || null,
+          notes: editDraft.notes || null,
+        } : x)));
+        saveEnd(tId);
+        cancelEdit();
+      } catch (e: any) { saveError(tId, e?.message); }
+    });
+  }
+  async function runTxSearch() {
+    try {
+      const r = await fetch(`/api/transactions/search?inflowOnly=1&q=${encodeURIComponent(txSearch)}&limit=15`, { credentials: 'same-origin' });
+      const d = await r.json();
+      setTxResults(d.transactions || []);
+    } catch { setTxResults([]); }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
@@ -597,23 +660,114 @@ function CashTab({
                 <th className="text-left px-3 py-2 font-medium">Person</th>
                 <th className="text-right px-3 py-2 font-medium">Amount</th>
                 <th className="text-left px-3 py-2 font-medium">Type</th>
+                <th className="text-left px-3 py-2 font-medium">Linked wire</th>
                 <th className="text-left px-3 py-2 font-medium">Notes</th>
-                <th className="text-right px-3 py-2 font-medium w-16"></th>
+                <th className="text-right px-3 py-2 font-medium w-24"></th>
               </tr>
             </thead>
             <tbody>
-              {contributions.map((c) => (
-                <tr key={c.id} className="border-t border-line/60">
-                  <td className="px-3 py-2 text-xs text-ink-dim mono">{c.contributionDate}</td>
-                  <td className="px-3 py-2">{peopleById.get(c.personId)?.name || '?'}</td>
-                  <td className="px-3 py-2 text-right mono tabnum text-income">{fmtCents(c.amountCents)}</td>
-                  <td className="px-3 py-2 text-xs text-ink-dim">{c.type.replace('_', ' ').toLowerCase()}</td>
-                  <td className="px-3 py-2 text-xs text-ink-dim truncate max-w-[280px]">{c.notes || '—'}</td>
-                  <td className="px-3 py-2 text-right">
-                    <button onClick={() => remove(c)} className="btn btn-ghost !p-1.5 text-expense" title="Delete"><Trash2 size={13} /></button>
-                  </td>
-                </tr>
-              ))}
+              {contributions.map((c) => {
+                const isEditing = editingId === c.id;
+                if (isEditing && editDraft) {
+                  return (
+                    <tr key={c.id} className="border-t border-line/60 bg-bg-2/30 align-top">
+                      <td className="px-3 py-2">
+                        <input type="date" value={editDraft.contributionDate} onChange={(e) => setEditDraft({ ...editDraft, contributionDate: e.target.value })} />
+                      </td>
+                      <td className="px-3 py-2">
+                        <select value={editDraft.personId} onChange={(e) => setEditDraft({ ...editDraft, personId: e.target.value })} className="w-full">
+                          {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2">
+                        <input value={editDraft.amount} onChange={(e) => setEditDraft({ ...editDraft, amount: e.target.value })} className="w-28 text-right" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <select value={editDraft.type} onChange={(e) => setEditDraft({ ...editDraft, type: e.target.value })} className="w-full">
+                          <option value="CASH">Cash</option>
+                          <option value="LOAN">Loan</option>
+                          <option value="SWEAT">Sweat equity</option>
+                          <option value="NOTE_CONVERSION">Note conversion</option>
+                        </select>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="space-y-1">
+                          {editDraft.linkedTransactionId ? (
+                            <div className="text-2xs text-income inline-flex items-center gap-1">
+                              ✓ linked
+                              <button type="button" onClick={() => setEditDraft({ ...editDraft, linkedTransactionId: '' })} className="text-ink-mute hover:text-expense">[unlink]</button>
+                            </div>
+                          ) : null}
+                          <div className="flex gap-1">
+                            <input
+                              type="text"
+                              placeholder="search wires…"
+                              value={txSearch}
+                              onChange={(e) => setTxSearch(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runTxSearch(); } }}
+                              className="flex-1"
+                            />
+                            <button type="button" onClick={runTxSearch} className="btn btn-sm">Find</button>
+                          </div>
+                          {txResults && txResults.length > 0 ? (
+                            <div className="border border-line rounded-md max-h-40 overflow-y-auto text-2xs">
+                              {txResults.map((t) => (
+                                <button
+                                  type="button"
+                                  key={t.id}
+                                  onClick={() => { setEditDraft({ ...editDraft, linkedTransactionId: t.id }); setTxResults(null); setTxSearch(''); }}
+                                  className="block w-full text-left px-2 py-1.5 hover:bg-bg-3 border-b border-line/40 last:border-b-0"
+                                >
+                                  <div className="flex justify-between gap-2">
+                                    <span className="truncate">{t.merchant || t.description.slice(0, 50)}</span>
+                                    <span className="mono text-income shrink-0">{fmtCents(Math.round(t.amount * 100))}</span>
+                                  </div>
+                                  <div className="text-ink-mute">{t.postingDate} · ···{t.accountId}</div>
+                                </button>
+                              ))}
+                            </div>
+                          ) : txResults && txResults.length === 0 ? (
+                            <div className="text-2xs text-ink-mute italic">No matching wires.</div>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <input value={editDraft.notes} onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })} className="w-full" />
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <div className="inline-flex gap-1">
+                          <button onClick={() => saveEdit(c)} className="btn btn-ghost !p-1.5 text-income" title="Save"><Check size={13} /></button>
+                          <button onClick={cancelEdit} className="btn btn-ghost !p-1.5 text-ink-mute" title="Cancel"><X size={13} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
+                return (
+                  <tr key={c.id} className="border-t border-line/60 hover:bg-bg-2/30 transition">
+                    <td className="px-3 py-2 text-xs text-ink-dim mono">{c.contributionDate}</td>
+                    <td className="px-3 py-2">{peopleById.get(c.personId)?.name || '?'}</td>
+                    <td className="px-3 py-2 text-right mono tabnum text-income">{fmtCents(c.amountCents)}</td>
+                    <td className="px-3 py-2 text-xs text-ink-dim">{c.type.replace('_', ' ').toLowerCase()}</td>
+                    <td className="px-3 py-2 text-xs">
+                      {c.linkedTransactionId ? (
+                        <span className="inline-flex items-center gap-1 pill text-[10px] bg-income/10 text-income border border-income/30">
+                          ✓ wire linked
+                        </span>
+                      ) : (
+                        <span className="text-ink-mute">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-ink-dim truncate max-w-[240px]">{c.notes || '—'}</td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="inline-flex gap-1">
+                        <button onClick={() => startEdit(c)} className="btn btn-ghost !p-1.5 hover:text-entity-bytes" title="Edit"><Pencil size={13} /></button>
+                        <button onClick={() => remove(c)} className="btn btn-ghost !p-1.5 text-expense" title="Delete"><Trash2 size={13} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
