@@ -21,7 +21,6 @@ export default function VirtualTable({ rows }: { rows: Transaction[] }) {
         className="bg-bg-2 text-ink-dim text-xs grid items-center font-medium uppercase tracking-wider"
         style={{ gridTemplateColumns: ROW_GRID }}
       >
-        <Cell className="text-center" title="Trace where this money came from">🔍</Cell>
         <Cell>Date</Cell>
         <Cell title="The Chase account this transaction posted on">Paid from</Cell>
         <Cell>Merchant / Description</Cell>

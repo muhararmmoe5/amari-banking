@@ -1,17 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Check, Split as SplitIcon } from 'lucide-react';
+import { Check } from 'lucide-react';
 import type { Transaction } from '@/types';
 import { ACCOUNTS, ENTITY_LABELS, ENTITY_COLORS } from '@/constants/accounts';
 import { Money } from '@/components/Money';
 import { EntityDot } from '@/components/EntityBadge';
 import { FlagBadge } from '@/components/FlagBadge';
 import { fmtDateShort, fmtMoney } from '@/lib/format';
-import SourceTraceModal from './SourceTraceModal';
 import TransactionDetailDrawer from './TransactionDetailDrawer';
 
-export const ROW_GRID = '36px 92px 80px 1fr 120px 120px 150px 130px 130px 70px 100px 90px';
+export const ROW_GRID = '92px 80px 1fr 120px 120px 150px 130px 130px 70px 100px 90px';
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   UNREVIEWED: { bg: 'rgba(136,136,136,0.12)', text: '#A8A8A0' },
@@ -23,7 +22,6 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 export function TransactionRow({ tx }: { tx: Transaction }) {
-  const [traceOpen, setTraceOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const acct = ACCOUNTS.find((a) => a.id === tx.accountId);
   const bookedEntity = (tx.confirmedEntity || tx.entityTag) as keyof typeof ENTITY_LABELS;
@@ -33,18 +31,12 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
   return (
     <div
       role="button"
+      tabIndex={0}
       onClick={() => setDetailOpen(true)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailOpen(true); } }}
       className="border-t border-line/60 hover:bg-bg-2/40 grid items-center text-sm cursor-pointer"
       style={{ gridTemplateColumns: ROW_GRID }}
     >
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); setTraceOpen(true); }}
-        title="Trace where this money came from"
-        className="inline-flex items-center justify-center w-7 h-7 rounded text-ink-mute hover:text-entity-bytes hover:bg-bg-3 mx-auto"
-      >
-        <Search size={13} />
-      </button>
       <div className="px-3 py-2 mono text-xs whitespace-nowrap text-ink-dim">{fmtDateShort(tx.postingDate)}</div>
       <div className="px-3 py-2 whitespace-nowrap">
         <span className="inline-flex items-center gap-1.5">
@@ -92,7 +84,7 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
       <div className="px-3 py-2"><FlagBadge score={tx.auditScore} /></div>
 
       {detailOpen ? <TransactionDetailDrawer tx={tx} onClose={() => setDetailOpen(false)} /> : null}
-      {traceOpen ? <SourceTraceModal txId={tx.id} onClose={() => setTraceOpen(false)} /> : null}
     </div>
   );
 }
+
