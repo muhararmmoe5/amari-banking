@@ -385,7 +385,10 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                         builtInOptions={{
                           label: 'Money pools (entity · type)',
                           values: [
-                            ...BUSINESS_ENTITIES.map((e) => `${ENTITY_LABELS[e]} revenue`),
+                            ...BUSINESS_ENTITIES.flatMap((e) => [
+                              `${ENTITY_LABELS[e]} revenue`,
+                              `${ENTITY_LABELS[e]} investment income`,
+                            ]),
                             ...(commitments || []).map((c) =>
                               `${ENTITY_LABELS[c.entity as keyof typeof ENTITY_LABELS] || c.entity} investment income — ${c.personName || 'unknown investor'}`
                             ),
@@ -395,6 +398,45 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                         onOptionAdded={(v) => addToList('source_of_money', v)}
                       />
                     </Field>
+                    {/* Secondary investor picker — only shown when source matches "<Entity> investment income" (without trailing person) */}
+                    {(() => {
+                      const m = sourceOfMoney.match(/^(.+?) investment income$/);
+                      if (!m) return null;
+                      const entityLabel = m[1];
+                      const matchingEntity = (BUSINESS_ENTITIES as readonly string[]).find((e) => ENTITY_LABELS[e as keyof typeof ENTITY_LABELS] === entityLabel);
+                      const matchingCommitments = (commitments || []).filter((c) => c.entity === matchingEntity);
+                      return (
+                        <Field
+                          label={`Which investment? · scoped to ${entityLabel}`}
+                          hint={matchingCommitments.length === 0 ? 'no commitments recorded for this entity' : undefined}
+                        >
+                          <select
+                            value=""
+                            onChange={(e) => {
+                              const personName = e.target.value;
+                              if (!personName) return;
+                              const newSource = `${entityLabel} investment income — ${personName}`;
+                              setSourceOfMoney(newSource);
+                              persist({ sourceOfMoney: newSource });
+                            }}
+                            className="w-full"
+                            disabled={matchingCommitments.length === 0}
+                          >
+                            <option value="">— pick an investor —</option>
+                            {matchingCommitments.map((c) => (
+                              <option key={c.id} value={c.personName || 'unknown investor'}>
+                                {c.personName || 'unknown investor'}
+                              </option>
+                            ))}
+                          </select>
+                          {matchingCommitments.length === 0 ? (
+                            <div className="text-2xs text-ink-mute mt-1">
+                              No investor commitments yet for {entityLabel}. Add one on the <a href={`/cap/${matchingEntity}`} className="text-entity-bytes hover:underline">Cap Table</a> page.
+                            </div>
+                          ) : null}
+                        </Field>
+                      );
+                    })()}
                     <Field label="Need to get from">
                       <OptionSelect
                         field="need_to_get_from"
