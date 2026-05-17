@@ -118,6 +118,7 @@ export interface Transaction {
   needToGetFrom: string | null;
   cpaReviewed: boolean;
   taggedDate: string | null;
+  sourcePersonId: string | null;
   importedAt: number;
   updatedAt: number;
   importBatchId: string;

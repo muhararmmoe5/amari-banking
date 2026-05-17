@@ -36,6 +36,8 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
   const [notes, setNotes] = useState(tx.notes || '');
   const [cpaReviewed, setCpaReviewed] = useState(tx.cpaReviewed);
   const [taggedDate, setTaggedDate] = useState(tx.taggedDate || '');
+  const [sourcePersonId, setSourcePersonId] = useState(tx.sourcePersonId || '');
+  const [people, setPeople] = useState<{ id: string; name: string; role: string }[] | null>(null);
   const [traceOpen, setTraceOpen] = useState(false);
   const [, startTx] = useTransition();
   const { saveStart, saveEnd, saveError } = useToast();
@@ -56,6 +58,15 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
     setStatus(s);
     persist({ auditStatus: s });
   }
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/people', { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setPeople(d.people || []); })
+      .catch(() => { if (!cancelled) setPeople([]); });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -113,7 +124,9 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                 </div>
               </div>
               <div className="text-[11px] text-ink-dim flex flex-wrap gap-x-3 gap-y-1 pt-2 border-t border-line">
-                <span>📅 {fmtDate(tx.postingDate)}</span>
+                <span title="From Chase — when the bank processed this transaction. Cannot be changed.">
+                  🏦 Posted on bank: <span className="mono">{fmtDate(tx.postingDate)}</span>
+                </span>
                 <span>Paid from <span className="mono">···{tx.accountId}</span>{acct ? ` (${acct.label})` : ''}</span>
                 <span>Posted as {tx.category.replace(/^(EXPENSE_|INCOME_)/, '').replace(/_/g, ' ').toLowerCase()}</span>
               </div>
@@ -141,7 +154,7 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                   {cpaReviewed ? <><Check size={14} /> Yes — reviewed</> : 'No — not reviewed'}
                 </button>
               </Field>
-              <Field label="Tagged date" hint="any date you want to associate (booking period, review date, etc.)">
+              <Field label="Booking date" hint="the only editable date — when this should be booked for accounting; defaults blank if unset">
                 <input
                   type="date"
                   value={taggedDate}
@@ -164,6 +177,29 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                     <option key={o} value={o}>{ENTITY_LABELS[o]}</option>
                   ))}
                 </select>
+              </Field>
+              <Field
+                label={tx.amount > 0 ? 'Source person (income)' : 'Source / counterparty person'}
+                hint={tx.amount > 0 ? 'who this money came FROM — investor, partner, etc.' : 'who this money went TO, if applicable'}
+              >
+                <select
+                  value={sourcePersonId}
+                  onChange={(e) => {
+                    setSourcePersonId(e.target.value);
+                    persist({ sourcePersonId: e.target.value || null });
+                  }}
+                  className="w-full"
+                >
+                  <option value="">— None —</option>
+                  {(people || []).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.role.toLowerCase()})
+                    </option>
+                  ))}
+                </select>
+                {(people && people.length === 0) ? (
+                  <div className="text-[10px] text-ink-mute mt-1">No people yet — add them on the <a href="/team" className="text-entity-bytes hover:underline">Team page</a>.</div>
+                ) : null}
               </Field>
               <Field label="Individual" hint="who is this about">
                 <input

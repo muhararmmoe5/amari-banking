@@ -15,8 +15,10 @@ interface SearchProps {
   flagged?: string;
   from?: string;
   to?: string;
+  bookFrom?: string;
+  bookTo?: string;
   preset?: string;
-  order?: string; // 'oldest' | 'newest'
+  order?: string;
 }
 
 function presetToRange(preset?: string): { from?: string; to?: string } {
@@ -71,6 +73,8 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
     flaggedOnly: searchParams.flagged === '1',
     dateFrom,
     dateTo,
+    bookDateFrom: searchParams.bookFrom,
+    bookDateTo: searchParams.bookTo,
     orderDir,
     limit: 5000,
   };
@@ -167,14 +171,22 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
           <label className="block">
-            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">From</div>
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Posted on bank · From</div>
             <input name="from" type="date" defaultValue={searchParams.from || ''} className="w-full" />
           </label>
           <label className="block">
-            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">To</div>
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Posted on bank · To</div>
             <input name="to" type="date" defaultValue={searchParams.to || ''} className="w-full" />
           </label>
-          <div className="md:col-span-2 flex justify-end gap-2">
+          <label className="block">
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Booking date · From</div>
+            <input name="bookFrom" type="date" defaultValue={searchParams.bookFrom || ''} className="w-full" />
+          </label>
+          <label className="block">
+            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Booking date · To</div>
+            <input name="bookTo" type="date" defaultValue={searchParams.bookTo || ''} className="w-full" />
+          </label>
+          <div className="md:col-span-4 flex justify-end gap-2">
             <Link href="/transactions" className="btn">Clear</Link>
             <button type="submit" className="btn btn-primary">Apply filters</button>
           </div>

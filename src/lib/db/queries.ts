@@ -41,6 +41,7 @@ function rowToTransaction(r: any): Transaction {
     needToGetFrom: r.need_to_get_from ?? null,
     cpaReviewed: !!r.cpa_reviewed,
     taggedDate: r.tagged_date ?? null,
+    sourcePersonId: r.source_person_id ?? null,
     importedAt: r.imported_at,
     updatedAt: r.updated_at,
     importBatchId: r.import_batch_id,
@@ -141,6 +142,8 @@ export interface ListFilters {
   maxAmount?: number;
   dateFrom?: string;
   dateTo?: string;
+  bookDateFrom?: string;
+  bookDateTo?: string;
   flaggedOnly?: boolean;
   limit?: number;
   offset?: number;
@@ -163,6 +166,8 @@ export function listTransactions(filters: ListFilters = {}): Transaction[] {
   if (filters.maxAmount !== undefined) { where.push('amount <= @maxAmount'); params.maxAmount = filters.maxAmount; }
   if (filters.dateFrom) { where.push('posting_date >= @dateFrom'); params.dateFrom = filters.dateFrom; }
   if (filters.dateTo) { where.push('posting_date <= @dateTo'); params.dateTo = filters.dateTo; }
+  if (filters.bookDateFrom) { where.push('tagged_date >= @bookDateFrom'); params.bookDateFrom = filters.bookDateFrom; }
+  if (filters.bookDateTo) { where.push('tagged_date <= @bookDateTo'); params.bookDateTo = filters.bookDateTo; }
   if (filters.flaggedOnly) { where.push('audit_score > 0 AND audit_status = \'UNREVIEWED\''); }
 
   const orderBy = filters.orderBy || 'posting_date';
@@ -212,6 +217,7 @@ export interface UpdateTxPatch {
   needToGetFrom?: string | null;
   cpaReviewed?: boolean;
   taggedDate?: string | null;
+  sourcePersonId?: string | null;
 }
 
 export function updateTransaction(id: string, patch: UpdateTxPatch): void {
@@ -232,6 +238,7 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   if (patch.needToGetFrom !== undefined) { fields.push('need_to_get_from = @need_to_get_from'); params.need_to_get_from = patch.needToGetFrom; }
   if (patch.cpaReviewed !== undefined) { fields.push('cpa_reviewed = @cpa_reviewed'); params.cpa_reviewed = patch.cpaReviewed ? 1 : 0; }
   if (patch.taggedDate !== undefined) { fields.push('tagged_date = @tagged_date'); params.tagged_date = patch.taggedDate; }
+  if (patch.sourcePersonId !== undefined) { fields.push('source_person_id = @source_person_id'); params.source_person_id = patch.sourcePersonId; }
   if (fields.length === 0) return;
   fields.push('updated_at = @updated_at');
   db.prepare(`UPDATE transactions SET ${fields.join(', ')} WHERE id = @id`).run(params);

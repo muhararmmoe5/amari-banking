@@ -226,6 +226,7 @@ export function getDb(): Database.Database {
     `ALTER TABLE transactions ADD COLUMN tagged_date TEXT`,
     `ALTER TABLE transaction_splits ADD COLUMN period_start TEXT`,
     `ALTER TABLE transaction_splits ADD COLUMN period_end TEXT`,
+    `ALTER TABLE transactions ADD COLUMN source_person_id TEXT REFERENCES people(id) ON DELETE SET NULL`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }
