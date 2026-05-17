@@ -48,7 +48,7 @@ export default function AuditPage({ searchParams }: { searchParams: SP }) {
   return (
     <div className="p-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Audit review</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Audit review</h1>
         <p className="text-sm text-ink-dim mt-1">
           {p.openFlagCount} open flags · {p.reviewedCount} of {p.totalCount} tagged ({reviewPct}%)
         </p>

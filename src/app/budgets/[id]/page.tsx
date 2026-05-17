@@ -22,22 +22,22 @@ export default function BudgetDetailPage({ params }: { params: { id: string } })
   const monthlyCap = b.monthlyAmountCents;
 
   return (
-    <div className="p-8 space-y-5 max-w-[1200px]">
+    <div className="p-8 space-y-6 max-w-[1300px] mx-auto">
       <div>
-        <Link href="/budgets" className="inline-flex items-center gap-1 text-xs text-ink-mute hover:text-ink mb-3">
+        <Link href="/budgets" className="inline-flex items-center gap-1.5 text-xs text-ink-mute hover:text-ink mb-4 transition">
           <ArrowLeft size={12} /> Back to budgets
         </Link>
-        <h1 className="text-2xl font-semibold flex items-center gap-3">
+        <h1 className="text-3xl font-semibold tracking-tight flex items-center gap-3 flex-wrap">
           {b.name}
-          <span className={`pill text-[10px] ${isIncome ? 'bg-income/10 text-income border border-income/30' : 'bg-expense/10 text-expense border border-expense/30'}`}>{isIncome ? 'income' : 'expense'}</span>
-          {b.subKind ? <span className="pill text-[10px] bg-entity-bytes/15 text-entity-bytes border border-entity-bytes/30">{BUDGET_SUB_KINDS[b.subKind]}</span> : null}
+          <span className={`pill pill-solid ${isIncome ? 'bg-income/10 text-income border border-income/30' : 'bg-expense/10 text-expense border border-expense/30'}`}>{isIncome ? 'income' : 'expense'}</span>
+          {b.subKind ? <span className="pill pill-solid bg-entity-bytes/15 text-entity-bytes border border-entity-bytes/30">{BUDGET_SUB_KINDS[b.subKind]}</span> : null}
         </h1>
-        <div className="mt-2 text-[12px] text-ink-dim flex flex-wrap gap-x-4 gap-y-1">
-          {b.entity ? <span>📌 Entity: <span className="text-ink">{b.entity.replace(/_/g, ' ').toLowerCase()}</span></span> : null}
-          {d.personName ? <span>👤 Person: <span className="text-ink">{d.personName}</span></span> : null}
-          {d.commitmentLabel ? <span>↳ Investment: <span className="text-ink">{d.commitmentLabel}</span></span> : null}
+        <div className="mt-3 text-xs text-ink-dim flex flex-wrap gap-x-5 gap-y-1">
+          {b.entity ? <span>📌 Entity: <span className="text-ink font-medium">{b.entity.replace(/_/g, ' ').toLowerCase()}</span></span> : null}
+          {d.personName ? <span>👤 Person: <span className="text-ink font-medium">{d.personName}</span></span> : null}
+          {d.commitmentLabel ? <span>↳ Investment: <span className="text-ink font-medium">{d.commitmentLabel}</span></span> : null}
         </div>
-        {b.notes ? <p className="mt-2 text-sm text-ink-dim">{b.notes}</p> : null}
+        {b.notes ? <p className="mt-3 text-sm text-ink-dim">{b.notes}</p> : null}
       </div>
 
       {/* Master summary */}
@@ -144,10 +144,10 @@ function SummaryCard({
 }: { label: string; value: string; hint?: string; tone?: 'income' | 'expense' }) {
   const toneClass = tone === 'income' ? 'text-income' : tone === 'expense' ? 'text-expense' : '';
   return (
-    <div className="card p-4">
-      <div className="text-[11px] uppercase tracking-wider text-ink-mute">{label}</div>
-      <div className={`mono tabnum text-2xl mt-1 ${toneClass}`}>{value}</div>
-      {hint ? <div className="text-[11px] text-ink-mute mt-1">{hint}</div> : null}
+    <div className="card p-4 hover-lift">
+      <div className="section-label">{label}</div>
+      <div className={`num-display text-2xl mt-1.5 font-semibold ${toneClass}`}>{value}</div>
+      {hint ? <div className="text-2xs text-ink-mute mt-1.5">{hint}</div> : null}
     </div>
   );
 }

@@ -18,7 +18,7 @@ export default function ReconcilePage() {
   return (
     <div className="p-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Reconciliation</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Reconciliation</h1>
         <p className="text-sm text-ink-dim mt-1">
           Internal transfer matching — pairs outflows in one account to inflows in another within 2 days, same amount.
         </p>

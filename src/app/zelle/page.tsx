@@ -17,7 +17,7 @@ export default function ZellePage() {
   return (
     <div className="p-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Zelle / 1099 compliance</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Zelle / 1099 compliance</h1>
         <p className="text-sm text-ink-dim mt-1">Every Zelle outflow grouped by recipient. Identify contractors who require a 1099.</p>
       </div>
 

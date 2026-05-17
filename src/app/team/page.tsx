@@ -18,7 +18,7 @@ export default function TeamPage() {
   return (
     <div className="p-8 space-y-5 max-w-[1200px]">
       <div>
-        <h1 className="text-2xl font-semibold">Team & investors</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Team & investors</h1>
         <p className="text-sm text-ink-dim mt-1">
           Everyone with a stake in any entity — founders, employees, contractors, advisors, investors. Click a name to see their full portfolio.
         </p>

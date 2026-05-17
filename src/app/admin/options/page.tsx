@@ -14,11 +14,11 @@ export default function AdminOptionsPage() {
   requireOwner();
   const grouped = listOptionsGrouped();
   return (
-    <div className="p-8 space-y-5 max-w-[1100px]">
+    <div className="p-8 space-y-6 max-w-[1200px] mx-auto">
       <div>
-        <h1 className="text-2xl font-semibold">Field options · admin</h1>
-        <p className="text-sm text-ink-dim mt-1">
-          The transaction drawer dropdowns (Individual, Sub Category 1/2, Business Purpose, Source of Money, Need to Get From) are populated from this list. Add the values you want to pick from. Drawer dropdowns will also let you create a new option inline.
+        <h1 className="text-3xl font-semibold tracking-tight">Field options</h1>
+        <p className="text-sm text-ink-dim mt-2 max-w-3xl">
+          Manage the dropdown values used inside the transaction drawer. Add the values you want to pick from. Drawer dropdowns also let you add new options inline as you go.
         </p>
       </div>
       <OptionsClient

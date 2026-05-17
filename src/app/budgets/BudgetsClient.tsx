@@ -370,11 +370,11 @@ function BudgetRow({
   const cap = b.monthlyAmountCents;
   const pct = cap && cap > 0 ? (b.spentThisMonthCents / cap) * 100 : 0;
   return (
-    <div className="p-4">
+    <div className="p-5 hover:bg-bg-2/30 transition-colors">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-base font-medium">
-            <Link href={`/budgets/${b.id}`} className="hover:underline">{b.name}</Link>
+          <div className="text-base font-semibold tracking-tight">
+            <Link href={`/budgets/${b.id}`} className="hover:text-entity-bytes transition-colors">{b.name}</Link>
             <span className={`ml-2 pill text-[10px] ${b.kind === 'EXPENSE' ? 'bg-expense/10 text-expense border border-expense/30' : 'bg-income/10 text-income border border-income/30'}`}>{b.kind === 'EXPENSE' ? 'expense' : 'income'}</span>
             {b.subKind ? <span className="ml-2 pill text-[10px] bg-entity-bytes/15 text-entity-bytes border border-entity-bytes/30">{BUDGET_SUB_KINDS[b.subKind]}</span> : null}
             {b.entity ? <span className="ml-2 pill text-[10px] bg-bg-2 text-ink-dim border border-line">{b.entity.replace(/_/g, ' ').toLowerCase()}</span> : null}

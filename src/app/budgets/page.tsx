@@ -25,10 +25,10 @@ export default function BudgetsPage() {
   });
   const people = listPeople().map((p) => ({ id: p.id, name: p.name }));
   return (
-    <div className="p-8 space-y-5 max-w-[1100px]">
+    <div className="p-8 space-y-6 max-w-[1200px] mx-auto">
       <div>
-        <h1 className="text-2xl font-semibold">Budgets</h1>
-        <p className="text-sm text-ink-dim mt-1">
+        <h1 className="text-3xl font-semibold tracking-tight">Budgets</h1>
+        <p className="text-sm text-ink-dim mt-2 max-w-2xl">
           Named buckets you can tag transactions to. Each budget tracks how much has been spent against it this month and all time. Link a budget to an investor commitment to track that month&apos;s tranche.
         </p>
       </div>

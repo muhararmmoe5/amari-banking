@@ -41,7 +41,7 @@ export default function IncomePage() {
   return (
     <div className="p-8 space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">Income tracker</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Income tracker</h1>
         <p className="text-sm text-ink-dim mt-1">Where money comes from, by source and over time.</p>
       </div>
 

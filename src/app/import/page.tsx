@@ -100,7 +100,7 @@ export default function ImportPage() {
   return (
     <div className="p-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Import CSV</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Import CSV</h1>
         <p className="text-sm text-ink-dim mt-1">
           Drop your Chase CSV exports. We auto-detect the account from the filename (e.g. <code className="mono text-ink">Chase0320_Activity_*.CSV</code>) and run full categorization before saving.
         </p>

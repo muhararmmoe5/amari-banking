@@ -13,7 +13,7 @@ export default function PLPage() {
   return (
     <div className="p-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Entity P&L</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Entity P&L</h1>
         <p className="text-sm text-ink-dim mt-1">Income, expenses, and net per business entity.</p>
       </div>
 

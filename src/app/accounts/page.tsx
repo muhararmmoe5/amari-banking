@@ -17,7 +17,7 @@ export default function AccountsPage() {
     <div className="p-8 space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Accounts</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Accounts</h1>
           <p className="text-sm text-ink-dim mt-1">All 15 Chase accounts and their entity assignment.</p>
         </div>
         <div className="card px-4 py-2 text-sm">

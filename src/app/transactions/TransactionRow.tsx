@@ -37,7 +37,7 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
         if (e.target !== e.currentTarget) return;
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailOpen(true); }
       }}
-      className="border-t border-line/60 hover:bg-bg-2/40 grid items-center text-sm cursor-pointer"
+      className="border-t border-line/40 hover:bg-bg-2/60 grid items-center text-sm cursor-pointer transition-colors duration-100 focus:outline-none focus:bg-bg-2 focus:ring-1 focus:ring-entity-bytes/40"
       style={{ gridTemplateColumns: ROW_GRID }}
     >
       <div className="px-3 py-1.5 mono text-xs whitespace-nowrap leading-tight">

@@ -625,9 +625,9 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
 function Field({ label, children, className = '', hint }: { label: string; children: React.ReactNode; className?: string; hint?: string }) {
   return (
     <label className={`block ${className}`}>
-      <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">
-        {label}
-        {hint ? <span className="ml-1 text-ink-mute normal-case">· {hint}</span> : null}
+      <div className="section-label mb-1.5 flex items-center gap-1.5">
+        <span>{label}</span>
+        {hint ? <span className="text-ink-mute normal-case tracking-normal text-2xs">· {hint}</span> : null}
       </div>
       <div>{children}</div>
     </label>

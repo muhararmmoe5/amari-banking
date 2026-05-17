@@ -16,7 +16,7 @@ export default function CpaExportPage() {
   return (
     <div className="p-8 space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-semibold">CPA export</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">CPA export</h1>
         <p className="text-sm text-ink-dim mt-1">
           Generates a single Excel workbook your accountant can open directly. Includes summaries, breakdowns, 1099 list, wires, Spacetel flow, full ledger, and a "Needs Review" tab for anything still untagged.
         </p>

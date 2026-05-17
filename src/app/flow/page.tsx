@@ -34,7 +34,7 @@ export default function FlowPage({ searchParams }: { searchParams: SP }) {
   return (
     <div className="p-8 space-y-6 max-w-[1320px]">
       <div>
-        <h1 className="text-2xl font-semibold">Cash Flow</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Cash Flow</h1>
         <p className="text-sm text-ink-dim mt-1">
           Where your money is right now, and where it went after each inflow.
         </p>

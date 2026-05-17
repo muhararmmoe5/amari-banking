@@ -83,36 +83,36 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
   const total = countTransactions({ hideInternal });
 
   return (
-    <div className="p-8 space-y-5">
-      <div className="flex items-center justify-between">
+    <div className="p-8 space-y-6 max-w-[1600px] mx-auto">
+      <div className="flex items-start justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-semibold">Transactions</h1>
-          <p className="text-sm text-ink-dim mt-1">
-            Showing {rows.length} of {total.toLocaleString()} non-internal transactions
+          <h1 className="text-3xl font-semibold tracking-tight">Transactions</h1>
+          <p className="text-sm text-ink-dim mt-1.5">
+            Showing <span className="text-ink font-medium num-display">{rows.length}</span> of <span className="num-display">{total.toLocaleString()}</span> non-internal transactions
           </p>
           {!searchParams.account ? (
-            <p className="text-[11px] text-warn mt-1">
-              💡 Tip: pick a single account in the filter below to read the running "Balance after" column like a bank statement.
+            <p className="text-2xs text-warn mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warn/5 border border-warn/20">
+              💡 Pick a single account to read the running &ldquo;Balance after&rdquo; like a bank statement.
             </p>
           ) : null}
         </div>
         <div className="flex items-center gap-2">
-          <Link href={`/audit/deep${searchParams.account ? `?account=${searchParams.account}` : ''}`} className="btn">🔍 Deep source audit</Link>
+          <Link href={`/audit/deep${searchParams.account ? `?account=${searchParams.account}` : ''}`} className="btn">🔍 Deep audit</Link>
           <RescanDatesButton />
           <Link href="/import" className="btn btn-primary">⬆ Import more</Link>
         </div>
       </div>
 
-      <form className="card p-4 space-y-3 text-xs" method="GET">
+      <form className="card p-5 space-y-4 text-xs" method="GET">
         <div className="flex flex-wrap gap-1.5">
           {[
             { v: '', l: 'All time' },
             { v: '7d', l: 'Last 7d' },
             { v: '30d', l: 'Last 30d' },
-            { v: 'mtd', l: 'Month-to-date' },
+            { v: 'mtd', l: 'MTD' },
             { v: 'last_month', l: 'Last month' },
-            { v: 'qtd', l: 'Quarter-to-date' },
-            { v: 'ytd', l: 'Year-to-date' },
+            { v: 'qtd', l: 'QTD' },
+            { v: 'ytd', l: 'YTD' },
             { v: 'last_year', l: 'Last year' },
           ].map((p) => (
             <button
@@ -120,10 +120,10 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
               type="submit"
               name="preset"
               value={p.v}
-              className={`pill border ${
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
                 (searchParams.preset || '') === p.v
-                  ? 'bg-entity-bytes text-bg-0 border-entity-bytes'
-                  : 'bg-bg-2 text-ink-dim border-line hover:text-ink'
+                  ? 'bg-entity-bytes text-bg-0 border-entity-bytes shadow-glow-bytes'
+                  : 'bg-bg-2/60 text-ink-dim border-line hover:text-ink hover:bg-bg-2 hover:border-line-strong'
               }`}
             >
               {p.l}
@@ -156,16 +156,16 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
             <option value="NEEDS_RECEIPT">Needs receipt</option>
             <option value="PERSONAL_NO_DEDUCT">Personal no-deduct</option>
           </select>
-          <div className="flex items-center gap-3 text-ink-dim flex-wrap">
-            <label className="inline-flex items-center gap-1">
+          <div className="flex items-center gap-4 text-ink-dim flex-wrap">
+            <label className="inline-flex items-center gap-1.5 cursor-pointer">
               <input type="checkbox" name="internal" value="1" defaultChecked={!hideInternal} className="accent-entity-bytes" />
               Show internal
             </label>
-            <label className="inline-flex items-center gap-1">
+            <label className="inline-flex items-center gap-1.5 cursor-pointer">
               <input type="checkbox" name="flagged" value="1" defaultChecked={filters.flaggedOnly} className="accent-entity-bytes" />
               Flags only
             </label>
-            <label className="inline-flex items-center gap-1">
+            <label className="inline-flex items-center gap-1.5">
               <span className="text-ink-mute">Order</span>
               <select name="order" defaultValue={searchParams.order === 'oldest' ? 'oldest' : 'newest'}>
                 <option value="newest">Newest first</option>
@@ -174,25 +174,26 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
             </label>
           </div>
         </div>
+        <div className="divider-soft" />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
           <label className="block">
-            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Posted on bank · From</div>
+            <div className="section-label mb-1.5">Posted on bank · From</div>
             <input name="from" type="date" defaultValue={searchParams.from || ''} className="w-full" />
           </label>
           <label className="block">
-            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Posted on bank · To</div>
+            <div className="section-label mb-1.5">Posted on bank · To</div>
             <input name="to" type="date" defaultValue={searchParams.to || ''} className="w-full" />
           </label>
           <label className="block">
-            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Booking date · From</div>
+            <div className="section-label mb-1.5">Booking date · From</div>
             <input name="bookFrom" type="date" defaultValue={searchParams.bookFrom || ''} className="w-full" />
           </label>
           <label className="block">
-            <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Booking date · To</div>
+            <div className="section-label mb-1.5">Booking date · To</div>
             <input name="bookTo" type="date" defaultValue={searchParams.bookTo || ''} className="w-full" />
           </label>
           <div className="md:col-span-4 flex justify-end gap-2">
-            <Link href="/transactions" className="btn">Clear</Link>
+            <Link href="/transactions" className="btn btn-ghost">Clear</Link>
             <button type="submit" className="btn btn-primary">Apply filters</button>
           </div>
         </div>

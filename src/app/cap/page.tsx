@@ -38,12 +38,12 @@ export default function CapOverviewPage() {
   }
 
   return (
-    <div className="p-8 space-y-6 max-w-[1320px]">
+    <div className="p-8 space-y-6 max-w-[1320px] mx-auto">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Cap table</h1>
-          <p className="text-sm text-ink-dim mt-1">
-            Equity, cash contributions, and outstanding SAFEs across your 5 business entities.
+          <h1 className="text-3xl font-semibold tracking-tight">Cap table</h1>
+          <p className="text-sm text-ink-dim mt-2 max-w-2xl">
+            Equity, cash contributions, and outstanding SAFEs across your business entities.
           </p>
         </div>
         <Link href="/team" className="btn">Manage people →</Link>

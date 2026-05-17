@@ -18,7 +18,7 @@ export default function VirtualTable({ rows }: { rows: Transaction[] }) {
   return (
     <div className="card overflow-hidden">
       <div
-        className="bg-bg-2 text-ink-dim text-xs grid items-center font-medium uppercase tracking-wider"
+        className="surface-glass border-b border-line text-ink-mute text-2xs grid items-center font-semibold uppercase tracking-[0.06em]"
         style={{ gridTemplateColumns: ROW_GRID }}
       >
         <Cell>Date</Cell>
@@ -26,16 +26,19 @@ export default function VirtualTable({ rows }: { rows: Transaction[] }) {
         <Cell>Merchant / Description</Cell>
         <Cell className="text-right">Amount</Cell>
         <Cell className="text-right">Balance after</Cell>
-        <Cell title="Which business this expense is booked to (independent of which account paid)">Books to</Cell>
+        <Cell title="Which business this expense is booked to">Books to</Cell>
         <Cell>Sub category</Cell>
         <Cell>Status</Cell>
-        <Cell className="text-center" title="CPA reviewed">CPA ✓</Cell>
-        <Cell title="Tagged date — any date you want to associate (booking period, review date, etc.)">Tagged date</Cell>
+        <Cell className="text-center" title="CPA reviewed">CPA</Cell>
+        <Cell title="Tagged date">Tagged date</Cell>
         <Cell>Flag</Cell>
       </div>
 
       {rows.length === 0 ? (
-        <div className="px-3 py-12 text-center text-ink-mute">No transactions match these filters.</div>
+        <div className="px-3 py-16 text-center text-ink-mute">
+          <div className="text-4xl mb-2 opacity-40">🔍</div>
+          <div className="text-sm">No transactions match these filters.</div>
+        </div>
       ) : (
         <div ref={parentRef} className="overflow-auto" style={{ height: 'min(72vh, 720px)' }}>
           <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative', width: '100%' }}>

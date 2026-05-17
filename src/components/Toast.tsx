@@ -54,17 +54,19 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {items.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto card px-3 py-2.5 min-w-[220px] max-w-sm shadow-soft animate-toast-in border-l-2 ${
-              t.kind === 'ok' ? 'border-l-income' :
-              t.kind === 'err' ? 'border-l-expense' :
-              t.kind === 'saving' ? 'border-l-entity-bytes' : 'border-l-line'
+            className={`pointer-events-auto surface-glass border rounded-xl px-4 py-3 min-w-[240px] max-w-sm shadow-elev-2 animate-toast-in ${
+              t.kind === 'ok' ? 'border-income/40' :
+              t.kind === 'err' ? 'border-expense/40' :
+              t.kind === 'saving' ? 'border-entity-bytes/40' : 'border-line'
             }`}
           >
-            <div className="flex items-center gap-2">
-              {t.kind === 'saving' ? <Spinner /> : t.kind === 'ok' ? <span className="text-income">✓</span> : t.kind === 'err' ? <span className="text-expense">✕</span> : null}
+            <div className="flex items-center gap-2.5">
+              {t.kind === 'saving' ? <Spinner /> :
+                t.kind === 'ok' ? <span className="w-5 h-5 rounded-full bg-income/15 text-income inline-flex items-center justify-center text-xs">✓</span> :
+                t.kind === 'err' ? <span className="w-5 h-5 rounded-full bg-expense/15 text-expense inline-flex items-center justify-center text-xs">✕</span> : null}
               <div className="text-sm font-medium">{t.title}</div>
             </div>
-            {t.body ? <div className="text-xs text-ink-dim mt-0.5">{t.body}</div> : null}
+            {t.body ? <div className="text-xs text-ink-dim mt-1 ml-7">{t.body}</div> : null}
           </div>
         ))}
       </div>
