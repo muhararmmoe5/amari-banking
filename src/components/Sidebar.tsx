@@ -6,42 +6,62 @@ import clsx from 'clsx';
 import {
   LayoutDashboard,
   Upload,
-  ListTree,
-  ShieldAlert,
-  Building2,
-  TrendingUp,
-  Banknote,
-  Target,
-  Settings,
+  Table2,
+  ArrowLeftRight,
+  ShieldCheck,
   PieChart,
-  FileSpreadsheet,
-  Repeat2,
+  Wallet,
   Users,
-  PieChart as PieChartIcon,
+  TrendingUp,
+  Activity,
+  DollarSign,
+  FileText,
+  Download,
+  SlidersHorizontal,
+  Settings,
+  ChevronDown,
   LogOut,
-  Waves,
 } from 'lucide-react';
 
-type NavItem = { href: string; label: string; icon: any; flagBadge?: boolean; ownerOnly?: boolean } | { divider: true; ownerOnly?: boolean };
+type NavItem = { href: string; label: string; icon: any; tag?: string; flagBadge?: boolean; ownerOnly?: boolean };
+type NavSection = { sec: string; items: NavItem[] };
 
-const NAV: NavItem[] = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard, ownerOnly: true },
-  { href: '/import', label: 'Import CSV', icon: Upload, ownerOnly: true },
-  { href: '/transactions', label: 'Transactions', icon: ListTree, ownerOnly: true },
-  { href: '/audit', label: 'Audit Review', icon: ShieldAlert, flagBadge: true, ownerOnly: true },
-  { divider: true, ownerOnly: true } as const,
-  { href: '/accounts', label: 'Accounts', icon: Building2, ownerOnly: true },
-  { href: '/flow', label: 'Cash Flow', icon: Waves, ownerOnly: true },
-  { href: '/income', label: 'Income Tracker', icon: TrendingUp, ownerOnly: true },
-  { href: '/budgets', label: 'Budgets', icon: Target, ownerOnly: true },
-  { href: '/zelle', label: 'Zelle / 1099', icon: Banknote, ownerOnly: true },
-  { href: '/pl', label: 'Entity P&L', icon: PieChart, ownerOnly: true },
-  { href: '/cpa', label: 'CPA Export', icon: FileSpreadsheet, ownerOnly: true },
-  { href: '/reconcile', label: 'Reconciliation', icon: Repeat2, ownerOnly: true },
-  { divider: true } as const,
-  { href: '/team', label: 'Team & Investors', icon: Users, ownerOnly: true },
-  { href: '/cap', label: 'Cap Table', icon: PieChartIcon },
-  { href: '/admin/options', label: 'Admin · Dropdown options', icon: Settings, ownerOnly: true },
+const NAV_SECTIONS: NavSection[] = [
+  {
+    sec: 'Banking',
+    items: [
+      { href: '/', label: 'Dashboard', icon: LayoutDashboard, ownerOnly: true },
+      { href: '/import', label: 'Import CSV', icon: Upload, ownerOnly: true },
+      { href: '/transactions', label: 'Transactions', icon: Table2, ownerOnly: true },
+      { href: '/reconcile', label: 'Reconciliation', icon: ArrowLeftRight, ownerOnly: true },
+      { href: '/audit', label: 'Audit Review', icon: ShieldCheck, flagBadge: true, ownerOnly: true },
+    ],
+  },
+  {
+    sec: 'Capital',
+    items: [
+      { href: '/cap', label: 'Cap Table', icon: PieChart },
+      { href: '/budgets', label: 'Budgets', icon: Wallet, ownerOnly: true },
+      { href: '/team', label: 'Team & Investors', icon: Users, ownerOnly: true },
+    ],
+  },
+  {
+    sec: 'Reports',
+    items: [
+      { href: '/pl', label: 'Entity P&L', icon: TrendingUp, ownerOnly: true },
+      { href: '/flow', label: 'Cash Flow', icon: Activity, ownerOnly: true },
+      { href: '/income', label: 'Income Tracker', icon: DollarSign, ownerOnly: true },
+      { href: '/zelle', label: 'Zelle / 1099', icon: FileText, ownerOnly: true },
+      { href: '/cpa', label: 'CPA Export', icon: Download, ownerOnly: true },
+      { href: '/accounts', label: 'Accounts', icon: Wallet, ownerOnly: true },
+    ],
+  },
+  {
+    sec: 'Admin',
+    items: [
+      { href: '/admin/options', label: 'Dropdown options', icon: SlidersHorizontal, ownerOnly: true },
+    ],
+  },
 ];
 
 export default function Sidebar({
@@ -54,7 +74,6 @@ export default function Sidebar({
 }) {
   const path = usePathname();
   const isOwner = role === 'OWNER';
-  const items = NAV.filter((n) => isOwner || !('ownerOnly' in n) || !n.ownerOnly);
   const initials = (userName || userEmail || '?').slice(0, 2).toUpperCase();
 
   async function logout() {
@@ -63,87 +82,91 @@ export default function Sidebar({
   }
 
   return (
-    <aside className="w-[72px] shrink-0 border-r border-line bg-bg-1/80 backdrop-blur-xl min-h-screen flex flex-col items-center py-5 sticky top-0 z-30">
-      {/* Logo */}
-      <Link
-        href="/"
-        className="relative w-11 h-11 rounded-xl inline-flex items-center justify-center mb-7 transition-transform hover:scale-105"
-        style={{
-          background: 'linear-gradient(135deg, #C060F0 0%, #7c3aed 100%)',
-          color: '#fff',
-          fontWeight: 800,
-          fontSize: 15,
-          letterSpacing: 0.3,
-          boxShadow: '0 1px 0 rgba(255,255,255,0.2) inset, 0 8px 20px rgba(124,58,237,0.35)',
-        }}
-        title="Amari Ventures"
-      >
-        AV
-      </Link>
+    <aside className="w-[232px] shrink-0 border-r border-line bg-bg-1 min-h-screen flex flex-col overflow-hidden sticky top-0 z-30">
+      {/* Brand */}
+      <div className="px-[18px] py-[18px] pb-[14px] flex items-center gap-2.5">
+        <div
+          className="w-7 h-7 grid place-items-center rounded-lg text-bg-0 font-normal italic"
+          style={{
+            background: 'radial-gradient(circle at 30% 30%, color-mix(in oklab, #c9a87a 92%, white), color-mix(in oklab, #c9a87a 60%, black)), #c9a87a',
+            fontFamily: 'var(--font-serif)',
+            fontSize: 18,
+            lineHeight: 1,
+            boxShadow: '0 0 0 1px rgba(255,255,255,.06), 0 1px 0 rgba(0,0,0,.4), 0 0 28px -6px rgba(201,168,122,.45)',
+          }}
+        >
+          A
+        </div>
+        <div>
+          <div className="font-semibold text-[14px] tracking-tight">Amari Banking</div>
+          <div className="text-[10.5px] text-ink-mute mt-px tracking-wide">Multi-entity audit</div>
+        </div>
+      </div>
 
-      <nav className="flex-1 flex flex-col items-center gap-1 w-full">
-        {items.map((n, idx) => {
-          if ('divider' in n) {
-            return (
-              <div key={`d-${idx}`} className="w-7 h-px my-3 bg-gradient-to-r from-transparent via-line-strong to-transparent" />
-            );
-          }
-          const Icon = n.icon;
-          const isActive = n.href === '/' ? path === '/' : path?.startsWith(n.href!);
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden">
+        {NAV_SECTIONS.map(({ sec, items }) => {
+          const visible = items.filter((n) => isOwner || !n.ownerOnly);
+          if (visible.length === 0) return null;
           return (
-            <Link
-              key={n.href}
-              href={n.href!}
-              title={n.label}
-              className={clsx(
-                'relative w-11 h-11 inline-flex items-center justify-center rounded-xl transition-all duration-150 group',
-                isActive
-                  ? 'text-bg-0 bg-entity-bytes shadow-glow-bytes'
-                  : 'text-ink-mute hover:text-ink hover:bg-bg-2'
-              )}
-              style={isActive ? {
-                background: 'linear-gradient(135deg, #D4F470 0%, #A5DE3F 100%)',
-              } : undefined}
-            >
-              <Icon size={19} strokeWidth={isActive ? 2.25 : 1.75} />
-              {n.flagBadge && openFlags ? (
-                <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] px-1 rounded-full text-[10px] font-bold inline-flex items-center justify-center bg-expense text-white ring-2 ring-bg-1">
-                  {openFlags > 99 ? '99+' : openFlags}
-                </span>
-              ) : null}
-              {/* Tooltip */}
-              <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap px-2.5 py-1.5 rounded-lg surface-glass border border-line-strong text-xs font-medium text-ink opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-elev-2">
-                {n.label}
-              </span>
-            </Link>
+            <div key={sec} className="px-2.5 pt-3.5 pb-1">
+              <div className="section-label px-2 pb-1.5">{sec}</div>
+              {visible.map((n) => {
+                const isActive = n.href === '/' ? path === '/' : path?.startsWith(n.href);
+                const Icon = n.icon;
+                const tag = n.flagBadge && openFlags ? (openFlags > 99 ? '99+' : String(openFlags)) : n.tag;
+                return (
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    className={clsx(
+                      'flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[12.5px] my-0.5',
+                      'transition-colors duration-75',
+                      isActive
+                        ? 'bg-bg-2 text-ink'
+                        : 'text-ink-dim hover:bg-bg-2 hover:text-ink'
+                    )}
+                    style={isActive ? { boxShadow: 'inset 2px 0 0 var(--color-accent, #c9a87a)' } : undefined}
+                  >
+                    <Icon
+                      size={14}
+                      strokeWidth={1.75}
+                      className={isActive ? 'text-accent' : 'text-ink-mute'}
+                      style={isActive ? { color: '#c9a87a' } : undefined}
+                    />
+                    <span className="leading-tight">{n.label}</span>
+                    {tag ? (
+                      <span className="ml-auto mono text-[10.5px] text-ink-mute">{tag}</span>
+                    ) : null}
+                  </Link>
+                );
+              })}
+            </div>
           );
         })}
       </nav>
 
-      <div className="flex flex-col items-center gap-2 mt-3">
-        <div
-          className="relative w-10 h-10 rounded-xl inline-flex items-center justify-center text-xs font-semibold bg-bg-3 text-ink border border-line group cursor-default"
-          title={`${userName || ''} (${userEmail || ''}) · ${role || ''}`}
-        >
-          {initials}
-          <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap px-2.5 py-1.5 rounded-lg surface-glass border border-line-strong text-xs text-ink opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-elev-2">
-            {userName || userEmail}{role ? ` · ${role.toLowerCase().replace('_', ' ')}` : ''}
-          </span>
-        </div>
+      {/* Footer — user + build stamp */}
+      <div className="mt-auto border-t border-line p-3">
         <button
-          onClick={logout}
-          className="w-11 h-11 inline-flex items-center justify-center rounded-xl text-ink-mute hover:text-expense hover:bg-bg-2 transition group relative"
-          title="Sign out"
           type="button"
+          onClick={logout}
+          className="w-full flex items-center gap-2 px-2.5 py-2 bg-bg-2 border border-line rounded-md hover:bg-bg-3 transition group"
+          title="Sign out"
         >
-          <LogOut size={18} strokeWidth={1.75} />
-          <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap px-2.5 py-1.5 rounded-lg surface-glass border border-line-strong text-xs text-ink opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-elev-2">
-            Sign out
-          </span>
+          <div
+            className="w-[22px] h-[22px] rounded-md grid place-items-center text-bg-0 font-bold text-[10.5px]"
+            style={{ background: 'linear-gradient(135deg, #c9a87a, #88724a)' }}
+          >
+            {initials}
+          </div>
+          <div className="min-w-0 flex-1 text-left">
+            <div className="text-[12px] font-medium truncate">{userName || userEmail || 'User'}</div>
+            <div className="text-[10.5px] text-ink-mute truncate">{role ? role.toLowerCase().replace('_', ' ') : 'signed in'}</div>
+          </div>
+          <LogOut size={12} className="text-ink-mute group-hover:text-expense transition" />
         </button>
-        <div className="mt-2 text-[9px] mono text-ink-ghost" title="Build stamp">
-          v.balance-truth
-        </div>
+        <div className="mono text-[10px] text-ink-ghost px-2 pt-2">v.warmdash · main</div>
       </div>
     </aside>
   );

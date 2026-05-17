@@ -13,15 +13,15 @@ export const ENTITY_LABELS: Record<EntityType, string> = {
 };
 
 export const ENTITY_COLORS: Record<EntityType, string> = {
-  BYTES_AI: '#C8F060',
-  ROCKET_WIRELESS: '#60C8F0',
-  DELICIOUS_BYTES: '#F0A060',
-  AMARI_VENTURES: '#C060F0',
-  BYTES_REST_TECH: '#A0D840',
-  PERSONAL: '#E8D8FF',
-  MULTI_ENTITY: '#F0F060',
-  BUSINESS_SHARED: '#A0A0FF',
-  UNKNOWN: '#888888',
+  BYTES_AI: '#c9a87a',          // warm gold
+  ROCKET_WIRELESS: '#6b8aa8',   // slate-blue
+  DELICIOUS_BYTES: '#c98a7a',   // terracotta
+  AMARI_VENTURES: '#b18ac9',    // orchid
+  BYTES_REST_TECH: '#7a8c6b',   // sage
+  PERSONAL: '#c9b8a8',          // warm cream
+  MULTI_ENTITY: '#c9a87a',
+  BUSINESS_SHARED: '#9f9a8c',
+  UNKNOWN: '#6f6e68',
 };
 
 export const ACCOUNTS: AccountConfig[] = [

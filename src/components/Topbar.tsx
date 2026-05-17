@@ -2,74 +2,99 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Upload, Download } from 'lucide-react';
+import { Search, Sparkles, Bell, HelpCircle, Calendar, ChevronDown, Upload, Download, Tag } from 'lucide-react';
 
-const MONTHS = [
-  { v: '01', label: 'Jan' },
-  { v: '02', label: 'Feb' },
-  { v: '03', label: 'Mar' },
-  { v: '04', label: 'Apr' },
-  { v: '05', label: 'May' },
-  { v: '06', label: 'Jun' },
-  { v: '07', label: 'Jul' },
-  { v: '08', label: 'Aug' },
-  { v: '09', label: 'Sep' },
-  { v: '10', label: 'Oct' },
-  { v: '11', label: 'Nov' },
-  { v: '12', label: 'Dec' },
+const PERIOD_OPTS = [
+  { v: '', l: 'All time' },
+  { v: '7d', l: 'Last 7d' },
+  { v: '30d', l: 'Last 30d' },
+  { v: 'mtd', l: 'Month-to-date' },
+  { v: 'last_month', l: 'Last month' },
+  { v: 'qtd', l: 'Quarter-to-date' },
+  { v: 'ytd', l: 'Year-to-date' },
+  { v: 'last_year', l: 'Last year' },
 ];
 
-export default function Topbar({ title }: { title: string }) {
+export default function Topbar({ title: _title }: { title?: string }) {
   const router = useRouter();
   const params = useSearchParams();
-  const period = params.get('period') || 'ytd';
+  const period = params.get('period') || '';
+  const currentLabel = PERIOD_OPTS.find((p) => p.v === period)?.l || 'All time';
 
-  const set = (next: string) => {
+  function setPeriod(next: string) {
     const sp = new URLSearchParams(params.toString());
-    if (next === 'ytd') sp.delete('period');
+    if (!next) sp.delete('period');
     else sp.set('period', next);
     router.push('?' + sp.toString());
-  };
+  }
 
   return (
-    <div className="border-b border-line surface-glass sticky top-0 z-20">
-      <div className="max-w-[1320px] mx-auto px-6 py-3.5 flex items-center justify-between gap-4">
-        <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
-        <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-0.5 bg-bg-2/70 border border-line rounded-full p-1 text-xs">
-            {MONTHS.slice(0, 6).map((m) => (
-              <button
-                key={m.v}
-                type="button"
-                onClick={() => set(m.v)}
-                className={`px-3 py-1 rounded-full transition font-medium ${
-                  period === m.v ? 'bg-bg-0 text-ink shadow-elev-1' : 'text-ink-mute hover:text-ink'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => set('ytd')}
-              className={`px-3 py-1 rounded-full transition font-medium ${
-                period === 'ytd' ? 'bg-bg-0 text-ink shadow-elev-1' : 'text-ink-mute hover:text-ink'
-              }`}
-            >
-              YTD
-            </button>
-          </div>
-          <Link href="/import" className="btn btn-primary text-sm">
-            <Upload size={14} strokeWidth={2.25} />
-            Import CSV
-          </Link>
-          <Link href="/cpa" className="btn text-sm">
-            <Download size={14} strokeWidth={2.25} />
-            Export CPA
-          </Link>
+    <div className="h-14 flex-none border-b border-line surface-glass flex items-center px-6 gap-3.5 sticky top-0 z-20">
+      {/* Entity scope (placeholder — wire to real switcher later) */}
+      <button
+        type="button"
+        className="flex items-center gap-2.5 pl-1.5 pr-2.5 py-1.5 rounded-md bg-bg-2 border border-line hover:bg-bg-3 hover:border-line-strong transition"
+        title="Scope: all entities"
+      >
+        <div
+          className="w-[22px] h-[22px] rounded-md grid place-items-center text-bg-0 font-bold text-[10.5px]"
+          style={{ background: 'linear-gradient(135deg, #c9a87a 0%, #6b8aa8 50%, #c98a7a 100%)' }}
+        >
+          A
         </div>
+        <div className="flex flex-col items-start leading-tight">
+          <span className="text-[12.5px] font-medium">All entities</span>
+          <span className="text-[10.5px] text-ink-mute">5 entities · 15 accounts</span>
+        </div>
+        <ChevronDown size={12} className="text-ink-mute ml-1" />
+      </button>
+
+      {/* Period selector */}
+      <div className="relative">
+        <select
+          value={period}
+          onChange={(e) => setPeriod(e.target.value)}
+          className="!appearance-none !pl-9 !pr-8 !py-1.5 !rounded-md !bg-bg-2 !border !border-line hover:!bg-bg-3 hover:!border-line-strong !text-[12.5px] !font-medium cursor-pointer h-[32px]"
+        >
+          {PERIOD_OPTS.map((p) => (
+            <option key={p.v || 'all'} value={p.v}>{p.l}</option>
+          ))}
+        </select>
+        <Calendar size={14} className="text-ink-dim absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
       </div>
+
+      <div className="flex-1" />
+
+      {/* Search */}
+      <div className="flex items-center gap-2 bg-bg-2 border border-line px-3 py-1.5 rounded-md text-ink-mute min-w-[280px] focus-within:border-line-2 transition">
+        <Search size={13} />
+        <input className="flex-1 !bg-transparent !border-0 !p-0 !text-[12.5px] !text-ink !rounded-none focus:!shadow-none placeholder:text-ink-mute" placeholder="Search transactions, merchants, accounts…" />
+        <kbd>⌘K</kbd>
+      </div>
+
+      <Link href="/import" className="btn btn-sm" title="Import CSV">
+        <Upload size={13} />
+        <span className="hidden lg:inline">Import</span>
+      </Link>
+      <Link href="/cpa" className="btn btn-sm" title="CPA Export">
+        <Download size={13} />
+        <span className="hidden lg:inline">Export</span>
+      </Link>
+      <Link href="/audit" className="btn btn-primary btn-sm" title="Tag transactions">
+        <Tag size={13} />
+        <span className="hidden lg:inline">Tag</span>
+      </Link>
+
+      <button className="w-8 h-8 grid place-items-center rounded-md text-ink-dim hover:bg-bg-2 hover:text-ink transition" title="AI assistant">
+        <Sparkles size={15} className="text-accent" style={{ color: '#c9a87a' }} />
+      </button>
+      <button className="w-8 h-8 grid place-items-center rounded-md text-ink-dim hover:bg-bg-2 hover:text-ink transition relative" title="Notifications">
+        <Bell size={15} />
+        <span className="absolute top-[7px] right-[7px] w-1.5 h-1.5 rounded-full" style={{ background: '#c9a87a', boxShadow: '0 0 0 2px #111114' }} />
+      </button>
+      <button className="w-8 h-8 grid place-items-center rounded-md text-ink-dim hover:bg-bg-2 hover:text-ink transition" title="Help">
+        <HelpCircle size={15} />
+      </button>
     </div>
   );
 }
-
