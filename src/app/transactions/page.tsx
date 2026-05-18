@@ -89,22 +89,46 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
   };
   const rawRows = listTransactions(filters);
 
-  // When a single account is filtered, balances skip rows that are hidden by
-  // other filters (review status, status, flagged, etc.) and look jumpy.
-  // Anchor at the newest visible row's Chase balance (which is the truth for
-  // that moment) and walk backward: each older visible row's synthetic
-  // balance = newer.balance - newer.amount. This makes the column read
-  // continuously regardless of how many in-between rows are hidden.
-  const rows = (() => {
-    if (!filters.accountId || rawRows.length < 2) return rawRows;
-    const out = [...rawRows];
-    for (let i = 1; i < out.length; i++) {
-      const prev = out[i - 1];
-      if (prev.balance == null) continue;
-      out[i] = { ...out[i], balance: prev.balance - prev.amount };
+  // True running balance for the selected account.
+  //
+  // When a single account is filtered, we pull the COMPLETE chronological
+  // list for that account (irrespective of other filters / hidden rows),
+  // anchor at the oldest row's reported Chase balance, and walk forward
+  // computing balance[i] = balance[i-1] + amount[i]. Each visible row then
+  // gets looked up from that map.
+  //
+  // This gives every row a balance that reflects the real account state at
+  // its moment, with no gaps from hidden rows. If Chase's own per-row
+  // balances were already correct (they usually are), this is identical to
+  // what was imported. If a same-day ordering disagreement causes drift,
+  // this re-computes it cleanly.
+  let rows = rawRows;
+  if (filters.accountId) {
+    const full = listTransactions({
+      accountId: filters.accountId,
+      hideInternal: false,
+      orderDir: 'ASC',
+      limit: 50000,
+    });
+    if (full.length > 0) {
+      const balanceById = new Map<string, number>();
+      // Anchor: the oldest row's reported Chase balance was AFTER it posted.
+      // So the pre-anchor balance = anchor.balance - anchor.amount.
+      const anchor = full[0];
+      if (anchor.balance != null) {
+        balanceById.set(anchor.id, anchor.balance);
+        let running = anchor.balance;
+        for (let i = 1; i < full.length; i++) {
+          running = running + full[i].amount;
+          balanceById.set(full[i].id, running);
+        }
+      }
+      rows = rawRows.map((r) => {
+        const computed = balanceById.get(r.id);
+        return computed != null ? { ...r, balance: computed } : r;
+      });
     }
-    return out;
-  })();
+  }
   const total = countTransactions({ hideInternal });
   const buckets = reviewBucketCounts();
 
