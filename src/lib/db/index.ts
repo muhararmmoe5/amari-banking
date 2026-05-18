@@ -428,6 +428,7 @@ export function getDb(): Database.Database {
     `ALTER TABLE transactions ADD COLUMN salary_id TEXT REFERENCES salaries(id) ON DELETE SET NULL`,
     `ALTER TABLE transaction_splits ADD COLUMN salary_id TEXT REFERENCES salaries(id) ON DELETE SET NULL`,
     `ALTER TABLE transaction_splits ADD COLUMN budget_id TEXT REFERENCES budgets(id) ON DELETE SET NULL`,
+    `ALTER TABLE transaction_splits ADD COLUMN owner_entity TEXT`,
     // ── Plaid-readiness (CLAUDE.md rules) ────────────────────────────
     `ALTER TABLE accounts ADD COLUMN source TEXT NOT NULL DEFAULT 'csv'`,
     `ALTER TABLE accounts ADD COLUMN external_id TEXT`,

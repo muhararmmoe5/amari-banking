@@ -41,6 +41,12 @@ export interface TransactionSplit {
   /** Master records this split allocates against. */
   salaryId: string | null;
   budgetId: string | null;
+  /** Original economic owner of the money sitting in sourceEntity.
+   *  When set and ≠ sourceEntity, sourceEntity was acting as a pass-through
+   *  on behalf of ownerEntity (e.g. money was wired earlier from Bytes AI to
+   *  Amari Holdings, and Amari Holdings is now spending it on Bytes AI's
+   *  behalf — no real debt is created, it's Bytes AI's own money). */
+  ownerEntity: string | null;
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
@@ -78,6 +84,7 @@ function rowToSplit(r: any): TransactionSplit {
     passthroughNotes: r.passthrough_notes ?? null,
     salaryId: r.salary_id ?? null,
     budgetId: r.budget_id ?? null,
+    ownerEntity: r.owner_entity ?? null,
     sortOrder: r.sort_order,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -122,6 +129,7 @@ export interface SplitInput {
   passthroughNotes?: string | null;
   salaryId?: string | null;
   budgetId?: string | null;
+  ownerEntity?: string | null;
   sortOrder?: number;
 }
 
@@ -139,9 +147,9 @@ export function createSplit(input: SplitInput): TransactionSplit {
         recurring_expected_cents,
         need_to_get_from, hop2_person, hop3_entity,
         passed_onward, passthrough_entity, passthrough_purpose, passthrough_notes,
-        salary_id, budget_id,
+        salary_id, budget_id, owner_entity,
         sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     input.transactionId,
@@ -173,6 +181,7 @@ export function createSplit(input: SplitInput): TransactionSplit {
     input.passthroughNotes?.trim() || null,
     input.salaryId || null,
     input.budgetId || null,
+    input.ownerEntity || null,
     input.sortOrder ?? 0,
     now,
     now,
@@ -209,6 +218,7 @@ export interface UpdateSplitPatch {
   passthroughNotes?: string | null;
   salaryId?: string | null;
   budgetId?: string | null;
+  ownerEntity?: string | null;
   sortOrder?: number;
 }
 
@@ -245,6 +255,7 @@ export function updateSplit(id: string, patch: UpdateSplitPatch): void {
     passthroughNotes: 'passthrough_notes',
     salaryId: 'salary_id',
     budgetId: 'budget_id',
+    ownerEntity: 'owner_entity',
     sortOrder: 'sort_order',
   };
   for (const [k, col] of Object.entries(map)) {

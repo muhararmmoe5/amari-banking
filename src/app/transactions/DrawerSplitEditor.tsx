@@ -155,6 +155,7 @@ export default function DrawerSplitEditor({ transactionId, transactionAmount }: 
         if (patch.passthroughNotes !== undefined) actionPatch.passthroughNotes = patch.passthroughNotes;
         if (patch.salaryId !== undefined) actionPatch.salaryId = patch.salaryId;
         if (patch.budgetId !== undefined) actionPatch.budgetId = patch.budgetId;
+        if (patch.ownerEntity !== undefined) actionPatch.ownerEntity = patch.ownerEntity;
         await updateSplitAction(rowId, actionPatch);
         saveEnd(id);
       } catch (e: any) { saveError(id, e?.message); }
@@ -212,13 +213,17 @@ export default function DrawerSplitEditor({ transactionId, transactionAmount }: 
     );
   }
 
-  // Compute inter-entity owings rollup
-  const owings = new Map<string, number>(); // key: `${owner}>${source}` → cents
+  // Inter-entity owings rollup. The effective creditor is the upstream
+  // owner of the money when set, otherwise the immediate source. If
+  // creditor == booked entity, it's a wash (entity spending its own money
+  // via a passthrough) and no owing is created.
+  const owings = new Map<string, number>(); // key: `${booked}>${creditor}` → cents
   for (const s of splits) {
-    if (!s.sourceEntity || !s.entity) continue;
-    if (s.sourceEntity === s.entity) continue;
-    if (s.sourceEntity === 'UNKNOWN' || s.entity === 'UNKNOWN') continue;
-    const key = `${s.entity}>${s.sourceEntity}`;
+    if (!s.entity || s.entity === 'UNKNOWN') continue;
+    const creditor = s.ownerEntity || s.sourceEntity;
+    if (!creditor || creditor === 'UNKNOWN') continue;
+    if (creditor === s.entity) continue; // wash — booked is spending its own money
+    const key = `${s.entity}>${creditor}`;
     owings.set(key, (owings.get(key) || 0) + Math.abs(s.amountCents));
   }
 
@@ -1232,16 +1237,30 @@ function SplitSourceOfMoney({
   split: TransactionSplit;
   onPatch: (p: Partial<TransactionSplit>) => void;
 }) {
-  const owner = split.entity;
+  const booked = split.entity;
   const source = split.sourceEntity;
-  const owes = !!source && source !== owner && source !== 'UNKNOWN' && owner !== 'UNKNOWN';
+  const owner = split.ownerEntity; // upstream original owner of the money in `source`
   const accountsForSource = source
     ? ACCOUNTS.filter((a) => a.entity === source && a.isActive)
     : [];
 
-  const ownerLabel = (ENTITY_LABELS as any)[owner] || owner;
+  const bookedLabel = (ENTITY_LABELS as any)[booked] || booked;
   const sourceLabel = source ? ((ENTITY_LABELS as any)[source] || source) : null;
+  const ownerLabel = owner ? ((ENTITY_LABELS as any)[owner] || owner) : null;
   const amount = Math.abs(split.amountCents) / 100;
+
+  // Owings logic:
+  //  - effective creditor = ownerEntity ?? sourceEntity (who really owns the money)
+  //  - If creditor == booked → wash (booked spending its own money via a passthrough)
+  //  - If creditor != booked → booked owes creditor
+  //  - When source != owner, source was a passthrough — annotate that too
+  const effectiveCreditor = owner || source;
+  const creditorLabel = ownerLabel || sourceLabel;
+  const isPassthrough = !!owner && !!source && owner !== source;
+  const noDebt = !!effectiveCreditor && effectiveCreditor === booked
+    && booked !== 'UNKNOWN';
+  const owes = !!effectiveCreditor && effectiveCreditor !== booked
+    && booked !== 'UNKNOWN' && effectiveCreditor !== 'UNKNOWN';
 
   return (
     <div
@@ -1304,21 +1323,68 @@ function SplitSourceOfMoney({
         </select>
       </div>
 
-      {owes ? (
+      {/* Optional: the original owner of the money sitting in `source` */}
+      {source ? (
+        <div className="mt-2">
+          <div
+            className="field-label"
+            style={{ marginBottom: 4, color: 'var(--ink-3)' }}
+          >
+            Money originally owned by{' '}
+            <span style={{ color: 'var(--ink-4, #44443f)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+              · optional, when source is a pass-through
+            </span>
+          </div>
+          <select
+            value={owner || ''}
+            onChange={(e) => onPatch({ ownerEntity: e.target.value || null })}
+            style={{ height: 30, fontSize: 12, width: '100%' }}
+          >
+            <option value="">— same as source ({sourceLabel}) —</option>
+            <optgroup label="Business entities">
+              {BUSINESS_ENTITIES.map((k) => (
+                <option key={k} value={k}>{(ENTITY_LABELS as any)[k]}</option>
+              ))}
+            </optgroup>
+            <option value="PERSONAL">Personal</option>
+          </select>
+          <div style={{ fontSize: 10, color: 'var(--ink-4, #44443f)', marginTop: 4, lineHeight: 1.4 }}>
+            Use this when {sourceLabel || 'the source entity'} was just holding the money on behalf of
+            someone else upstream — e.g. a prior wire from Bytes AI parked in Amari Holdings, now
+            being spent. That changes who really owes what (or makes it a no-op wash).
+          </div>
+        </div>
+      ) : null}
+
+      {/* Owing pill — accounts for the upstream owner */}
+      {noDebt ? (
         <div
           className="mt-2 flex items-center gap-1.5 text-[11px]"
+          style={{ color: 'var(--income)' }}
+        >
+          <span style={{ width: 6, height: 6, borderRadius: 50, background: 'var(--income)' }} />
+          <span>
+            <span className="font-medium">{sourceLabel}</span> was holding this for{' '}
+            <span className="font-medium">{bookedLabel}</span> — no debt created
+            {' '}<span className="num">({fmtMoney(amount)})</span>
+          </span>
+        </div>
+      ) : owes ? (
+        <div
+          className="mt-2 flex items-center gap-1.5 text-[11px] flex-wrap"
           style={{ color: 'var(--warn)' }}
         >
-          <span
-            style={{
-              width: 6, height: 6, borderRadius: 50, background: 'var(--warn)',
-            }}
-          />
-          <span className="font-medium">{ownerLabel}</span>
+          <span style={{ width: 6, height: 6, borderRadius: 50, background: 'var(--warn)' }} />
+          <span className="font-medium">{bookedLabel}</span>
           <ArrowRight size={11} className="opacity-60" />
           <span>owes</span>
-          <span className="font-medium">{sourceLabel}</span>
+          <span className="font-medium">{creditorLabel}</span>
           <span className="num">{fmtMoney(amount)}</span>
+          {isPassthrough ? (
+            <span style={{ color: 'var(--ink-3)', fontSize: 10, marginLeft: 2 }}>
+              · routed through {sourceLabel}
+            </span>
+          ) : null}
         </div>
       ) : null}
     </div>
