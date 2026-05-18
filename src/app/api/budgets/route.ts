@@ -12,6 +12,7 @@ export async function GET() {
     name: b.name,
     entity: b.entity,
     kind: b.kind,
+    monthlyAmountCents: b.monthlyAmountCents,
   }));
   return NextResponse.json({ budgets });
 }

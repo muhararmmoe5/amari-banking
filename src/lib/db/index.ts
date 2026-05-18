@@ -255,6 +255,21 @@ export function getDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_field_options_field ON field_options(field, sort_order);
 
+    CREATE TABLE IF NOT EXISTS salaries (
+      id TEXT PRIMARY KEY,
+      person_id TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+      entity TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'SALARY',
+      monthly_amount_cents INTEGER NOT NULL,
+      label TEXT,
+      notes TEXT,
+      status TEXT NOT NULL DEFAULT 'ACTIVE',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_salaries_entity ON salaries(entity);
+    CREATE INDEX IF NOT EXISTS idx_salaries_person ON salaries(person_id);
+
     CREATE TABLE IF NOT EXISTS expense_funding_splits (
       id TEXT PRIMARY KEY,
       expense_tx_id TEXT NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
@@ -340,6 +355,9 @@ export function getDb(): Database.Database {
     `ALTER TABLE transactions ADD COLUMN needs_escalation INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE transactions ADD COLUMN escalation_to TEXT`,
     `ALTER TABLE transactions ADD COLUMN escalation_notes TEXT`,
+    `ALTER TABLE transactions ADD COLUMN salary_id TEXT REFERENCES salaries(id) ON DELETE SET NULL`,
+    `ALTER TABLE transaction_splits ADD COLUMN salary_id TEXT REFERENCES salaries(id) ON DELETE SET NULL`,
+    `ALTER TABLE transaction_splits ADD COLUMN budget_id TEXT REFERENCES budgets(id) ON DELETE SET NULL`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }

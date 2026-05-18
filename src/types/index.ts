@@ -147,6 +147,7 @@ export interface Transaction {
   needsEscalation: boolean;
   escalationTo: string | null;
   escalationNotes: string | null;
+  salaryId: string | null;
   businessDepartment: string | null;
   businessCat1Key: string | null;
   personalCat1Key: string | null;

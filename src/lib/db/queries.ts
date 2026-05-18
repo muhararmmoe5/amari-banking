@@ -69,6 +69,7 @@ function rowToTransaction(r: any): Transaction {
     needsEscalation: !!r.needs_escalation,
     escalationTo: r.escalation_to ?? null,
     escalationNotes: r.escalation_notes ?? null,
+    salaryId: r.salary_id ?? null,
     businessDepartment: r.business_department ?? null,
     businessCat1Key: r.business_cat1_key ?? null,
     personalCat1Key: r.personal_cat1_key ?? null,
@@ -415,6 +416,7 @@ export interface UpdateTxPatch {
   needsEscalation?: boolean;
   escalationTo?: string | null;
   escalationNotes?: string | null;
+  salaryId?: string | null;
   businessDepartment?: string | null;
   businessCat1Key?: string | null;
   personalCat1Key?: string | null;
@@ -487,6 +489,7 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   if (patch.needsEscalation !== undefined) { fields.push('needs_escalation = @needs_escalation'); params.needs_escalation = patch.needsEscalation ? 1 : 0; }
   if (patch.escalationTo !== undefined) { fields.push('escalation_to = @escalation_to'); params.escalation_to = patch.escalationTo; }
   if (patch.escalationNotes !== undefined) { fields.push('escalation_notes = @escalation_notes'); params.escalation_notes = patch.escalationNotes; }
+  if (patch.salaryId !== undefined) { fields.push('salary_id = @salary_id'); params.salary_id = patch.salaryId; }
   if (patch.businessDepartment !== undefined) { fields.push('business_department = @business_department'); params.business_department = patch.businessDepartment; }
   if (patch.businessCat1Key !== undefined) { fields.push('business_cat1_key = @business_cat1_key'); params.business_cat1_key = patch.businessCat1Key; }
   if (patch.personalCat1Key !== undefined) { fields.push('personal_cat1_key = @personal_cat1_key'); params.personal_cat1_key = patch.personalCat1Key; }

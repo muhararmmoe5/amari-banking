@@ -42,6 +42,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: '/cap', label: 'Cap Table', icon: PieChart },
       { href: '/budgets', label: 'Budgets', icon: Wallet, ownerOnly: true },
+      { href: '/salaries', label: 'Salaries & budgets', icon: Users, ownerOnly: true },
       { href: '/personal', label: 'Personal finance', icon: Wallet, ownerOnly: true },
       { href: '/team', label: 'Team & Investors', icon: Users, ownerOnly: true },
     ],
@@ -167,7 +168,7 @@ export default function Sidebar({
           </div>
           <LogOut size={12} className="text-ink-mute group-hover:text-expense transition" />
         </button>
-        <div className="mono text-[10px] text-ink-ghost px-2 pt-2">v.review-tabs · main</div>
+        <div className="mono text-[10px] text-ink-ghost px-2 pt-2">v.salaries · main</div>
       </div>
     </aside>
   );

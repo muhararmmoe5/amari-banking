@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState, useTransition } from 'react';
-import { Plus, X, User, Building2, Split as SplitIcon, Lock, ArrowRight, StickyNote, Repeat, GitBranch, Activity } from 'lucide-react';
+import { Plus, X, User, Building2, Split as SplitIcon, Lock, ArrowRight, StickyNote, Repeat, GitBranch, Activity, Wallet } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import { fmtMoney } from '@/lib/format';
 import {
@@ -38,9 +38,28 @@ function getPath(entity: string): 'PERSONAL' | 'BUSINESS' | null {
   return null;
 }
 
+interface SalaryLite {
+  id: string;
+  personId: string;
+  personName?: string;
+  entity: string;
+  kind: string;
+  monthlyAmountCents: number;
+  label: string | null;
+}
+
+interface BudgetLite {
+  id: string;
+  name: string;
+  entity: string | null;
+  monthlyAmountCents: number | null;
+}
+
 export default function DrawerSplitEditor({ transactionId, transactionAmount }: Props) {
   const { saveStart, saveEnd, saveError, toast } = useToast();
   const [splits, setSplits] = useState<TransactionSplit[] | null>(null);
+  const [salaries, setSalaries] = useState<SalaryLite[]>([]);
+  const [budgets, setBudgets] = useState<BudgetLite[]>([]);
   const [, startTx] = useTransition();
 
   useEffect(() => {
@@ -48,6 +67,19 @@ export default function DrawerSplitEditor({ transactionId, transactionAmount }: 
       .then((rows) => setSplits(rows || []))
       .catch(() => setSplits([]));
   }, [transactionId]);
+
+  useEffect(() => {
+    fetch('/api/salaries', { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((d) => setSalaries(d.salaries || []))
+      .catch(() => setSalaries([]));
+    fetch('/api/budgets', { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((d) => setBudgets((d.budgets || []).map((b: any) => ({
+        id: b.id, name: b.name, entity: b.entity, monthlyAmountCents: b.monthlyAmountCents,
+      }))))
+      .catch(() => setBudgets([]));
+  }, []);
 
   const totalCents = Math.round(Math.abs(transactionAmount) * 100);
   const sign = transactionAmount < 0 ? -1 : 1;
@@ -117,6 +149,8 @@ export default function DrawerSplitEditor({ transactionId, transactionAmount }: 
         if (patch.passthroughEntity !== undefined) actionPatch.passthroughEntity = patch.passthroughEntity;
         if (patch.passthroughPurpose !== undefined) actionPatch.passthroughPurpose = patch.passthroughPurpose;
         if (patch.passthroughNotes !== undefined) actionPatch.passthroughNotes = patch.passthroughNotes;
+        if (patch.salaryId !== undefined) actionPatch.salaryId = patch.salaryId;
+        if (patch.budgetId !== undefined) actionPatch.budgetId = patch.budgetId;
         await updateSplitAction(rowId, actionPatch);
         saveEnd(id);
       } catch (e: any) { saveError(id, e?.message); }
@@ -277,6 +311,8 @@ export default function DrawerSplitEditor({ transactionId, transactionAmount }: 
           index={i}
           split={s}
           sign={sign}
+          salaries={salaries}
+          budgets={budgets}
           onPatch={(p) => patchRow(s.id, p)}
           onRemove={() => removeRow(s.id)}
         />
@@ -303,11 +339,13 @@ export default function DrawerSplitEditor({ transactionId, transactionAmount }: 
 }
 
 function SplitRow({
-  index, split, sign, onPatch, onRemove,
+  index, split, sign, salaries, budgets, onPatch, onRemove,
 }: {
   index: number;
   split: TransactionSplit;
   sign: number;
+  salaries: SalaryLite[];
+  budgets: BudgetLite[];
   onPatch: (p: Partial<TransactionSplit>) => void;
   onRemove: () => void;
 }) {
@@ -431,9 +469,135 @@ function SplitRow({
         <SplitPassedOnward split={split} onPatch={onPatch} />
       ) : null}
 
+      {/* Per-split allocation — counts toward a salary / budget */}
+      {path ? (
+        <SplitAllocation
+          split={split}
+          salaries={salaries}
+          budgets={budgets}
+          onPatch={onPatch}
+        />
+      ) : null}
+
       {/* Per-split notes — tag each part on its own */}
       {path ? (
         <SplitNotes split={split} onPatch={onPatch} />
+      ) : null}
+    </div>
+  );
+}
+
+function SplitAllocation({
+  split, salaries, budgets, onPatch,
+}: {
+  split: TransactionSplit;
+  salaries: SalaryLite[];
+  budgets: BudgetLite[];
+  onPatch: (p: Partial<TransactionSplit>) => void;
+}) {
+  // Suggest salaries scoped to the booked entity first, then fall back to all.
+  const owner = split.entity;
+  const scopedSalaries = salaries.filter((s) => s.entity === owner);
+  const otherSalaries = salaries.filter((s) => s.entity !== owner);
+  const scopedBudgets = budgets.filter((b) => b.entity === owner);
+  const otherBudgets = budgets.filter((b) => b.entity !== owner);
+
+  const selectedSalary = salaries.find((s) => s.id === split.salaryId);
+  const selectedBudget = budgets.find((b) => b.id === split.budgetId);
+  const hasAny = !!(selectedSalary || selectedBudget);
+  const amount = Math.abs(split.amountCents) / 100;
+
+  return (
+    <div
+      className="mt-2.5"
+      style={{
+        padding: '10px 12px',
+        background: hasAny ? 'rgba(201,168,122,0.06)' : 'rgba(255,255,255,0.02)',
+        border: '0.5px solid ' + (hasAny ? 'rgba(201,168,122,0.30)' : 'var(--border-subtle, rgba(255,255,255,0.07))'),
+        borderRadius: 7,
+      }}
+    >
+      <div className="flex items-center gap-1.5 mb-2">
+        <Wallet size={11} style={{ color: hasAny ? 'var(--gold)' : 'var(--ink-mute)' }} />
+        <span
+          className="field-label"
+          style={{ marginBottom: 0, color: hasAny ? 'var(--gold)' : undefined }}
+        >
+          Counts toward
+        </span>
+        <span className="flex-1" />
+        <span className="text-[10.5px] text-ink-mute">salary / budget</span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <select
+          value={split.salaryId || ''}
+          onChange={(e) => onPatch({ salaryId: e.target.value || null })}
+          style={{ height: 30, fontSize: 12 }}
+        >
+          <option value="">— no salary —</option>
+          {scopedSalaries.length > 0 ? (
+            <optgroup label={`${(ENTITY_LABELS as any)[owner] || owner} salaries`}>
+              {scopedSalaries.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.personName || '—'} · ${(s.monthlyAmountCents / 100).toLocaleString()}/mo
+                  {s.kind !== 'SALARY' ? ` · ${s.kind.toLowerCase()}` : ''}
+                </option>
+              ))}
+            </optgroup>
+          ) : null}
+          {otherSalaries.length > 0 ? (
+            <optgroup label="Other entities">
+              {otherSalaries.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.personName || '—'} · {(ENTITY_LABELS as any)[s.entity] || s.entity} · ${(s.monthlyAmountCents / 100).toLocaleString()}/mo
+                </option>
+              ))}
+            </optgroup>
+          ) : null}
+        </select>
+        <select
+          value={split.budgetId || ''}
+          onChange={(e) => onPatch({ budgetId: e.target.value || null })}
+          style={{ height: 30, fontSize: 12 }}
+        >
+          <option value="">— no budget —</option>
+          {scopedBudgets.length > 0 ? (
+            <optgroup label={`${(ENTITY_LABELS as any)[owner] || owner} budgets`}>
+              {scopedBudgets.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </optgroup>
+          ) : null}
+          {otherBudgets.length > 0 ? (
+            <optgroup label="Other budgets">
+              {otherBudgets.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name} · {(ENTITY_LABELS as any)[b.entity || ''] || b.entity || '—'}
+                </option>
+              ))}
+            </optgroup>
+          ) : null}
+        </select>
+      </div>
+
+      {selectedSalary ? (
+        <div
+          className="mt-2 flex items-center gap-1.5 text-[11px]"
+          style={{ color: 'var(--gold)' }}
+        >
+          <span style={{ width: 6, height: 6, borderRadius: 50, background: 'var(--gold)' }} />
+          <span>
+            <span className="font-medium">{fmtMoney(amount)}</span>
+            {' '}counts toward{' '}
+            <span className="font-medium">{selectedSalary.personName}&apos;s</span>
+            {' '}
+            <span className="font-medium">${(selectedSalary.monthlyAmountCents / 100).toLocaleString()}/mo</span>
+            {' '}
+            {(ENTITY_LABELS as any)[selectedSalary.entity] || selectedSalary.entity}
+            {' '}{selectedSalary.kind === 'SALARY' ? 'salary' : selectedSalary.kind.toLowerCase()}
+          </span>
+        </div>
       ) : null}
     </div>
   );
