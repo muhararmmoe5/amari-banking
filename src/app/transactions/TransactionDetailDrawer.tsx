@@ -16,7 +16,7 @@ import { useToast } from '@/components/Toast';
 import Portal from '@/components/Portal';
 import ManualSourceLink, { type ManualSourceLinkHandle } from './ManualSourceLink';
 import ManualDownstreamList from './ManualDownstreamList';
-import SplitEditor from '../audit/SplitEditor';
+import DrawerSplitEditor from './DrawerSplitEditor';
 import SameDayPanel from './SameDayPanel';
 
 type SectionKey = 'source' | 'booked' | 'recurrence' | 'flow' | 'passthrough' | 'split' | 'notes' | 'cpa';
@@ -56,6 +56,9 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
     recurringNextDate: tx.recurringNextDate || '',
     recurringLabel: tx.recurringLabel || '',
     recurringAlertDays: tx.recurringAlertDays || 3,
+    recurringExpectedAmount: tx.recurringExpectedCents != null
+      ? (tx.recurringExpectedCents / 100).toFixed(2)
+      : Math.abs(tx.amount).toFixed(2),
     moneySource: tx.sourceOfMoney || '',
     sourceEntityForPay: '',     // derived initially, may be set by picker
     sourceAccountForPay: tx.sourceAccountId || '',
@@ -401,7 +404,7 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
             </div>
 
             {isSplit ? (
-              <SplitEditor transactionId={tx.id} transactionAmount={tx.amount} />
+              <DrawerSplitEditor transactionId={tx.id} transactionAmount={tx.amount} />
             ) : null}
           </SectionCard>
 
@@ -1103,11 +1106,22 @@ function RecurrenceSection({
           >
             <div className="field-label" style={{ color: 'var(--warn)', marginBottom: 10 }}>Forecast setup</div>
             <div className="grid grid-cols-2 gap-3.5">
-              <Field label="Expected amount">
+              <Field
+                label="Expected amount"
+                hint={`This wire was ${fmtMoney(Math.abs(tx.amount))} — set the full recurring amount if it differs`}
+              >
                 <input
+                  type="text"
+                  inputMode="decimal"
                   className="num"
-                  value={fmtMoney(Math.abs(tx.amount))}
-                  readOnly
+                  value={state.recurringExpectedAmount}
+                  onChange={(e) => setState({ recurringExpectedAmount: e.target.value })}
+                  onBlur={() => {
+                    const num = Number(String(state.recurringExpectedAmount).replace(/[^0-9.\-]/g, ''));
+                    const cents = Number.isFinite(num) && num > 0 ? Math.round(num * 100) : null;
+                    setState({}, { recurringExpectedCents: cents });
+                  }}
+                  placeholder="6000.00"
                 />
               </Field>
               <Field label="Next due date">

@@ -138,6 +138,7 @@ export interface Transaction {
   recurringNextDate: string | null;
   recurringLabel: string | null;
   recurringAlertDays: number | null;
+  recurringExpectedCents: number | null;
   businessDepartment: string | null;
   businessCat1Key: string | null;
   personalCat1Key: string | null;

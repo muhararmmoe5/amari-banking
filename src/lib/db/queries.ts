@@ -61,6 +61,7 @@ function rowToTransaction(r: any): Transaction {
     recurringNextDate: r.recurring_next_date ?? null,
     recurringLabel: r.recurring_label ?? null,
     recurringAlertDays: r.recurring_alert_days ?? null,
+    recurringExpectedCents: r.recurring_expected_cents ?? null,
     businessDepartment: r.business_department ?? null,
     businessCat1Key: r.business_cat1_key ?? null,
     personalCat1Key: r.personal_cat1_key ?? null,
@@ -356,6 +357,7 @@ export interface UpdateTxPatch {
   recurringNextDate?: string | null;
   recurringLabel?: string | null;
   recurringAlertDays?: number | null;
+  recurringExpectedCents?: number | null;
   businessDepartment?: string | null;
   businessCat1Key?: string | null;
   personalCat1Key?: string | null;
@@ -420,6 +422,7 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   if (patch.recurringNextDate !== undefined) { fields.push('recurring_next_date = @recurring_next_date'); params.recurring_next_date = patch.recurringNextDate; }
   if (patch.recurringLabel !== undefined) { fields.push('recurring_label = @recurring_label'); params.recurring_label = patch.recurringLabel; }
   if (patch.recurringAlertDays !== undefined) { fields.push('recurring_alert_days = @recurring_alert_days'); params.recurring_alert_days = patch.recurringAlertDays; }
+  if (patch.recurringExpectedCents !== undefined) { fields.push('recurring_expected_cents = @recurring_expected_cents'); params.recurring_expected_cents = patch.recurringExpectedCents; }
   if (patch.businessDepartment !== undefined) { fields.push('business_department = @business_department'); params.business_department = patch.businessDepartment; }
   if (patch.businessCat1Key !== undefined) { fields.push('business_cat1_key = @business_cat1_key'); params.business_cat1_key = patch.businessCat1Key; }
   if (patch.personalCat1Key !== undefined) { fields.push('personal_cat1_key = @personal_cat1_key'); params.personal_cat1_key = patch.personalCat1Key; }
