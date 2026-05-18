@@ -211,14 +211,14 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
               />
             ) : null}
 
-            {/* Section 2 — Source of money (expenses only) — MANUAL link */}
+            {/* Section 2 — Source of money (expenses only) — MANUAL splits */}
             {tx.amount < 0 ? (
               <SectionCard
                 title="Source of money"
-                subtitle="Tag this expense to the specific income transaction that funded it"
+                subtitle="Tag this expense to one or more income sources, each with its own dollar amount"
                 accent="income"
               >
-                <ManualSourceLink txId={tx.id} currentFundedById={tx.fundedByTransactionId} />
+                <ManualSourceLink txId={tx.id} expenseAmount={tx.amount} />
               </SectionCard>
             ) : null}
 

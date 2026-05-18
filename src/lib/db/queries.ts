@@ -415,6 +415,133 @@ export function fundedByInflow(txId: string): {
   };
 }
 
+// ===== Manual funding splits =====
+// One expense can be funded by multiple inflows (or free-text sources like
+// "Personal money", "Pre-import balance"), each with its own dollar amount.
+
+export interface FundingSplit {
+  id: string;
+  expenseTxId: string;
+  sourceTxId: string | null;
+  sourceLabel: string | null;
+  amountCents: number;
+  notes: string | null;
+  createdAt: number;
+  /** Joined inflow snapshot when sourceTxId is set. */
+  sourceTx?: {
+    postingDate: string;
+    description: string;
+    merchant: string | null;
+    amount: number;
+    accountId: string;
+  } | null;
+}
+
+function rowToSplit(r: any): FundingSplit {
+  return {
+    id: r.id,
+    expenseTxId: r.expense_tx_id,
+    sourceTxId: r.source_tx_id ?? null,
+    sourceLabel: r.source_label ?? null,
+    amountCents: r.amount_cents,
+    notes: r.notes ?? null,
+    createdAt: r.created_at,
+    sourceTx: r.src_posting_date ? {
+      postingDate: r.src_posting_date,
+      description: r.src_description,
+      merchant: r.src_merchant,
+      amount: r.src_amount,
+      accountId: r.src_account_id,
+    } : null,
+  };
+}
+
+export function listFundingSplits(expenseTxId: string): FundingSplit[] {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT s.*,
+      i.posting_date as src_posting_date,
+      i.description  as src_description,
+      i.merchant_name as src_merchant,
+      i.amount       as src_amount,
+      i.account_id   as src_account_id
+    FROM expense_funding_splits s
+    LEFT JOIN transactions i ON i.id = s.source_tx_id
+    WHERE s.expense_tx_id = ?
+    ORDER BY s.created_at ASC
+  `).all(expenseTxId) as any[];
+  return rows.map(rowToSplit);
+}
+
+export interface FundingSplitInput {
+  expenseTxId: string;
+  sourceTxId?: string | null;
+  sourceLabel?: string | null;
+  amountCents: number;
+  notes?: string | null;
+}
+
+export function addFundingSplit(input: FundingSplitInput): FundingSplit {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  db.prepare(`
+    INSERT INTO expense_funding_splits (id, expense_tx_id, source_tx_id, source_label, amount_cents, notes, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    input.expenseTxId,
+    input.sourceTxId || null,
+    input.sourceLabel?.trim() || null,
+    input.amountCents,
+    input.notes?.trim() || null,
+    Date.now(),
+  );
+  const list = listFundingSplits(input.expenseTxId);
+  return list.find((s) => s.id === id)!;
+}
+
+export function deleteFundingSplit(id: string): void {
+  const db = getDb();
+  db.prepare('DELETE FROM expense_funding_splits WHERE id = ?').run(id);
+}
+
+/** Expenses that are funded by a given inflow via the splits table.
+ *  Returns one row per linked expense with the portion of THIS expense
+ *  attributed to the given inflow. */
+export function expensesFundedByInflowViaSplits(inflowTxId: string): Array<{
+  expenseTxId: string;
+  splitAmountCents: number;
+  splitNotes: string | null;
+  postingDate: string;
+  description: string;
+  merchant: string | null;
+  expenseAmount: number;
+  accountId: string;
+  confirmedEntity: string | null;
+}> {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT s.expense_tx_id, s.amount_cents as split_amount_cents, s.notes,
+      t.posting_date, t.description, t.merchant_name, t.amount, t.account_id,
+      t.confirmed_entity, t.entity_tag
+    FROM expense_funding_splits s
+    JOIN transactions t ON t.id = s.expense_tx_id
+    WHERE s.source_tx_id = ?
+    ORDER BY t.posting_date DESC, t.id DESC
+  `).all(inflowTxId) as any[];
+  return rows.map((r) => ({
+    expenseTxId: r.expense_tx_id,
+    splitAmountCents: r.split_amount_cents,
+    splitNotes: r.notes,
+    postingDate: r.posting_date,
+    description: r.description,
+    merchant: r.merchant_name,
+    expenseAmount: r.amount,
+    accountId: r.account_id,
+    confirmedEntity: r.confirmed_entity || r.entity_tag,
+  }));
+}
+
 /** List expense transactions that the user has manually linked to a given
  *  inflow via funded_by_transaction_id. Used on inflow drawer to show
  *  "this money was used to pay for…" with no FIFO assumption. */

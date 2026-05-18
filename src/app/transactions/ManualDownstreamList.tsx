@@ -6,20 +6,28 @@ import { fmtMoney, fmtDate } from '@/lib/format';
 import { getAccount, ENTITY_LABELS } from '@/constants/accounts';
 import type { EntityType } from '@/types';
 
-interface Expense {
-  id: string;
+interface FundedExpense {
+  expenseTxId: string;
   postingDate: string;
   description: string;
   merchant: string | null;
-  amount: number;
+  amount: number;            // full expense amount
+  splitAmountCents: number;  // portion attributed to this inflow
+  splitNotes: string | null;
   accountId: string;
   confirmedEntity: string | null;
 }
 
 /** For inflows: show only the expenses the user has MANUALLY tagged as
- *  funded by this inflow. No FIFO assumption. */
-export default function ManualDownstreamList({ inflowTxId, inflowAmount }: { inflowTxId: string; inflowAmount: number }) {
-  const [expenses, setExpenses] = useState<Expense[] | null>(null);
+ *  funded by this inflow (via splits). No FIFO assumption. */
+export default function ManualDownstreamList({
+  inflowTxId,
+  inflowAmount,
+}: {
+  inflowTxId: string;
+  inflowAmount: number;
+}) {
+  const [expenses, setExpenses] = useState<FundedExpense[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,20 +50,21 @@ export default function ManualDownstreamList({ inflowTxId, inflowAmount }: { inf
   if (expenses.length === 0) {
     return (
       <div className="card p-4 text-2xs text-ink-mute italic">
-        No expenses tagged as funded by this inflow yet. Open any expense in the transactions list and click <span className="text-ink">Link to income</span> to tag it here.
+        No expenses tagged as funded by this inflow yet. Open any expense in the transactions list and add a funding split that points to this income to tag it here.
       </div>
     );
   }
 
-  const totalSpent = expenses.reduce((s, e) => s + Math.abs(e.amount), 0);
-  const remaining = Math.max(0, inflowAmount - totalSpent);
-  const pct = inflowAmount > 0 ? (totalSpent / inflowAmount) * 100 : 0;
+  const totalTaggedCents = expenses.reduce((s, e) => s + e.splitAmountCents, 0);
+  const inflowCents = Math.round(inflowAmount * 100);
+  const remainingCents = Math.max(0, inflowCents - totalTaggedCents);
+  const pct = inflowCents > 0 ? (totalTaggedCents / inflowCents) * 100 : 0;
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-2xs">
         <div className="text-ink-mute">
-          <span className="num text-expense">{fmtMoney(totalSpent)}</span> tagged · <span className="num text-warn">{fmtMoney(remaining)}</span> unallocated
+          <span className="num text-expense">{fmtMoney(totalTaggedCents / 100)}</span> tagged · <span className="num text-warn">{fmtMoney(remainingCents / 100)}</span> unallocated
         </div>
         <div className="text-ink-mute">{pct.toFixed(1)}% used</div>
       </div>
@@ -65,8 +74,9 @@ export default function ManualDownstreamList({ inflowTxId, inflowAmount }: { inf
       <div className="card divide-y divide-line/40 overflow-hidden">
         {expenses.map((e) => {
           const acct = getAccount(e.accountId);
+          const portionPct = Math.abs(e.amount) > 0 ? (e.splitAmountCents / 100 / Math.abs(e.amount)) * 100 : 0;
           return (
-            <div key={e.id} className="p-3 flex items-center gap-3">
+            <div key={e.expenseTxId + e.splitAmountCents} className="p-3 flex items-center gap-3">
               <ArrowUpFromLine size={14} className="text-expense shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium truncate">{e.merchant || e.description.slice(0, 70)}</div>
@@ -74,9 +84,13 @@ export default function ManualDownstreamList({ inflowTxId, inflowAmount }: { inf
                   <span>{fmtDate(e.postingDate)}</span>
                   <span>· ···{e.accountId}{acct ? ` (${acct.label})` : ''}</span>
                   {e.confirmedEntity ? <span>· books to {ENTITY_LABELS[e.confirmedEntity as EntityType] || e.confirmedEntity}</span> : null}
+                  {portionPct < 99.5 ? <span>· {portionPct.toFixed(0)}% of {fmtMoney(e.amount)}</span> : null}
+                  {e.splitNotes ? <span>· {e.splitNotes}</span> : null}
                 </div>
               </div>
-              <div className="num text-expense text-sm font-semibold shrink-0">{fmtMoney(e.amount)}</div>
+              <div className="num text-expense text-sm font-semibold shrink-0">
+                {fmtMoney(-e.splitAmountCents / 100)}
+              </div>
             </div>
           );
         })}

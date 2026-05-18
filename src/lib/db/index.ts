@@ -254,6 +254,18 @@ export function getDb(): Database.Database {
       UNIQUE (field, value) ON CONFLICT IGNORE
     );
     CREATE INDEX IF NOT EXISTS idx_field_options_field ON field_options(field, sort_order);
+
+    CREATE TABLE IF NOT EXISTS expense_funding_splits (
+      id TEXT PRIMARY KEY,
+      expense_tx_id TEXT NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+      source_tx_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
+      source_label TEXT,
+      amount_cents INTEGER NOT NULL,
+      notes TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_funding_split_expense ON expense_funding_splits(expense_tx_id);
+    CREATE INDEX IF NOT EXISTS idx_funding_split_source ON expense_funding_splits(source_tx_id);
   `);
 
   // Forward-compatible column adds (SQLite ALTER ignores if column exists in some versions; we catch)
