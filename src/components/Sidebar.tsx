@@ -42,6 +42,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: '/cap', label: 'Cap Table', icon: PieChart },
       { href: '/budgets', label: 'Budgets', icon: Wallet, ownerOnly: true },
+      { href: '/personal', label: 'Personal finance', icon: Wallet, ownerOnly: true },
       { href: '/team', label: 'Team & Investors', icon: Users, ownerOnly: true },
     ],
   },
