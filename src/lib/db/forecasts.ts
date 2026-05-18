@@ -86,13 +86,24 @@ export function recurringByEntity(): EntityForecast[] {
   }
 
   const splitRows = db.prepare(`
-    SELECT transaction_id, entity, amount_cents
+    SELECT transaction_id, entity, amount_cents,
+      is_recurring, recurring_frequency, recurring_expected_cents,
+      recurring_next_date, recurring_label
     FROM transaction_splits
-  `).all() as Array<{ transaction_id: string; entity: string; amount_cents: number }>;
-  const splitsByTx = new Map<string, Array<{ entity: string; amountCents: number }>>();
+  `).all() as Array<{
+    transaction_id: string;
+    entity: string;
+    amount_cents: number;
+    is_recurring: number;
+    recurring_frequency: string | null;
+    recurring_expected_cents: number | null;
+    recurring_next_date: string | null;
+    recurring_label: string | null;
+  }>;
+  const splitsByTx = new Map<string, typeof splitRows>();
   for (const s of splitRows) {
     const arr = splitsByTx.get(s.transaction_id) || [];
-    arr.push({ entity: s.entity, amountCents: Math.abs(s.amount_cents) });
+    arr.push(s);
     splitsByTx.set(s.transaction_id, arr);
   }
 
@@ -115,6 +126,13 @@ export function recurringByEntity(): EntityForecast[] {
   }
 
   for (const r of unique) {
+    const splits = splitsByTx.get(r.id) || [];
+    const anySplitRecurring = splits.some((s) => s.is_recurring);
+
+    // If any split is recurring, per-split recurrence takes over for this
+    // transaction — skip the transaction-level rollup entirely.
+    if (anySplitRecurring) continue;
+
     const freq = r.recurring_frequency || 'MONTHLY';
     const perYear = FREQ_PER_YEAR[freq] || 12;
     const expected = r.recurring_expected_cents != null
@@ -123,14 +141,13 @@ export function recurringByEntity(): EntityForecast[] {
     const monthly = expected * (perYear / 12);
     const annual = expected * perYear;
 
-    const splits = splitsByTx.get(r.id) || [];
-    const totalSplitCents = splits.reduce((s, x) => s + x.amountCents, 0);
+    const totalSplitCents = splits.reduce((s, x) => s + Math.abs(x.amount_cents), 0);
 
     type Alloc = { entity: string; pct: number };
     const allocations: Alloc[] = [];
     if (splits.length > 0 && totalSplitCents > 0) {
       for (const s of splits) {
-        allocations.push({ entity: s.entity, pct: s.amountCents / totalSplitCents });
+        allocations.push({ entity: s.entity, pct: Math.abs(s.amount_cents) / totalSplitCents });
       }
     } else {
       const ent = r.confirmed_entity || r.entity_tag || 'UNKNOWN';
@@ -155,6 +172,51 @@ export function recurringByEntity(): EntityForecast[] {
         sharePct: a.pct,
       });
     }
+  }
+
+  // Per-split recurrences — each contributes independently to its own entity.
+  const recurringSplitRows = db.prepare(`
+    SELECT ts.transaction_id, ts.entity, ts.amount_cents,
+      ts.recurring_frequency, ts.recurring_expected_cents,
+      ts.recurring_next_date, ts.recurring_label,
+      t.merchant_name, t.description
+    FROM transaction_splits ts
+    JOIN transactions t ON t.id = ts.transaction_id
+    WHERE ts.is_recurring = 1
+  `).all() as Array<{
+    transaction_id: string;
+    entity: string;
+    amount_cents: number;
+    recurring_frequency: string | null;
+    recurring_expected_cents: number | null;
+    recurring_next_date: string | null;
+    recurring_label: string | null;
+    merchant_name: string | null;
+    description: string;
+  }>;
+
+  for (const s of recurringSplitRows) {
+    const freq = s.recurring_frequency || 'MONTHLY';
+    const perYear = FREQ_PER_YEAR[freq] || 12;
+    const expected = s.recurring_expected_cents != null
+      ? s.recurring_expected_cents / 100
+      : Math.abs(s.amount_cents) / 100;
+    const monthly = expected * (perYear / 12);
+    const annual = expected * perYear;
+    const b = bucketFor(s.entity);
+    b.monthlyTotal += monthly;
+    b.annualTotal += annual;
+    b.itemCount += 1;
+    b.items.push({
+      txId: s.transaction_id,
+      merchant: s.merchant_name || s.description.slice(0, 50),
+      label: s.recurring_label,
+      frequency: freq,
+      monthlyShare: monthly,
+      annualShare: annual,
+      nextDate: s.recurring_next_date,
+      sharePct: 1,
+    });
   }
 
   return Array.from(acc.values()).sort((a, b) => b.monthlyTotal - a.monthlyTotal);

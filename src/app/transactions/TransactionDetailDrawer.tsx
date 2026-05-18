@@ -419,14 +419,17 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
             />
           ) : null}
 
-          {/* ④ Recurrence */}
-          <RecurrenceSection
-            tx={tx}
-            state={state}
-            setState={setState}
-            open={openMap.recurrence}
-            setOpen={() => toggle('recurrence')}
-          />
+          {/* ④ Recurrence — hidden at the transaction level when split, since
+              each part below now carries its own recurrence settings. */}
+          {!isSplit ? (
+            <RecurrenceSection
+              tx={tx}
+              state={state}
+              setState={setState}
+              open={openMap.recurrence}
+              setOpen={() => toggle('recurrence')}
+            />
+          ) : null}
 
           {/* ⑤ Money flow — when split, source-of-money sub-section is hidden
               because each split row already carries its own funding entity. */}

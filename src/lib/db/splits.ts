@@ -19,6 +19,15 @@ export interface TransactionSplit {
    *  When sourceEntity !== entity, the booking entity owes the source entity. */
   sourceEntity: string | null;
   sourceAccountId: string | null;
+  /** Per-part recurrence — when the transaction is split, recurrence
+   *  lives on each split independently so e.g. the $3k Bytes AI rent
+   *  share can be monthly while the $1k Delicious Bytes share is quarterly. */
+  isRecurring: boolean;
+  recurringFrequency: string | null;
+  recurringNextDate: string | null;
+  recurringLabel: string | null;
+  recurringAlertDays: number | null;
+  recurringExpectedCents: number | null;
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
@@ -40,6 +49,12 @@ function rowToSplit(r: any): TransactionSplit {
     periodEnd: r.period_end ?? null,
     sourceEntity: r.source_entity ?? null,
     sourceAccountId: r.source_account_id ?? null,
+    isRecurring: !!r.is_recurring,
+    recurringFrequency: r.recurring_frequency ?? null,
+    recurringNextDate: r.recurring_next_date ?? null,
+    recurringLabel: r.recurring_label ?? null,
+    recurringAlertDays: r.recurring_alert_days ?? null,
+    recurringExpectedCents: r.recurring_expected_cents ?? null,
     sortOrder: r.sort_order,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -68,6 +83,12 @@ export interface SplitInput {
   periodEnd?: string | null;
   sourceEntity?: string | null;
   sourceAccountId?: string | null;
+  isRecurring?: boolean;
+  recurringFrequency?: string | null;
+  recurringNextDate?: string | null;
+  recurringLabel?: string | null;
+  recurringAlertDays?: number | null;
+  recurringExpectedCents?: number | null;
   sortOrder?: number;
 }
 
@@ -80,8 +101,10 @@ export function createSplit(input: SplitInput): TransactionSplit {
        (id, transaction_id, amount_cents, entity, category, individual,
         sub_category_1, sub_category_2, business_purpose, notes,
         period_start, period_end, source_entity, source_account_id,
+        is_recurring, recurring_frequency, recurring_next_date,
+        recurring_label, recurring_alert_days, recurring_expected_cents,
         sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     input.transactionId,
@@ -97,6 +120,12 @@ export function createSplit(input: SplitInput): TransactionSplit {
     input.periodEnd || null,
     input.sourceEntity || null,
     input.sourceAccountId || null,
+    input.isRecurring ? 1 : 0,
+    input.recurringFrequency || null,
+    input.recurringNextDate || null,
+    input.recurringLabel?.trim() || null,
+    input.recurringAlertDays ?? null,
+    input.recurringExpectedCents ?? null,
     input.sortOrder ?? 0,
     now,
     now,
@@ -117,6 +146,12 @@ export interface UpdateSplitPatch {
   periodEnd?: string | null;
   sourceEntity?: string | null;
   sourceAccountId?: string | null;
+  isRecurring?: boolean;
+  recurringFrequency?: string | null;
+  recurringNextDate?: string | null;
+  recurringLabel?: string | null;
+  recurringAlertDays?: number | null;
+  recurringExpectedCents?: number | null;
   sortOrder?: number;
 }
 
@@ -137,6 +172,12 @@ export function updateSplit(id: string, patch: UpdateSplitPatch): void {
     periodEnd: 'period_end',
     sourceEntity: 'source_entity',
     sourceAccountId: 'source_account_id',
+    isRecurring: 'is_recurring',
+    recurringFrequency: 'recurring_frequency',
+    recurringNextDate: 'recurring_next_date',
+    recurringLabel: 'recurring_label',
+    recurringAlertDays: 'recurring_alert_days',
+    recurringExpectedCents: 'recurring_expected_cents',
     sortOrder: 'sort_order',
   };
   for (const [k, col] of Object.entries(map)) {
@@ -144,6 +185,7 @@ export function updateSplit(id: string, patch: UpdateSplitPatch): void {
     fields.push(`${col} = @${col}`);
     let val = (patch as any)[k];
     if (typeof val === 'string') val = val.trim().slice(0, 1024);
+    if (typeof val === 'boolean') val = val ? 1 : 0;
     params[col] = val;
   }
   if (!fields.length) return;

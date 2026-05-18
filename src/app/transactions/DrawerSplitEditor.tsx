@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState, useTransition } from 'react';
-import { Plus, X, User, Building2, Split as SplitIcon, Lock, ArrowRight, StickyNote } from 'lucide-react';
+import { Plus, X, User, Building2, Split as SplitIcon, Lock, ArrowRight, StickyNote, Repeat } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import { fmtMoney } from '@/lib/format';
 import {
@@ -104,6 +104,12 @@ export default function DrawerSplitEditor({ transactionId, transactionAmount }: 
         if (patch.notes !== undefined) actionPatch.notes = patch.notes;
         if (patch.sourceEntity !== undefined) actionPatch.sourceEntity = patch.sourceEntity;
         if (patch.sourceAccountId !== undefined) actionPatch.sourceAccountId = patch.sourceAccountId;
+        if (patch.isRecurring !== undefined) actionPatch.isRecurring = patch.isRecurring;
+        if (patch.recurringFrequency !== undefined) actionPatch.recurringFrequency = patch.recurringFrequency;
+        if (patch.recurringNextDate !== undefined) actionPatch.recurringNextDate = patch.recurringNextDate;
+        if (patch.recurringLabel !== undefined) actionPatch.recurringLabel = patch.recurringLabel;
+        if (patch.recurringAlertDays !== undefined) actionPatch.recurringAlertDays = patch.recurringAlertDays;
+        if (patch.recurringExpectedCents !== undefined) actionPatch.recurringExpectedCents = patch.recurringExpectedCents;
         await updateSplitAction(rowId, actionPatch);
         saveEnd(id);
       } catch (e: any) { saveError(id, e?.message); }
@@ -403,9 +409,179 @@ function SplitRow({
         <SplitSourceOfMoney split={split} onPatch={onPatch} />
       ) : null}
 
+      {/* Per-split recurrence — each part can be recurring independently */}
+      {path ? (
+        <SplitRecurrence split={split} onPatch={onPatch} />
+      ) : null}
+
       {/* Per-split notes — tag each part on its own */}
       {path ? (
         <SplitNotes split={split} onPatch={onPatch} />
+      ) : null}
+    </div>
+  );
+}
+
+function SplitRecurrence({
+  split, onPatch,
+}: {
+  split: TransactionSplit;
+  onPatch: (p: Partial<TransactionSplit>) => void;
+}) {
+  const isRec = !!split.isRecurring;
+  const frequency = split.recurringFrequency || 'MONTHLY';
+  const expectedDollars = split.recurringExpectedCents != null
+    ? (split.recurringExpectedCents / 100).toFixed(2)
+    : (Math.abs(split.amountCents) / 100).toFixed(2);
+  const [amountStr, setAmountStr] = useState(expectedDollars);
+  const [label, setLabel] = useState(split.recurringLabel || '');
+
+  // Re-sync local state if the underlying split changes externally (e.g. amount edit)
+  useEffect(() => {
+    if (split.recurringExpectedCents == null) {
+      setAmountStr((Math.abs(split.amountCents) / 100).toFixed(2));
+    }
+  }, [split.amountCents, split.recurringExpectedCents]);
+
+  return (
+    <div
+      className="mt-2.5"
+      style={{
+        padding: '10px 12px',
+        background: isRec ? 'rgba(251,191,36,0.06)' : 'rgba(255,255,255,0.02)',
+        border: '0.5px solid ' + (isRec ? 'rgba(251,191,36,0.30)' : 'var(--border-subtle, rgba(255,255,255,0.07))'),
+        borderRadius: 7,
+      }}
+    >
+      <div className="flex items-center gap-1.5 mb-2">
+        <Repeat size={11} style={{ color: isRec ? 'var(--warn)' : 'var(--ink-mute)' }} />
+        <span
+          className="field-label"
+          style={{ marginBottom: 0, color: isRec ? 'var(--warn)' : undefined }}
+        >
+          Recurrence for this part
+        </span>
+        <span className="flex-1" />
+        <button
+          type="button"
+          onClick={() => onPatch({
+            isRecurring: !isRec,
+            // Seed defaults when first turning on
+            recurringFrequency: !isRec && !split.recurringFrequency ? 'MONTHLY' : split.recurringFrequency,
+          })}
+          className="btn btn-sm"
+          style={{
+            padding: '3px 8px',
+            fontSize: 10.5,
+            background: isRec ? 'rgba(251,191,36,0.16)' : 'var(--bg-2)',
+            borderColor: isRec ? 'rgba(251,191,36,0.40)' : 'var(--border-default, rgba(255,255,255,0.12))',
+            color: isRec ? 'var(--warn)' : 'var(--ink-2)',
+          }}
+        >
+          {isRec ? 'Recurring · ON' : 'One-time'}
+        </button>
+      </div>
+
+      {isRec ? (
+        <div className="flex flex-col" style={{ gap: 8 }}>
+          {/* Frequency segmented control */}
+          <div
+            className="flex p-0.5"
+            style={{
+              gap: 2,
+              background: 'var(--bg-2)',
+              border: '0.5px solid var(--border-subtle, rgba(255,255,255,0.07))',
+              borderRadius: 6,
+            }}
+          >
+            {['MONTHLY', 'WEEKLY', 'BIWEEKLY', 'QUARTERLY', 'ANNUAL'].map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => onPatch({ recurringFrequency: f })}
+                style={{
+                  flex: 1,
+                  padding: '4px 0',
+                  borderRadius: 4,
+                  background: frequency === f ? 'var(--bg-0)' : 'transparent',
+                  color: frequency === f ? 'var(--ink)' : 'var(--ink-3)',
+                  fontSize: 10.5,
+                  fontWeight: 500,
+                }}
+              >
+                {f.charAt(0) + f.slice(1).toLowerCase()}
+              </button>
+            ))}
+          </div>
+
+          {/* Expected amount + Next due date */}
+          <div className="grid grid-cols-2" style={{ gap: 8 }}>
+            <div>
+              <div className="field-label" style={{ marginBottom: 4 }}>Expected amount</div>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="num"
+                value={amountStr}
+                onChange={(e) => setAmountStr(e.target.value)}
+                onBlur={() => {
+                  const num = Number(String(amountStr).replace(/[^0-9.\-]/g, ''));
+                  const cents = Number.isFinite(num) && num > 0 ? Math.round(num * 100) : null;
+                  if (cents !== split.recurringExpectedCents) {
+                    onPatch({ recurringExpectedCents: cents });
+                  }
+                }}
+                style={{ fontSize: 12, height: 28 }}
+              />
+            </div>
+            <div>
+              <div className="field-label" style={{ marginBottom: 4 }}>Next due date</div>
+              <input
+                type="date"
+                value={split.recurringNextDate || ''}
+                onChange={(e) => onPatch({ recurringNextDate: e.target.value || null })}
+                style={{ fontSize: 12, height: 28 }}
+              />
+            </div>
+          </div>
+
+          {/* Label + Alert days */}
+          <div className="grid grid-cols-2" style={{ gap: 8 }}>
+            <div>
+              <div className="field-label" style={{ marginBottom: 4 }}>Label</div>
+              <input
+                type="text"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                onBlur={() => {
+                  const next = label.trim() || null;
+                  if (next !== (split.recurringLabel || null)) onPatch({ recurringLabel: next });
+                }}
+                placeholder="e.g. NYC Team Apartment 1"
+                style={{ fontSize: 12, height: 28 }}
+              />
+            </div>
+            <div>
+              <div className="field-label" style={{ marginBottom: 4 }}>Alert days before</div>
+              <select
+                value={split.recurringAlertDays ?? 3}
+                onChange={(e) => onPatch({ recurringAlertDays: Number(e.target.value) })}
+                style={{ fontSize: 12, height: 28 }}
+              >
+                <option value="1">1 day before</option>
+                <option value="3">3 days before</option>
+                <option value="7">7 days before</option>
+                <option value="14">14 days before</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="text-[10px] text-ink-mute">
+            Books to <span className="font-medium" style={{ color: 'var(--ink-2)' }}>
+              {(ENTITY_LABELS as any)[split.entity] || split.entity}
+            </span> every {frequency.toLowerCase()} — rolls forward until you switch this off.
+          </div>
+        </div>
       ) : null}
     </div>
   );

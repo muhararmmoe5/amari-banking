@@ -319,6 +319,12 @@ export function getDb(): Database.Database {
     `ALTER TABLE expense_funding_splits ADD COLUMN from_ai INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE transaction_splits ADD COLUMN source_entity TEXT`,
     `ALTER TABLE transaction_splits ADD COLUMN source_account_id TEXT`,
+    `ALTER TABLE transaction_splits ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE transaction_splits ADD COLUMN recurring_frequency TEXT`,
+    `ALTER TABLE transaction_splits ADD COLUMN recurring_next_date TEXT`,
+    `ALTER TABLE transaction_splits ADD COLUMN recurring_label TEXT`,
+    `ALTER TABLE transaction_splits ADD COLUMN recurring_alert_days INTEGER`,
+    `ALTER TABLE transaction_splits ADD COLUMN recurring_expected_cents INTEGER`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }
