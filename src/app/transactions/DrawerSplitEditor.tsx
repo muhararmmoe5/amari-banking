@@ -1323,14 +1323,14 @@ function SplitSourceOfMoney({
         </select>
       </div>
 
-      {/* Optional: the original owner of the money sitting in `source` */}
+      {/* Optional: the intended owner of the money sitting in `source` */}
       {source ? (
         <div className="mt-2">
           <div
             className="field-label"
             style={{ marginBottom: 4, color: 'var(--ink-3)' }}
           >
-            Money originally owned by{' '}
+            Intent owner of the money{' '}
             <span style={{ color: 'var(--ink-4, #44443f)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
               · optional, when source is a pass-through
             </span>
@@ -1349,9 +1349,9 @@ function SplitSourceOfMoney({
             <option value="PERSONAL">Personal</option>
           </select>
           <div style={{ fontSize: 10, color: 'var(--ink-4, #44443f)', marginTop: 4, lineHeight: 1.4 }}>
-            Use this when {sourceLabel || 'the source entity'} was just holding the money on behalf of
-            someone else upstream — e.g. a prior wire from Bytes AI parked in Amari Holdings, now
-            being spent. That changes who really owes what (or makes it a no-op wash).
+            Who the money in {sourceLabel || 'the source entity'} is really intended for. Use this when
+            {sourceLabel || 'the source'} is parking funds on someone else&apos;s behalf — that changes who
+            actually owes what (or makes it a no-op wash).
           </div>
         </div>
       ) : null}
