@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Loader2, Search, X, Plus, ArrowDownToLine, AlertCircle } from 'lucide-react';
+import { useEffect, useImperativeHandle, forwardRef, useState } from 'react';
+import { Loader2, Search, X, Plus, ArrowDownToLine, AlertCircle, Sparkles } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import { fmtMoney, fmtDate } from '@/lib/format';
 import { getAccount } from '@/constants/accounts';
@@ -12,6 +12,7 @@ interface Split {
   sourceLabel: string | null;
   amountCents: number;
   notes: string | null;
+  fromAI?: boolean;
   sourceTx?: {
     postingDate: string;
     description: string;
@@ -19,6 +20,10 @@ interface Split {
     amount: number;
     accountId: string;
   } | null;
+}
+
+export interface ManualSourceLinkHandle {
+  reload: () => Promise<void>;
 }
 interface SearchResult {
   id: string;
@@ -38,13 +43,10 @@ const FREE_LABELS = [
 
 /** Manual funding split UI: tag this expense to one OR MORE income sources,
  *  each with its own dollar amount. No FIFO assumption. */
-export default function ManualSourceLink({
-  txId,
-  expenseAmount,
-}: {
+const ManualSourceLink = forwardRef<ManualSourceLinkHandle, {
   txId: string;
   expenseAmount: number;
-}) {
+}>(function ManualSourceLink({ txId, expenseAmount }, ref) {
   const { saveStart, saveEnd, saveError } = useToast();
   const [splits, setSplits] = useState<Split[] | null>(null);
   const [adding, setAdding] = useState(false);
@@ -69,6 +71,8 @@ export default function ManualSourceLink({
     }
   }
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [txId]);
+
+  useImperativeHandle(ref, () => ({ reload: load }), [txId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalAllocatedCents = (splits || []).reduce((s, x) => s + x.amountCents, 0);
   const expenseCents = Math.round(Math.abs(expenseAmount) * 100);
@@ -168,10 +172,26 @@ export default function ManualSourceLink({
               <div key={s.id} className="p-3 flex items-center gap-3">
                 <ArrowDownToLine size={14} className="text-income shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium truncate">
-                    {isInflow
-                      ? (src!.merchant || src!.description.slice(0, 60))
-                      : (s.sourceLabel || 'Untagged source')}
+                  <div className="text-sm font-medium truncate flex items-center gap-1.5">
+                    <span className="truncate">
+                      {isInflow
+                        ? (src!.merchant || src!.description.slice(0, 60))
+                        : (s.sourceLabel || 'Untagged source')}
+                    </span>
+                    {s.fromAI ? (
+                      <span
+                        className="pill inline-flex items-center gap-1 shrink-0"
+                        style={{
+                          fontSize: 9.5,
+                          padding: '1px 6px',
+                          color: 'var(--gold)',
+                          borderColor: 'rgba(201,168,122,0.30)',
+                          background: 'rgba(201,168,122,0.10)',
+                        }}
+                      >
+                        <Sparkles size={8} /> AI · override
+                      </span>
+                    ) : null}
                   </div>
                   <div className="text-2xs text-ink-mute mt-0.5">
                     {isInflow ? (
@@ -355,4 +375,6 @@ export default function ManualSourceLink({
       )}
     </div>
   );
-}
+});
+
+export default ManualSourceLink;

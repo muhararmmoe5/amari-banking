@@ -468,6 +468,7 @@ export interface FundingSplit {
   sourceLabel: string | null;
   amountCents: number;
   notes: string | null;
+  fromAI: boolean;
   createdAt: number;
   /** Joined inflow snapshot when sourceTxId is set. */
   sourceTx?: {
@@ -487,6 +488,7 @@ function rowToSplit(r: any): FundingSplit {
     sourceLabel: r.source_label ?? null,
     amountCents: r.amount_cents,
     notes: r.notes ?? null,
+    fromAI: !!r.from_ai,
     createdAt: r.created_at,
     sourceTx: r.src_posting_date ? {
       postingDate: r.src_posting_date,
@@ -521,14 +523,15 @@ export interface FundingSplitInput {
   sourceLabel?: string | null;
   amountCents: number;
   notes?: string | null;
+  fromAI?: boolean;
 }
 
 export function addFundingSplit(input: FundingSplitInput): FundingSplit {
   const db = getDb();
   const id = crypto.randomUUID();
   db.prepare(`
-    INSERT INTO expense_funding_splits (id, expense_tx_id, source_tx_id, source_label, amount_cents, notes, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO expense_funding_splits (id, expense_tx_id, source_tx_id, source_label, amount_cents, notes, from_ai, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     input.expenseTxId,
@@ -536,6 +539,7 @@ export function addFundingSplit(input: FundingSplitInput): FundingSplit {
     input.sourceLabel?.trim() || null,
     input.amountCents,
     input.notes?.trim() || null,
+    input.fromAI ? 1 : 0,
     Date.now(),
   );
   const list = listFundingSplits(input.expenseTxId);

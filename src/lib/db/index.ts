@@ -315,6 +315,7 @@ export function getDb(): Database.Database {
     `ALTER TABLE transactions ADD COLUMN auto_detect_rule INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE transactions ADD COLUMN cpa_reviewed_at TEXT`,
     `ALTER TABLE transactions ADD COLUMN cpa_reviewer_name TEXT`,
+    `ALTER TABLE expense_funding_splits ADD COLUMN from_ai INTEGER NOT NULL DEFAULT 0`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }

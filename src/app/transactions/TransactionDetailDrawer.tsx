@@ -1,19 +1,20 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import {
   X, ChevronDown, Check, Lock, Plus, ArrowDown, ArrowRight,
   User, Building2, Repeat, Calendar, Wallet, Receipt, Paperclip,
-  Split, Tag, Award, Link2,
+  Split, Tag, Award, Link2, Sparkles,
 } from 'lucide-react';
 import type { Transaction, EntityType, AuditStatus } from '@/types';
 import { ACCOUNTS, ENTITY_LABELS, ENTITY_COLORS, BUSINESS_ENTITIES, getAccount } from '@/constants/accounts';
 import { PERSONAL_CATEGORIES, BUSINESS_CATEGORIES } from '@/constants/categories';
 import { fmtMoney, fmtDate } from '@/lib/format';
 import { saveTransaction } from './actions';
+import { listSplitsAction } from './splitActions';
 import { useToast } from '@/components/Toast';
 import Portal from '@/components/Portal';
-import ManualSourceLink from './ManualSourceLink';
+import ManualSourceLink, { type ManualSourceLinkHandle } from './ManualSourceLink';
 import ManualDownstreamList from './ManualDownstreamList';
 import SplitEditor from '../audit/SplitEditor';
 import SameDayPanel from './SameDayPanel';
@@ -80,11 +81,50 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
     recurrence: false,
     flow: false,
     passthrough: !!tx.passthroughEntity,
-    split: false,
+    split: true,
     notes: false,
     cpa: false,
   });
   const toggle = (k: SectionKey) => setOpenMap((m) => ({ ...m, [k]: !m[k] }));
+
+  // Split-first flow: track whether this transaction is split (decision-first UX).
+  // Initialize from server — if any splits exist, mark as split.
+  const [isSplit, setIsSplit] = useState<boolean | null>(null);
+  useEffect(() => {
+    listSplitsAction(tx.id)
+      .then((rows) => setIsSplit((rows?.length ?? 0) > 0))
+      .catch(() => setIsSplit(false));
+  }, [tx.id]);
+
+  // AI source detection — pulses for ~1.4s minimum, then refreshes ManualSourceLink.
+  const sourceLinkRef = useRef<ManualSourceLinkHandle | null>(null);
+  const [aiThinking, setAiThinking] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  async function runAITrace() {
+    if (aiThinking) return;
+    setAiThinking(true);
+    setAiError(null);
+    const startedAt = Date.now();
+    try {
+      const r = await fetch('/api/flow/ai-trace', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ txId: tx.id }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d?.error || `http_${r.status}`);
+      }
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 1400) await new Promise((res) => setTimeout(res, 1400 - elapsed));
+      await sourceLinkRef.current?.reload();
+    } catch (e: any) {
+      setAiError(e?.message === 'no_source_found' ? 'No prior inflow found on this account.' : 'AI trace failed. Try again.');
+    } finally {
+      setAiThinking(false);
+    }
+  }
 
   // Persist helper — calls saveTransaction with the proper patch keys
   function persist(patch: any) {
@@ -220,20 +260,160 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
             <div className="text-[11.5px] text-ink-mute mb-3.5">
               Tag this expense to one or more income sources, each with its own dollar amount.
             </div>
+
+            {/* AI Find Source strip — only for expenses */}
             {isExpense ? (
-              <ManualSourceLink txId={tx.id} expenseAmount={tx.amount} />
+              <div
+                className="flex items-center gap-2.5 mb-3.5"
+                style={{
+                  padding: '10px 12px',
+                  background:
+                    'linear-gradient(90deg, color-mix(in oklab, var(--gold) 12%, var(--bg-3)), var(--bg-3))',
+                  border: '0.5px solid rgba(201,168,122,0.30)',
+                  borderRadius: 8,
+                }}
+              >
+                <div
+                  className="grid place-items-center shrink-0"
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 6,
+                    background: 'rgba(201,168,122,0.18)',
+                    color: 'var(--gold)',
+                  }}
+                >
+                  <Sparkles size={13} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12px] font-medium" style={{ color: 'var(--ink)' }}>
+                    {aiThinking ? 'Tracing through your accounts…' : 'Auto-trace this expense'}
+                  </div>
+                  <div className="text-[10.5px] text-ink-mute mt-px">
+                    {aiThinking
+                      ? 'Following FIFO from prior inflows · scanning this account'
+                      : aiError || 'FoundersOS AI will find which prior inflow funded this. You can override.'}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={runAITrace}
+                  disabled={aiThinking}
+                  style={{
+                    background: 'rgba(201,168,122,0.16)',
+                    borderColor: 'rgba(201,168,122,0.4)',
+                    color: 'var(--gold)',
+                    opacity: aiThinking ? 0.6 : 1,
+                  }}
+                >
+                  {aiThinking ? (
+                    <>
+                      <span
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 50,
+                          background: 'var(--gold)',
+                          animation: 'pulse 0.9s ease infinite',
+                          display: 'inline-block',
+                        }}
+                      />
+                      Thinking
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={11} /> Find source with AI
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : null}
+
+            {isExpense ? (
+              <ManualSourceLink ref={sourceLinkRef} txId={tx.id} expenseAmount={tx.amount} />
             ) : (
               <ManualDownstreamList inflowTxId={tx.id} inflowAmount={tx.amount} />
             )}
           </SectionCard>
 
-          {/* ③ Booked attribution */}
-          <BookedAttributionSection
-            state={state}
-            setState={setState}
-            open={openMap.booked}
-            setOpen={() => toggle('booked')}
-          />
+          {/* ⑦→② Split decision — comes BEFORE Booked Attribution (v2.1) */}
+          <SectionCard
+            accent={isSplit ? 'purple' : undefined}
+            open={openMap.split}
+            setOpen={() => toggle('split')}
+            icon={<Split size={13} style={{ color: 'var(--ink-3)' }} />}
+            title="Split transaction"
+            badge={isSplit ? 'split first' : undefined}
+            badgeColor={isSplit ? 'pill-personal' : undefined}
+            summary={
+              isSplit === null
+                ? 'Checking…'
+                : isSplit
+                  ? 'Multiple parts · each gets its own categorization'
+                  : 'Single transaction · not split'
+            }
+          >
+            <div className="text-[11.5px] text-ink-mute mb-3.5">
+              Does this charge cover more than one entity, category, or period?
+              Decide here first — then categorize each part separately below.
+            </div>
+
+            {/* Yes/No decision */}
+            <div className="grid grid-cols-2 gap-2 mb-3.5">
+              <button
+                type="button"
+                onClick={() => setIsSplit(false)}
+                className="btn"
+                style={{
+                  padding: '11px 14px',
+                  justifyContent: 'flex-start',
+                  background: isSplit === false
+                    ? 'color-mix(in oklab, var(--ink-3) 14%, var(--bg-3))'
+                    : 'var(--bg-3)',
+                  borderColor: isSplit === false ? 'var(--ink-3)' : 'var(--border-default, rgba(255,255,255,0.12))',
+                  color: isSplit === false ? 'var(--ink)' : 'var(--ink-2)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                }}
+              >
+                <Check size={12} style={{ opacity: isSplit === false ? 1 : 0 }} />
+                No — one charge, one categorization
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSplit(true)}
+                className="btn"
+                style={{
+                  padding: '11px 14px',
+                  justifyContent: 'flex-start',
+                  background: isSplit
+                    ? 'color-mix(in oklab, var(--purple) 14%, var(--bg-3))'
+                    : 'var(--bg-3)',
+                  borderColor: isSplit ? 'var(--purple)' : 'var(--border-default, rgba(255,255,255,0.12))',
+                  color: isSplit ? 'var(--purple)' : 'var(--ink-2)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                }}
+              >
+                <Split size={12} /> Yes — split this charge
+              </button>
+            </div>
+
+            {isSplit ? (
+              <SplitEditor transactionId={tx.id} transactionAmount={tx.amount} />
+            ) : null}
+          </SectionCard>
+
+          {/* ③ Booked attribution — only when NOT split */}
+          {isSplit === false ? (
+            <BookedAttributionSection
+              state={state}
+              setState={setState}
+              open={openMap.booked}
+              setOpen={() => toggle('booked')}
+            />
+          ) : null}
 
           {/* ④ Recurrence */}
           <RecurrenceSection
@@ -261,18 +441,6 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
             open={openMap.passthrough}
             setOpen={() => toggle('passthrough')}
           />
-
-          {/* ⑦ Split */}
-          <SectionCard
-            accent={undefined}
-            open={openMap.split}
-            setOpen={() => toggle('split')}
-            icon={<Split size={13} style={{ color: 'var(--ink-3)' }} />}
-            title="Split transaction"
-            summary="Divide this charge across entities, categories, or periods"
-          >
-            <SplitEditor transactionId={tx.id} transactionAmount={tx.amount} />
-          </SectionCard>
 
           {/* ⑧ Notes */}
           <NotesSection

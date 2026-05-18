@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
     sourceLabel,
     amountCents: Math.round(amount * 100),
     notes,
+    fromAI: !!body.fromAI,
   });
   return NextResponse.json({ split });
 }
