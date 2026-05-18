@@ -156,24 +156,17 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
     if (dbPatch) persist(dbPatch);
   }
 
-  // Keyboard handler
+  // Keyboard handler — Esc to close
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
       if (e.key === 'Escape') onClose();
-      else if (e.key === '1') applyStatus('CONFIRMED');
-      else if (e.key === '2') applyStatus('NEEDS_RECEIPT');
-      else if (e.key === '3') applyStatus('PERSONAL_NO_DEDUCT');
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  function applyStatus(s: AuditStatus) {
-    setState({ auditStatus: s }, { auditStatus: s });
-  }
 
   // Progress dots — 5 required completion criteria
   const completed = (
@@ -512,30 +505,6 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
           <div className="h-4" />
         </div>
 
-        {/* Footer */}
-        <div className="dr-foot">
-          <button
-            type="button"
-            className="btn btn-confirm"
-            onClick={() => applyStatus('CONFIRMED')}
-          >
-            <span className="kbd" style={{ background: 'rgba(74,222,128,0.18)', color: 'var(--income)' }}>1</span>
-            <Check size={11} /> Confirm
-          </button>
-          <button type="button" className="btn" onClick={() => applyStatus('NEEDS_RECEIPT')}>
-            <span className="kbd">2</span>
-            <Receipt size={11} /> Needs receipt
-          </button>
-          <button type="button" className="btn" onClick={() => applyStatus('PERSONAL_NO_DEDUCT')}>
-            <span className="kbd">3</span>
-            <User size={11} /> Personal
-          </button>
-          <span className="flex-1" />
-          <span className="text-[10.5px] text-ink-mute inline-flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-ink-ghost" />
-            Changes save automatically
-          </span>
-        </div>
       </div>
     </Portal>
   );

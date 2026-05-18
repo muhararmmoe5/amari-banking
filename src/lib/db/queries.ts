@@ -181,6 +181,10 @@ export interface ListFilters {
   bookDateFrom?: string;
   bookDateTo?: string;
   flaggedOnly?: boolean;
+  /** Filter by review workflow. 'PENDING_REVIEW' includes rows whose
+   *  review_state is null (default state for unreviewed transactions).
+   *  'ESCALATIONS' returns rows where needs_escalation = 1. */
+  reviewBucket?: 'PENDING_REVIEW' | 'REVIEWED' | 'REVIEWED_APPROVED' | 'ESCALATIONS' | 'ALL';
   limit?: number;
   offset?: number;
   orderBy?: 'posting_date' | 'audit_score' | 'amount';
@@ -205,6 +209,17 @@ export function listTransactions(filters: ListFilters = {}): Transaction[] {
   if (filters.bookDateFrom) { where.push('tagged_date >= @bookDateFrom'); params.bookDateFrom = filters.bookDateFrom; }
   if (filters.bookDateTo) { where.push('tagged_date <= @bookDateTo'); params.bookDateTo = filters.bookDateTo; }
   if (filters.flaggedOnly) { where.push('audit_score > 0 AND audit_status = \'UNREVIEWED\''); }
+  if (filters.reviewBucket && filters.reviewBucket !== 'ALL') {
+    if (filters.reviewBucket === 'PENDING_REVIEW') {
+      where.push("(review_state IS NULL OR review_state = 'PENDING_REVIEW')");
+    } else if (filters.reviewBucket === 'REVIEWED') {
+      where.push("review_state = 'REVIEWED'");
+    } else if (filters.reviewBucket === 'REVIEWED_APPROVED') {
+      where.push("review_state = 'REVIEWED_APPROVED'");
+    } else if (filters.reviewBucket === 'ESCALATIONS') {
+      where.push('needs_escalation = 1');
+    }
+  }
 
   const orderBy = filters.orderBy || 'posting_date';
   const orderDir = filters.orderDir || 'DESC';
@@ -328,6 +343,34 @@ export function countTransactions(filters: ListFilters = {}): number {
   if (filters.auditStatus) { where.push('audit_status = @auditStatus'); params.auditStatus = filters.auditStatus; }
   const sql = `SELECT COUNT(*) as c FROM transactions ${where.length ? `WHERE ${where.join(' AND ')}` : ''}`;
   return (db.prepare(sql).get(params) as { c: number }).c;
+}
+
+/** Counts of non-internal transactions bucketed by review workflow state. */
+export function reviewBucketCounts(): {
+  all: number;
+  pending: number;
+  reviewed: number;
+  approved: number;
+  escalations: number;
+} {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT
+      COUNT(*) AS all_count,
+      SUM(CASE WHEN review_state IS NULL OR review_state = 'PENDING_REVIEW' THEN 1 ELSE 0 END) AS pending_count,
+      SUM(CASE WHEN review_state = 'REVIEWED' THEN 1 ELSE 0 END) AS reviewed_count,
+      SUM(CASE WHEN review_state = 'REVIEWED_APPROVED' THEN 1 ELSE 0 END) AS approved_count,
+      SUM(CASE WHEN needs_escalation = 1 THEN 1 ELSE 0 END) AS escalation_count
+    FROM transactions
+    WHERE is_internal = 0
+  `).get() as any;
+  return {
+    all: row.all_count || 0,
+    pending: row.pending_count || 0,
+    reviewed: row.reviewed_count || 0,
+    approved: row.approved_count || 0,
+    escalations: row.escalation_count || 0,
+  };
 }
 
 export interface UpdateTxPatch {

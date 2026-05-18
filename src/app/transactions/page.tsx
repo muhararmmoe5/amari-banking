@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { listTransactions, countTransactions } from '@/lib/db/queries';
+import { listTransactions, countTransactions, reviewBucketCounts } from '@/lib/db/queries';
 import { ACCOUNTS } from '@/constants/accounts';
 import VirtualTable from './VirtualTable';
 import RescanDatesButton from './RescanDatesButton';
@@ -20,6 +20,7 @@ interface SearchProps {
   bookTo?: string;
   preset?: string;
   order?: string;
+  review?: string;
 }
 
 function presetToRange(preset?: string): { from?: string; to?: string } {
@@ -65,6 +66,12 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
   const dateFrom = searchParams.from || presetRange.from;
   const dateTo = searchParams.to || presetRange.to;
   const orderDir: 'ASC' | 'DESC' = searchParams.order === 'oldest' ? 'ASC' : 'DESC';
+  const reviewBucket: 'PENDING_REVIEW' | 'REVIEWED' | 'REVIEWED_APPROVED' | 'ESCALATIONS' | 'ALL' =
+    searchParams.review === 'reviewed' ? 'REVIEWED'
+      : searchParams.review === 'approved' ? 'REVIEWED_APPROVED'
+      : searchParams.review === 'escalations' ? 'ESCALATIONS'
+      : searchParams.review === 'all' ? 'ALL'
+      : 'PENDING_REVIEW'; // default — every transaction starts as pending review
   const filters = {
     accountId: searchParams.account,
     entityTag: searchParams.entity as EntityType | undefined,
@@ -72,6 +79,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
     search: searchParams.search,
     hideInternal,
     flaggedOnly: searchParams.flagged === '1',
+    reviewBucket,
     dateFrom,
     dateTo,
     bookDateFrom: searchParams.bookFrom,
@@ -81,6 +89,28 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
   };
   const rows = listTransactions(filters);
   const total = countTransactions({ hideInternal });
+  const buckets = reviewBucketCounts();
+
+  // Build href that preserves all current search params except `review`.
+  function reviewHref(bucket: string): string {
+    const q: Record<string, string> = {};
+    for (const [k, v] of Object.entries(searchParams)) {
+      if (k === 'review') continue;
+      if (typeof v === 'string' && v) q[k] = v;
+    }
+    if (bucket && bucket !== 'pending') q.review = bucket;
+    const qs = new URLSearchParams(q).toString();
+    return `/transactions${qs ? `?${qs}` : ''}`;
+  }
+
+  const tabs: Array<{ key: string; label: string; count: number; color: string }> = [
+    { key: 'pending', label: 'Pending review', count: buckets.pending, color: 'var(--warn)' },
+    { key: 'reviewed', label: 'Reviewed', count: buckets.reviewed, color: 'var(--blue, #60a5fa)' },
+    { key: 'approved', label: 'Reviewed & approved', count: buckets.approved, color: 'var(--income)' },
+    { key: 'escalations', label: 'Escalations', count: buckets.escalations, color: 'var(--expense)' },
+    { key: 'all', label: 'All', count: buckets.all, color: 'var(--ink-2)' },
+  ];
+  const activeTab = searchParams.review || 'pending';
 
   return (
     <div className="p-8 space-y-6 max-w-[1600px] mx-auto">
@@ -103,7 +133,60 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
         </div>
       </div>
 
+      {/* Review workflow tabs */}
+      <div
+        className="flex flex-wrap gap-1.5"
+        style={{
+          padding: 4,
+          background: 'var(--bg-2)',
+          border: '0.5px solid var(--border-subtle, rgba(255,255,255,0.07))',
+          borderRadius: 10,
+        }}
+      >
+        {tabs.map((t) => {
+          const active = activeTab === t.key;
+          return (
+            <Link
+              key={t.key}
+              href={reviewHref(t.key)}
+              className="inline-flex items-center gap-2"
+              style={{
+                padding: '7px 14px',
+                borderRadius: 7,
+                background: active ? `color-mix(in oklab, ${t.color} 12%, var(--bg-0))` : 'transparent',
+                border: '0.5px solid ' + (active ? t.color : 'transparent'),
+                color: active ? t.color : 'var(--ink-2)',
+                fontSize: 12,
+                fontWeight: active ? 600 : 500,
+                transition: 'all 120ms ease',
+              }}
+            >
+              <span style={{ width: 6, height: 6, borderRadius: 50, background: t.color }} />
+              {t.label}
+              <span
+                className="num"
+                style={{
+                  fontSize: 10.5,
+                  padding: '1px 6px',
+                  borderRadius: 50,
+                  background: active ? `color-mix(in oklab, ${t.color} 18%, var(--bg-0))` : 'var(--bg-3)',
+                  color: active ? t.color : 'var(--ink-3)',
+                  minWidth: 22,
+                  textAlign: 'center',
+                }}
+              >
+                {t.count.toLocaleString()}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+
       <form className="card p-5 space-y-4 text-xs" method="GET">
+        {/* Preserve the review tab when the user submits other filters */}
+        {searchParams.review ? (
+          <input type="hidden" name="review" value={searchParams.review} />
+        ) : null}
         <div className="flex flex-wrap gap-1.5">
           {[
             { v: '', l: 'All time' },
