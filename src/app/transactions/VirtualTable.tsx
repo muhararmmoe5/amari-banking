@@ -16,21 +16,37 @@ export default function VirtualTable({ rows }: { rows: Transaction[] }) {
   });
 
   return (
-    <div className="card overflow-hidden">
+    <div
+      style={{
+        background: 'var(--bg-1, #111114)',
+        border: '1px solid rgba(255,255,255,0.055)',
+        borderRadius: 12,
+        overflow: 'hidden',
+      }}
+    >
       <div
-        className="surface-glass border-b border-line text-ink-mute text-2xs grid items-center font-semibold uppercase tracking-[0.06em]"
-        style={{ gridTemplateColumns: ROW_GRID }}
+        className="grid items-center"
+        style={{
+          gridTemplateColumns: ROW_GRID,
+          background: 'color-mix(in oklab, var(--gold) 2%, var(--bg-1, #111114))',
+          borderBottom: '1px solid rgba(255,255,255,0.055)',
+          fontSize: 9.5,
+          fontWeight: 600,
+          letterSpacing: '.16em',
+          textTransform: 'uppercase',
+          color: 'var(--ink-3)',
+        }}
       >
         <Cell>Date</Cell>
-        <Cell title="The Chase account this transaction posted on">Paid from</Cell>
+        <Cell title="The Chase account this transaction posted on">Account</Cell>
         <Cell>Merchant / Description</Cell>
         <Cell className="text-right">Amount</Cell>
-        <Cell className="text-right" title="Account balance after this transaction posted — as reported by Chase at import. If you've filtered the list (review tab, status, etc.), jumps row-to-row mean filtered-out transactions happened in between; that's the truth, not a bug.">Balance after</Cell>
-        <Cell title="Which business this expense is booked to">Books to</Cell>
+        <Cell className="text-right" title="Account balance after this transaction posted — Chase's per-row truth. Filters can show gaps where in-between transactions are filtered out of view.">Balance after</Cell>
+        <Cell title="Which entity this transaction is booked to">Books to</Cell>
         <Cell>Sub category</Cell>
         <Cell>Status</Cell>
         <Cell className="text-center" title="CPA reviewed">CPA</Cell>
-        <Cell title="Tagged date">Tagged date</Cell>
+        <Cell title="Tagged date">Tagged</Cell>
         <Cell>Flag</Cell>
       </div>
 
@@ -69,5 +85,5 @@ export default function VirtualTable({ rows }: { rows: Transaction[] }) {
 }
 
 function Cell({ children, className = '', title }: { children: React.ReactNode; className?: string; title?: string }) {
-  return <div className={`px-3 py-2.5 ${className}`} title={title}>{children}</div>;
+  return <div className={`px-4 py-3 ${className}`} title={title}>{children}</div>;
 }

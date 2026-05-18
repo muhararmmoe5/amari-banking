@@ -108,84 +108,285 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
     return `/transactions${qs ? `?${qs}` : ''}`;
   }
 
-  const tabs: Array<{ key: string; label: string; count: number; color: string }> = [
-    { key: 'pending', label: 'Pending review', count: buckets.pending, color: 'var(--warn)' },
-    { key: 'reviewed', label: 'Reviewed', count: buckets.reviewed, color: 'var(--blue, #60a5fa)' },
-    { key: 'approved', label: 'Reviewed & approved', count: buckets.approved, color: 'var(--income)' },
-    { key: 'escalations', label: 'Escalations', count: buckets.escalations, color: 'var(--expense)' },
-    { key: 'all', label: 'All', count: buckets.all, color: 'var(--ink-2)' },
+  const cells: Array<{ key: string; label: string; count: number; sub: string; color: string }> = [
+    {
+      key: 'all',
+      label: 'All transactions',
+      count: rows.length,
+      sub: `${rows.length} of ${buckets.all.toLocaleString()} · matching filters`,
+      color: 'var(--gold)',
+    },
+    {
+      key: 'pending',
+      label: 'Pending review',
+      count: buckets.pending,
+      sub: `${buckets.all > 0 ? Math.round((buckets.pending / buckets.all) * 100) : 0}% needs tagging`,
+      color: 'var(--warn)',
+    },
+    {
+      key: 'reviewed',
+      label: 'Reviewed',
+      count: buckets.reviewed,
+      sub: 'awaiting CPA sign-off',
+      color: '#7a9fc9',
+    },
+    {
+      key: 'approved',
+      label: 'Approved',
+      count: buckets.approved,
+      sub: 'CPA confirmed',
+      color: 'var(--income)',
+    },
+    {
+      key: 'escalations',
+      label: 'Escalations',
+      count: buckets.escalations,
+      sub: buckets.escalations === 0 ? 'no critical issues' : 'flagged for verification',
+      color: 'var(--expense)',
+    },
   ];
   const activeTab = searchParams.review || 'pending';
+  const activeKey = activeTab === 'pending' ? 'pending'
+    : activeTab === 'reviewed' ? 'reviewed'
+    : activeTab === 'approved' ? 'approved'
+    : activeTab === 'escalations' ? 'escalations'
+    : 'all';
 
   return (
-    <div className="p-8 space-y-6 max-w-[1600px] mx-auto">
-      <div className="flex items-start justify-between gap-6">
+    <div className="max-w-[1600px] mx-auto pb-12">
+      {/* ── Page header ─────────────────────────────────────── */}
+      <div
+        className="flex items-end gap-5"
+        style={{
+          padding: '36px 36px 24px',
+          borderBottom: '1px solid rgba(255,255,255,0.055)',
+        }}
+      >
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Transactions</h1>
-          <p className="text-sm text-ink-dim mt-1.5">
-            Showing <span className="text-ink font-medium num-display">{rows.length}</span> of <span className="num-display">{total.toLocaleString()}</span> non-internal transactions
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 500,
+              textTransform: 'uppercase',
+              letterSpacing: '.16em',
+              color: 'var(--gold)',
+              marginBottom: 10,
+            }}
+          >
+            Banking · transactions
+          </div>
+          <h1
+            style={{
+              fontSize: 42,
+              fontWeight: 500,
+              letterSpacing: '-.03em',
+              lineHeight: 1,
+              margin: 0,
+              color: 'var(--ink)',
+            }}
+          >
+            <em
+              style={{
+                fontFamily: 'var(--font-serif, "Instrument Serif", serif)',
+                fontStyle: 'italic',
+                fontWeight: 400,
+                color: 'var(--gold)',
+                fontSize: 48,
+              }}
+            >
+              Trans
+            </em>
+            actions
+          </h1>
+          <p
+            style={{
+              marginTop: 10,
+              fontSize: 13,
+              color: 'var(--ink-2, #b0afa6)',
+              maxWidth: 540,
+              lineHeight: 1.55,
+            }}
+          >
+            <span className="num" style={{ color: 'var(--ink)', fontWeight: 500 }}>
+              {buckets.all.toLocaleString()}
+            </span>{' '}
+            non-internal transactions across all institutions. Showing{' '}
+            <span className="num" style={{ color: 'var(--ink)', fontWeight: 500 }}>
+              {rows.length.toLocaleString()}
+            </span>{' '}
+            matching current filters.
           </p>
-          {!searchParams.account ? (
-            <p className="text-2xs text-warn mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warn/5 border border-warn/20">
-              💡 Pick a single account to read the running &ldquo;Balance after&rdquo; like a bank statement.
-            </p>
-          ) : null}
         </div>
+        <div className="flex-1" />
         <div className="flex items-center gap-2">
-          <Link href={`/audit/deep${searchParams.account ? `?account=${searchParams.account}` : ''}`} className="btn">🔍 Deep audit</Link>
+          <Link
+            href={`/audit/deep${searchParams.account ? `?account=${searchParams.account}` : ''}`}
+            className="btn"
+          >
+            Deep audit
+          </Link>
           <RescanDatesButton />
-          <Link href="/import" className="btn btn-primary">⬆ Import more</Link>
+          <Link href="/import" className="btn btn-primary">
+            Import more
+          </Link>
         </div>
       </div>
 
-      {/* Review workflow tabs */}
+      {/* ── Stat strip — clickable filter cells ────────────── */}
       <div
-        className="flex flex-wrap gap-1.5"
+        className="grid"
         style={{
-          padding: 4,
-          background: 'var(--bg-2)',
-          border: '0.5px solid var(--border-subtle, rgba(255,255,255,0.07))',
-          borderRadius: 10,
+          gridTemplateColumns: '1.2fr 1fr 1fr 1fr 1fr',
+          background: 'var(--bg-1, #111114)',
+          borderBottom: '1px solid rgba(255,255,255,0.055)',
+          position: 'relative',
         }}
       >
-        {tabs.map((t) => {
-          const active = activeTab === t.key;
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: '10%',
+            right: '10%',
+            height: 1,
+            background: 'linear-gradient(90deg, transparent, color-mix(in oklab, var(--gold) 30%, transparent), transparent)',
+          }}
+        />
+        {cells.map((c) => {
+          const isActive = c.key === activeKey;
           return (
             <Link
-              key={t.key}
-              href={reviewHref(t.key)}
-              className="inline-flex items-center gap-2"
+              key={c.key}
+              href={reviewHref(c.key)}
               style={{
-                padding: '7px 14px',
-                borderRadius: 7,
-                background: active ? `color-mix(in oklab, ${t.color} 12%, var(--bg-0))` : 'transparent',
-                border: '0.5px solid ' + (active ? t.color : 'transparent'),
-                color: active ? t.color : 'var(--ink-2)',
-                fontSize: 12,
-                fontWeight: active ? 600 : 500,
-                transition: 'all 120ms ease',
+                padding: '18px 26px',
+                borderRight: '1px solid rgba(255,255,255,0.055)',
+                position: 'relative',
+                cursor: 'pointer',
+                background: isActive
+                  ? `color-mix(in oklab, ${c.color} 4%, var(--bg-1, #111114))`
+                  : 'transparent',
+                boxShadow: isActive ? `inset 3px 0 0 ${c.color}` : 'none',
+                transition: 'background 120ms ease',
               }}
             >
-              <span style={{ width: 6, height: 6, borderRadius: 50, background: t.color }} />
-              {t.label}
-              <span
-                className="num"
+              <div
                 style={{
-                  fontSize: 10.5,
-                  padding: '1px 6px',
-                  borderRadius: 50,
-                  background: active ? `color-mix(in oklab, ${t.color} 18%, var(--bg-0))` : 'var(--bg-3)',
-                  color: active ? t.color : 'var(--ink-3)',
-                  minWidth: 22,
-                  textAlign: 'center',
+                  fontSize: 10,
+                  textTransform: 'uppercase',
+                  letterSpacing: '.16em',
+                  color: isActive ? c.color : 'var(--ink-3)',
+                  fontWeight: 500,
                 }}
               >
-                {t.count.toLocaleString()}
-              </span>
+                {c.label}
+              </div>
+              <div className="flex items-baseline" style={{ gap: 5, marginTop: 10 }}>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-serif, "Instrument Serif", serif)',
+                    fontStyle: 'italic',
+                    fontSize: 30,
+                    lineHeight: 1,
+                    color: isActive ? c.color : 'var(--ink)',
+                  }}
+                >
+                  {c.count.toLocaleString()}
+                </span>
+                {c.key === 'all' ? (
+                  <span style={{ fontSize: 13, color: 'var(--ink-2, #b0afa6)' }}>
+                    of {buckets.all.toLocaleString()}
+                  </span>
+                ) : null}
+              </div>
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--ink-3)' }}>
+                {c.sub}
+              </div>
             </Link>
           );
         })}
       </div>
+
+      {/* ── AI auto-trace strip ────────────────────────────── */}
+      <div style={{ padding: '16px 36px 0' }}>
+        <div
+          className="flex items-center"
+          style={{
+            padding: '14px 18px',
+            gap: 14,
+            background: 'linear-gradient(90deg, color-mix(in oklab, var(--gold) 12%, var(--bg-1, #111114)) 0%, color-mix(in oklab, var(--gold) 4%, var(--bg-1, #111114)) 80%)',
+            border: '1px solid color-mix(in oklab, var(--gold) 26%, rgba(255,255,255,0.055))',
+            borderRadius: 12,
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              width: 200,
+              height: 200,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(201,168,122,.18), transparent 70%)',
+              right: -60,
+              top: -60,
+              pointerEvents: 'none',
+            }}
+          />
+          <div
+            className="grid place-items-center"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 9,
+              background: 'color-mix(in oklab, var(--gold) 22%, var(--bg-2, #16161a))',
+              border: '0.5px solid color-mix(in oklab, var(--gold) 40%, rgba(255,255,255,0.055))',
+              color: 'var(--gold)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06), 0 0 14px -6px rgba(201,168,122,.4)',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3 L13.5 8.5 L19 10 L13.5 11.5 L12 17 L10.5 11.5 L5 10 L10.5 8.5 Z"/>
+              <path d="M19 17 L19.7 19 L21.5 19.5 L19.7 20 L19 22 L18.3 20 L16.5 19.5 L18.3 19 Z"/>
+            </svg>
+          </div>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <div style={{ fontSize: 13.5, fontWeight: 500, letterSpacing: '-.005em' }}>
+              Let Amari{' '}
+              <span
+                style={{
+                  fontFamily: 'var(--font-serif, "Instrument Serif", serif)',
+                  fontStyle: 'italic',
+                  color: 'var(--gold)',
+                }}
+              >
+                auto-trace
+              </span>{' '}
+              your unreviewed transactions
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-2, #b0afa6)', marginTop: 3, lineHeight: 1.5 }}>
+              AI will detect funding sources via FIFO, classify Personal vs Business, suggest entity + category — you review and override.{' '}
+              <b style={{ color: 'var(--gold)' }}>
+                ~{Math.max(1, Math.round(buckets.pending / 50))} min for {buckets.pending.toLocaleString()} transactions.
+              </b>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, position: 'relative' }}>
+            <button type="button" className="btn btn-ghost btn-sm">Preview rules</button>
+            <button type="button" className="btn btn-primary">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                <path d="M12 3 L13.5 8.5 L19 10 L13.5 11.5 L12 17 L10.5 11.5 L5 10 L10.5 8.5 Z"/>
+              </svg>
+              Auto-tag all
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter form (existing functionality, restyled wrapper) */}
+      <div style={{ padding: '16px 36px 8px' }}>
 
       <form className="card p-5 space-y-4 text-xs" method="GET">
         {/* Preserve the review tab when the user submits other filters */}
@@ -286,8 +487,11 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
           </div>
         </div>
       </form>
+      </div>
 
-      <VirtualTable rows={rows} />
+      <div style={{ padding: '8px 36px 56px' }}>
+        <VirtualTable rows={rows} />
+      </div>
     </div>
   );
 }
