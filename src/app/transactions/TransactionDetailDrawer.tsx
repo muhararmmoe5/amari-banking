@@ -56,6 +56,8 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
     recurringLabel: tx.recurringLabel || '',
     recurringAlertDays: tx.recurringAlertDays || 3,
     moneySource: tx.sourceOfMoney || '',
+    sourceEntityForPay: '',     // derived initially, may be set by picker
+    sourceAccountForPay: tx.sourceAccountId || '',
     needToGetFrom: tx.needToGetFrom || '',
     hop2Person: tx.salaryPersonId || '',
     hop3Entity: tx.passthroughEntity || '',
@@ -994,6 +996,33 @@ function RecurrenceSection({
 function MoneyFlowSection({
   tx, state, setState, open, setOpen,
 }: { tx: Transaction; state: any; setState: any; open: boolean; setOpen: () => void }) {
+  // Source-of-money entity selection: drives the bank account picker on the right
+  const sourceEntity: string = state.sourceEntityForPay || (() => {
+    // Try to derive from sourceOfMoney string if a previous value exists
+    const m = (state.moneySource || '').match(/^(.+?)\s+(revenue|investment income|funds)$/);
+    if (m) {
+      const ent = BUSINESS_ENTITIES.find((e) => ENTITY_LABELS[e] === m[1]);
+      if (ent) return ent;
+    }
+    if (state.moneySource === 'Personal funds') return 'PERSONAL';
+    if (state.moneySource === 'External / other') return 'EXTERNAL';
+    return '';
+  })();
+  const accountsForEntity = sourceEntity && sourceEntity !== 'EXTERNAL'
+    ? ACCOUNTS.filter((a) => a.entity === sourceEntity)
+    : [];
+
+  function pickEntity(en: string) {
+    // Default the moneySource string to "<Entity> revenue" or "Personal funds" or "External / other"
+    const labelFor = en === 'PERSONAL' ? 'Personal funds'
+      : en === 'EXTERNAL' ? 'External / other'
+      : `${ENTITY_LABELS[en as EntityType]} revenue`;
+    setState(
+      { sourceEntityForPay: en, moneySource: labelFor, sourceAccountForPay: '' },
+      { sourceOfMoney: labelFor, sourceAccountId: null }
+    );
+  }
+
   return (
     <SectionCard
       open={open}
@@ -1001,23 +1030,43 @@ function MoneyFlowSection({
       title="Money flow"
       summary={state.moneySource ? `Source: ${state.moneySource}` : 'Not set'}
     >
-      <div className="grid grid-cols-2 gap-3.5">
-        <Field label="Source of money to pay" hint="Which entity pool is paying">
+      <div className="field-label mb-2">Source of money to pay</div>
+      <div className="grid grid-cols-2" style={{ gap: 14 }}>
+        <Field label="① Entity" hint="Which entity's pool is paying">
           <select
-            value={state.moneySource || ''}
-            onChange={(e) => setState({ moneySource: e.target.value }, { sourceOfMoney: e.target.value || null })}
+            value={sourceEntity}
+            onChange={(e) => pickEntity(e.target.value)}
           >
-            <option value="">— select —</option>
-            <optgroup label="Money pools">
-              {BUSINESS_ENTITIES.flatMap((e) => [
-                <option key={`${e}-rev`} value={`${ENTITY_LABELS[e]} revenue`}>{ENTITY_LABELS[e]} revenue</option>,
-                <option key={`${e}-inv`} value={`${ENTITY_LABELS[e]} investment income`}>{ENTITY_LABELS[e]} investment income</option>,
-              ])}
-              <option value="Personal funds">Personal funds</option>
-              <option value="Pre-import balance">Pre-import balance</option>
-            </optgroup>
+            <option value="">— pick entity —</option>
+            {BUSINESS_ENTITIES.map((e) => (
+              <option key={e} value={e}>{ENTITY_LABELS[e]}</option>
+            ))}
+            <option value="PERSONAL">Personal</option>
+            <option value="EXTERNAL">External / other</option>
           </select>
         </Field>
+        <Field
+          label="② Bank account"
+          hint={sourceEntity && sourceEntity !== 'EXTERNAL' && accountsForEntity.length === 0 ? 'no accounts on this entity yet' : `${accountsForEntity.length} account${accountsForEntity.length === 1 ? '' : 's'}`}
+        >
+          <select
+            value={state.sourceAccountForPay || ''}
+            onChange={(e) => {
+              const accountId = e.target.value;
+              setState({ sourceAccountForPay: accountId }, { sourceAccountId: accountId || null });
+            }}
+            disabled={!sourceEntity || sourceEntity === 'EXTERNAL'}
+          >
+            <option value="">— pick account —</option>
+            {accountsForEntity.map((a) => (
+              <option key={a.id} value={a.id}>···{a.last4} — {a.label}</option>
+            ))}
+            <option value="EXTERNAL">External / N/A</option>
+          </select>
+        </Field>
+      </div>
+
+      <div className="mt-4">
         <Field label="Need to get from" hint="Who reimburses this account">
           <select
             value={state.needToGetFrom || ''}
@@ -1027,6 +1076,7 @@ function MoneyFlowSection({
             {BUSINESS_ENTITIES.map((e) => (
               <option key={e} value={`${ENTITY_LABELS[e]} (reimburse from)`}>{ENTITY_LABELS[e]} (reimburse from)</option>
             ))}
+            <option value="Personal funds">Personal (reimburse from)</option>
           </select>
         </Field>
       </div>
