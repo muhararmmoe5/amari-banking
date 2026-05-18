@@ -16,9 +16,20 @@ import {
 import { saveTransaction } from '../actions';
 import { useToast } from '@/components/Toast';
 import BankChip from '@/components/BankChip';
+import DrawerSplitEditor from '../DrawerSplitEditor';
+import { fmtMoney } from '@/lib/format';
 
 interface AccountLite { id: string; label: string; entity: EntityType; last4: string }
 interface FifoSource { merchant: string; amount: number; accountId: string; date: string; isInternal: boolean; attributedAmount: number }
+interface SplitSummary {
+  id: string;
+  amountCents: number;
+  entity: string;
+  subCategory1: string | null;
+  subCategory2: string | null;
+  individual: string | null;
+  notes: string | null;
+}
 
 interface FlagInfo { level: 'critical' | 'high' | 'medium' | 'low'; label: string; color: string }
 function flagFor(score: number | null | undefined): FlagInfo {
@@ -30,11 +41,13 @@ function flagFor(score: number | null | undefined): FlagInfo {
 }
 
 export default function TransactionDetailView({
-  tx, account, fifoSource,
+  tx, account, fifoSource, initialSplitCount, initialSplitSummary,
 }: {
   tx: Transaction;
   account: AccountLite | null;
   fifoSource: FifoSource | null;
+  initialSplitCount: number;
+  initialSplitSummary: SplitSummary[];
 }) {
   const router = useRouter();
   const { saveStart, saveEnd, saveError } = useToast();
@@ -57,7 +70,12 @@ export default function TransactionDetailView({
   const [individual, setIndividual] = useState<string>(tx.individual || '');
   const [docRef, setDocRef] = useState<string>(tx.receiptRef || '');
   const [notes, setNotes] = useState<string>(tx.notes || '');
-  const [isSplit, setIsSplit] = useState(false);
+  // Default to split=true when this transaction already has split rows saved.
+  // Earlier categorization persists in transaction_splits — surface it instead
+  // of hiding it.
+  const [isSplit, setIsSplit] = useState(initialSplitCount > 0);
+  const [editingSplits, setEditingSplits] = useState(false);
+  const splitTotal = initialSplitSummary.reduce((s, x) => s + Math.abs(x.amountCents), 0) / 100;
 
   function persist(patch: any) {
     const id = saveStart();
@@ -270,8 +288,14 @@ export default function TransactionDetailView({
             <AiSourceTraceCard tx={tx} fifoSource={fifoSource} />
           ) : null}
 
-          {/* Split decision */}
-          <SectionEm title="Split transaction" emFirst="Split" sub="Decide first — then categorize each part">
+          {/* Split decision + summary */}
+          <SectionEm
+            title="Split transaction"
+            emFirst="Split"
+            sub={isSplit
+              ? `${initialSplitCount} part${initialSplitCount === 1 ? '' : 's'} · $${splitTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} allocated`
+              : 'Decide first — then categorize each part'}
+          >
             <div className="grid grid-cols-2" style={{ gap: 8 }}>
               <button
                 type="button"
@@ -280,7 +304,7 @@ export default function TransactionDetailView({
               >
                 <Check size={13} style={{ opacity: !isSplit ? 1 : 0.4 }} />
                 One charge · one categorization
-                <span style={{ marginLeft: 'auto', fontSize: 11 }}>●</span>
+                {!isSplit ? <span style={{ marginLeft: 'auto', fontSize: 11 }}>●</span> : null}
               </button>
               <button
                 type="button"
@@ -289,29 +313,126 @@ export default function TransactionDetailView({
               >
                 <SplitIcon size={13} />
                 Split this charge
+                {isSplit ? <Check size={12} style={{ marginLeft: 'auto' }} /> : null}
               </button>
             </div>
-            {isSplit ? (
-              <div
-                style={{
-                  marginTop: 14,
-                  padding: '14px 18px',
-                  background: 'rgba(167,139,250,0.04)',
-                  border: '1px dashed rgba(167,139,250,0.30)',
-                  borderRadius: 10,
-                  fontSize: 12,
-                  color: 'var(--ink-2)',
-                  lineHeight: 1.55,
-                }}
-              >
-                Split editing lives in the legacy drawer for now — open the row from the list and pick
-                &ldquo;Yes — split this charge&rdquo; for the full per-part categorizer (entity, source of money,
-                recurrence, money flow, notes, all per split).
+
+            {isSplit && initialSplitSummary.length > 0 ? (
+              <div style={{ marginTop: 18 }}>
+                <div className="flex flex-col" style={{ gap: 8 }}>
+                  {initialSplitSummary.map((s, i) => {
+                    const color = ['var(--purple)', 'var(--gold)', '#7a9fc9', 'var(--income)'][i % 4];
+                    const entityLabel = (ENTITY_LABELS as any)[s.entity] || s.entity;
+                    return (
+                      <div
+                        key={s.id}
+                        style={{
+                          padding: '12px 14px 12px 12px',
+                          background: 'var(--bg-2, #16161a)',
+                          border: '0.5px solid rgba(255,255,255,0.055)',
+                          borderLeft: `3px solid ${color}`,
+                          borderRadius: 8,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                        }}
+                      >
+                        <span
+                          className="grid place-items-center"
+                          style={{
+                            width: 22, height: 22, borderRadius: 50,
+                            background: color, color: 'var(--bg-0, #0a0a0c)',
+                            fontWeight: 700, fontSize: 10.5,
+                          }}
+                        >
+                          {String.fromCharCode(65 + i)}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className="flex items-center" style={{ gap: 8, fontSize: 12, color: 'var(--ink)' }}>
+                            <span style={{ fontWeight: 500 }}>{entityLabel}</span>
+                            {s.subCategory1 ? (
+                              <>
+                                <span style={{ color: 'var(--ink-4, #44443f)' }}>·</span>
+                                <span style={{ color: 'var(--ink-2)' }}>{s.subCategory1}</span>
+                              </>
+                            ) : null}
+                            {s.subCategory2 ? (
+                              <>
+                                <span style={{ color: 'var(--ink-4, #44443f)' }}>·</span>
+                                <span style={{ color: 'var(--ink-2)' }}>{s.subCategory2}</span>
+                              </>
+                            ) : null}
+                          </div>
+                          {(s.individual || s.notes) ? (
+                            <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 3 }}>
+                              {s.individual ? <span>{s.individual}</span> : null}
+                              {s.individual && s.notes ? <span style={{ color: 'var(--ink-4, #44443f)' }}> · </span> : null}
+                              {s.notes ? <span>{s.notes.slice(0, 80)}{s.notes.length > 80 ? '…' : ''}</span> : null}
+                            </div>
+                          ) : null}
+                        </div>
+                        <span className="num" style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+                          ${(Math.abs(s.amountCents) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center" style={{ marginTop: 12, gap: 10, fontSize: 11, color: 'var(--ink-3)' }}>
+                  <Check size={11} style={{ color: 'var(--income)' }} />
+                  <span>
+                    Allocated{' '}
+                    <span className="num" style={{ color: 'var(--ink-2)' }}>
+                      ${splitTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                    {' '}of{' '}
+                    <span className="num" style={{ color: 'var(--ink-2)' }}>
+                      {fmtMoney(Math.abs(tx.amount))}
+                    </span>
+                  </span>
+                  <span style={{ flex: 1 }} />
+                  <button
+                    type="button"
+                    onClick={() => setEditingSplits((v) => !v)}
+                    className="btn btn-ghost btn-sm"
+                    style={{ color: 'var(--purple)' }}
+                  >
+                    {editingSplits ? 'Done editing' : 'Edit splits'}
+                  </button>
+                </div>
+
+                {editingSplits ? (
+                  <div
+                    style={{
+                      marginTop: 14,
+                      padding: 16,
+                      background: 'rgba(167,139,250,0.04)',
+                      border: '1px solid rgba(167,139,250,0.25)',
+                      borderRadius: 10,
+                    }}
+                  >
+                    <DrawerSplitEditor
+                      transactionId={tx.id}
+                      transactionAmount={tx.amount}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {isSplit && initialSplitSummary.length === 0 ? (
+              <div style={{ marginTop: 14 }}>
+                <DrawerSplitEditor
+                  transactionId={tx.id}
+                  transactionAmount={tx.amount}
+                />
               </div>
             ) : null}
           </SectionEm>
 
-          {/* Books to */}
+          {/* Books to — hidden when split (each part carries its own) */}
+          {!isSplit ? (
           <SectionEm
             title="Books to"
             emFirst="Books"
@@ -476,8 +597,10 @@ export default function TransactionDetailView({
               </div>
             )}
           </SectionEm>
+          ) : null}
 
-          {/* Notes & documentation */}
+          {/* Notes & documentation — hidden when split (per-part notes live in the split editor) */}
+          {!isSplit ? (
           <SectionEm
             title="Notes & documentation"
             emFirst="Notes"
@@ -519,6 +642,7 @@ export default function TransactionDetailView({
               </div>
             </div>
           </SectionEm>
+          ) : null}
 
           {/* Pointer back to the full drawer for advanced editing */}
           <div
