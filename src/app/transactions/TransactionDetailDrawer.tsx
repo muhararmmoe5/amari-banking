@@ -267,19 +267,76 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
             </SectionCard>
 
             {/* Section 4 — Categorization */}
-            <SectionCard title="Categorization" subtitle="Where it books, who it's about, and how it's classified">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Field label="Books to entity">
-                  <select
-                    value={confirmedEntity}
-                    onChange={(e) => { const v = e.target.value as EntityType; setConfirmedEntity(v); persist({ confirmedEntity: v }); }}
-                    className="w-full"
-                  >
-                    {ENTITY_OPTIONS.map((o) => (
-                      <option key={o} value={o}>{ENTITY_LABELS[o]}</option>
-                    ))}
-                  </select>
+            <SectionCard title="Categorization" subtitle="Personal or business · who it's about · how it's classified">
+              <div className="space-y-3">
+                {/* Personal / Business toggle */}
+                <Field label="Is this personal or business?" className="md:col-span-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmedEntity('PERSONAL');
+                        persist({ confirmedEntity: 'PERSONAL' });
+                      }}
+                      className={`px-3 py-2 rounded-md border text-sm font-medium transition ${
+                        confirmedEntity === 'PERSONAL'
+                          ? 'bg-entity-personal/15 border-entity-personal/40 text-ink'
+                          : 'bg-bg-2 border-line text-ink-dim hover:bg-bg-3 hover:text-ink'
+                      }`}
+                    >
+                      👤 Personal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // If switching from Personal, default to the original entity_tag
+                        const v = (confirmedEntity === 'PERSONAL' ? (tx.entityTag as EntityType) : confirmedEntity) || 'BYTES_AI';
+                        setConfirmedEntity(v === 'PERSONAL' ? 'BYTES_AI' : v);
+                        persist({ confirmedEntity: v === 'PERSONAL' ? 'BYTES_AI' : v });
+                      }}
+                      className={`px-3 py-2 rounded-md border text-sm font-medium transition ${
+                        confirmedEntity !== 'PERSONAL'
+                          ? 'bg-accent/15 border-accent/40 text-ink'
+                          : 'bg-bg-2 border-line text-ink-dim hover:bg-bg-3 hover:text-ink'
+                      }`}
+                      style={confirmedEntity !== 'PERSONAL' ? { background: 'rgba(201,168,122,0.15)', borderColor: 'rgba(201,168,122,0.4)' } : undefined}
+                    >
+                      🏢 Business
+                    </button>
+                  </div>
                 </Field>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                {confirmedEntity === 'PERSONAL' ? (
+                  <Field label="Whose personal expense?" hint="pick a person on the Team page">
+                    <select
+                      value={sourcePersonId}
+                      onChange={(e) => {
+                        setSourcePersonId(e.target.value);
+                        persist({ sourcePersonId: e.target.value || null });
+                      }}
+                      className="w-full"
+                    >
+                      <option value="">— pick a person —</option>
+                      {(people || []).map((p) => (
+                        <option key={p.id} value={p.id}>{p.name} ({p.role.toLowerCase()})</option>
+                      ))}
+                    </select>
+                  </Field>
+                ) : (
+                  <Field label="Which business entity?" hint="books to this entity's P&L">
+                    <select
+                      value={confirmedEntity}
+                      onChange={(e) => { const v = e.target.value as EntityType; setConfirmedEntity(v); persist({ confirmedEntity: v }); }}
+                      className="w-full"
+                    >
+                      {ENTITY_OPTIONS.filter((o) => o !== 'PERSONAL').map((o) => (
+                        <option key={o} value={o}>{ENTITY_LABELS[o]}</option>
+                      ))}
+                    </select>
+                  </Field>
+                )}
                 <Field
                   label={tx.amount > 0 ? 'Source person (income)' : 'Counterparty person'}
                   hint={tx.amount > 0 ? 'who this money came FROM' : 'who this money went TO, if applicable'}
