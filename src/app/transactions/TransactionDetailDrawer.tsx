@@ -70,6 +70,7 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
     needsEscalation: !!tx.needsEscalation,
     escalationTo: tx.escalationTo || '',
     escalationNotes: tx.escalationNotes || '',
+    fundingCommitmentId: tx.fundingCommitmentId || '',
     moneySource: tx.sourceOfMoney || '',
     sourceEntityForPay: '',     // derived initially, may be set by picker
     sourceAccountForPay: tx.sourceAccountId || '',
@@ -915,6 +916,18 @@ function BusinessPath({ state, setState, isIncome = false }: { state: any; setSt
           placeholder="Pick or add a person"
         />
       </Field>
+
+      {/* Capital Investment — tie this wire to an existing investor commitment */}
+      {isIncome && state.businessCat1Key === 'CAPITAL' ? (
+        <CommitmentPicker
+          value={state.fundingCommitmentId || ''}
+          entity={state.confirmedEntity}
+          personName={state.individual || ''}
+          onChange={(commitmentId) =>
+            setState({ fundingCommitmentId: commitmentId }, { fundingCommitmentId: commitmentId || null })
+          }
+        />
+      ) : null}
     </div>
   );
 }
@@ -1965,5 +1978,150 @@ function ReviewSection({
         ) : null}
       </div>
     </SectionCard>
+  );
+}
+
+// ──────────── Capital Investment → Commitment picker ────────────
+interface CommitmentLite {
+  id: string;
+  entity: string;
+  personId: string;
+  personName: string | null;
+  totalAmountCents: number;
+  monthlyAmountCents: number | null;
+  fundedCents: number;
+  remainingCents: number;
+  pctFunded: number;
+}
+
+function CommitmentPicker({
+  value, entity, personName, onChange,
+}: {
+  value: string;
+  entity: string | null;
+  personName: string;
+  onChange: (commitmentId: string | null) => void;
+}) {
+  const [commitments, setCommitments] = useState<CommitmentLite[]>([]);
+
+  useEffect(() => {
+    let cancel = false;
+    fetch('/api/commitments', { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((d) => { if (!cancel) setCommitments(d.commitments || []); })
+      .catch(() => { if (!cancel) setCommitments([]); });
+    return () => { cancel = true; };
+  }, []);
+
+  const scoped = commitments.filter((c) => c.entity === entity);
+  const otherEntity = commitments.filter((c) => c.entity !== entity);
+  const selected = commitments.find((c) => c.id === value) || null;
+
+  // Best-guess match suggestion: same entity + same person name
+  const suggested = !value && personName
+    ? scoped.find((c) => c.personName?.toLowerCase() === personName.toLowerCase())
+    : null;
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        padding: '12px 14px',
+        background: 'rgba(167,139,250,0.06)',
+        border: '0.5px solid rgba(167,139,250,0.30)',
+        borderRadius: 8,
+      }}
+    >
+      <div className="field-label" style={{ marginBottom: 6, color: 'var(--purple)' }}>
+        Investor commitment
+      </div>
+      <div className="text-[11.5px] text-ink-mute mb-2">
+        Tie this wire to the master commitment so the remaining balance + monthly
+        tranches update automatically. Set up commitments on /cap or /team.
+      </div>
+
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value || null)}
+        style={{ fontSize: 12 }}
+      >
+        <option value="">— no commitment linked —</option>
+        {scoped.length > 0 ? (
+          <optgroup label={`${(ENTITY_LABELS as any)[entity || ''] || entity || 'This entity'} commitments`}>
+            {scoped.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.personName || '—'} · ${(c.totalAmountCents / 100).toLocaleString()} total
+                {c.monthlyAmountCents ? ` · $${(c.monthlyAmountCents / 100).toLocaleString()}/mo` : ''}
+              </option>
+            ))}
+          </optgroup>
+        ) : null}
+        {otherEntity.length > 0 ? (
+          <optgroup label="Other entities">
+            {otherEntity.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.personName || '—'} · {(ENTITY_LABELS as any)[c.entity] || c.entity} · ${(c.totalAmountCents / 100).toLocaleString()}
+              </option>
+            ))}
+          </optgroup>
+        ) : null}
+      </select>
+
+      {suggested ? (
+        <button
+          type="button"
+          onClick={() => onChange(suggested.id)}
+          className="btn btn-sm mt-2"
+          style={{
+            background: 'rgba(167,139,250,0.12)',
+            borderColor: 'rgba(167,139,250,0.40)',
+            color: 'var(--purple)',
+            fontSize: 11,
+          }}
+        >
+          Match → {suggested.personName} · ${(suggested.totalAmountCents / 100).toLocaleString()} commitment
+        </button>
+      ) : null}
+
+      {selected ? (
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-[11px] mb-1.5">
+            <span className="text-ink-mute">
+              {selected.personName} ·{' '}
+              {(ENTITY_LABELS as any)[selected.entity] || selected.entity}
+            </span>
+            <span className="num font-medium" style={{ color: 'var(--ink)' }}>
+              {fmtMoney(selected.fundedCents / 100)} of {fmtMoney(selected.totalAmountCents / 100)}
+              <span className="text-ink-mute">{' · '}{Math.round(selected.pctFunded * 100)}%</span>
+            </span>
+          </div>
+          <div style={{ height: 5, background: 'var(--bg-3)', borderRadius: 3, overflow: 'hidden' }}>
+            <div
+              style={{
+                width: `${Math.min(100, selected.pctFunded * 100)}%`,
+                height: '100%',
+                background: selected.pctFunded >= 1
+                  ? 'var(--income)'
+                  : 'linear-gradient(90deg, var(--purple), color-mix(in oklab, var(--purple) 60%, var(--gold)))',
+                transition: 'width 220ms ease',
+              }}
+            />
+          </div>
+          {selected.monthlyAmountCents ? (
+            <div className="text-[10.5px] text-ink-mute mt-2">
+              Monthly tranche target:{' '}
+              <span className="num text-ink">${(selected.monthlyAmountCents / 100).toLocaleString()}</span>{' '}
+              · Remaining{' '}
+              <span className="num text-ink">{fmtMoney(selected.remainingCents / 100)}</span>
+            </div>
+          ) : (
+            <div className="text-[10.5px] text-ink-mute mt-2">
+              Remaining{' '}
+              <span className="num text-ink">{fmtMoney(selected.remainingCents / 100)}</span>
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
   );
 }

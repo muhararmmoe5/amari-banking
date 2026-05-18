@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listCommitments, getPerson } from '@/lib/db/cap';
+import { listCommitments, getPerson, commitmentFundedCents } from '@/lib/db/cap';
 import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -11,12 +11,19 @@ export async function GET() {
     .filter((c) => c.status === 'ACTIVE')
     .map((c) => {
       const person = getPerson(c.personId);
+      const fundedCents = commitmentFundedCents(c.id);
+      const remainingCents = Math.max(0, c.totalAmountCents - fundedCents);
+      const pctFunded = c.totalAmountCents > 0 ? Math.min(1, fundedCents / c.totalAmountCents) : 0;
       return {
         id: c.id,
         entity: c.entity,
         personId: c.personId,
         personName: person?.name || null,
+        totalAmountCents: c.totalAmountCents,
         monthlyAmountCents: c.monthlyAmountCents,
+        fundedCents,
+        remainingCents,
+        pctFunded,
         equityPercent: c.equityPercent,
       };
     });

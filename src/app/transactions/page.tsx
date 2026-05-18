@@ -87,7 +87,24 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
     orderDir,
     limit: 5000,
   };
-  const rows = listTransactions(filters);
+  const rawRows = listTransactions(filters);
+
+  // When a single account is filtered, balances skip rows that are hidden by
+  // other filters (review status, status, flagged, etc.) and look jumpy.
+  // Anchor at the newest visible row's Chase balance (which is the truth for
+  // that moment) and walk backward: each older visible row's synthetic
+  // balance = newer.balance - newer.amount. This makes the column read
+  // continuously regardless of how many in-between rows are hidden.
+  const rows = (() => {
+    if (!filters.accountId || rawRows.length < 2) return rawRows;
+    const out = [...rawRows];
+    for (let i = 1; i < out.length; i++) {
+      const prev = out[i - 1];
+      if (prev.balance == null) continue;
+      out[i] = { ...out[i], balance: prev.balance - prev.amount };
+    }
+    return out;
+  })();
   const total = countTransactions({ hideInternal });
   const buckets = reviewBucketCounts();
 
