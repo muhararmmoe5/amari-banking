@@ -1,8 +1,26 @@
 import 'server-only';
+import crypto from 'crypto';
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { ACCOUNTS } from '@/constants/accounts';
+
+// Plaid-readiness primitives (must match src/lib/db/fingerprint.ts).
+// Duplicated here to keep migration self-contained without import cycles.
+function normalizeMerchantStr(s: string): string {
+  if (!s) return '';
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\b(pos|purchase|debit|ach|web|tst|sq|tst\*|pp)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 32);
+}
+function computeFingerprintStr(amount: number, date: string, merchantRaw: string): string {
+  const norm = normalizeMerchantStr(merchantRaw);
+  return crypto.createHash('sha256').update(`${amount.toFixed(2)}|${date}|${norm}`).digest('hex');
+}
 
 const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'amari.db');
 
@@ -281,7 +299,59 @@ export function getDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_funding_split_expense ON expense_funding_splits(expense_tx_id);
     CREATE INDEX IF NOT EXISTS idx_funding_split_source ON expense_funding_splits(source_tx_id);
+
+    -- Plaid-readiness: ingestion log (CSV files + Plaid syncs)
+    CREATE TABLE IF NOT EXISTS ingestion_log (
+      id TEXT PRIMARY KEY,
+      source TEXT NOT NULL,                          -- 'csv' | 'plaid'
+      identifier TEXT,                               -- filename for CSV, cursor for Plaid
+      started_at INTEGER NOT NULL,
+      completed_at INTEGER,
+      records_inserted INTEGER NOT NULL DEFAULT 0,
+      records_merged INTEGER NOT NULL DEFAULT 0,    -- CSV row matched & promoted to Plaid
+      records_duplicate INTEGER NOT NULL DEFAULT 0, -- Plaid sent same row again
+      records_skipped INTEGER NOT NULL DEFAULT 0,
+      records_orphaned INTEGER NOT NULL DEFAULT 0,  -- CSV row Plaid didn't see
+      notes TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_ingestion_log_source ON ingestion_log(source, started_at DESC);
   `);
+
+  // Plaid-readiness indexes (after ALTER TABLE columns are in place)
+  try {
+    db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_tx_source_external
+        ON transactions(source, external_id) WHERE external_id IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_tx_fingerprint
+        ON transactions(fingerprint, account_id);
+      CREATE INDEX IF NOT EXISTS idx_accounts_source_external
+        ON accounts(source, external_id);
+    `);
+  } catch (_e) { /* indexes may already exist */ }
+
+  // One-time backfill: populate fingerprint + merchant_normalized for rows
+  // imported before the Plaid-ready migration. The fingerprint matches the
+  // spec in CLAUDE.md: sha256(amount|date|normalize_merchant(merchant_raw)).
+  try {
+    const needsBackfill = (db.prepare(
+      `SELECT COUNT(*) as c FROM transactions WHERE fingerprint IS NULL`
+    ).get() as { c: number }).c;
+    if (needsBackfill > 0) {
+      const rows = db.prepare(
+        `SELECT id, amount, posting_date, description, merchant_name FROM transactions WHERE fingerprint IS NULL`
+      ).all() as Array<{ id: string; amount: number; posting_date: string; description: string; merchant_name: string | null }>;
+      const upd = db.prepare(`UPDATE transactions SET fingerprint = ?, merchant_normalized = ? WHERE id = ?`);
+      const tx = db.transaction((batch: typeof rows) => {
+        for (const r of batch) {
+          const raw = r.merchant_name || r.description || '';
+          const norm = normalizeMerchantStr(raw);
+          const fp = computeFingerprintStr(r.amount, r.posting_date, raw);
+          upd.run(fp, norm, r.id);
+        }
+      });
+      tx(rows);
+    }
+  } catch (_e) { /* swallow — first-run before columns exist */ }
 
   // Forward-compatible column adds (SQLite ALTER ignores if column exists in some versions; we catch)
   for (const sql of [
@@ -358,6 +428,18 @@ export function getDb(): Database.Database {
     `ALTER TABLE transactions ADD COLUMN salary_id TEXT REFERENCES salaries(id) ON DELETE SET NULL`,
     `ALTER TABLE transaction_splits ADD COLUMN salary_id TEXT REFERENCES salaries(id) ON DELETE SET NULL`,
     `ALTER TABLE transaction_splits ADD COLUMN budget_id TEXT REFERENCES budgets(id) ON DELETE SET NULL`,
+    // ── Plaid-readiness (CLAUDE.md rules) ────────────────────────────
+    `ALTER TABLE accounts ADD COLUMN source TEXT NOT NULL DEFAULT 'csv'`,
+    `ALTER TABLE accounts ADD COLUMN external_id TEXT`,
+    `ALTER TABLE accounts ADD COLUMN institution TEXT`,
+    `ALTER TABLE accounts ADD COLUMN account_type TEXT`,
+    `ALTER TABLE transactions ADD COLUMN source TEXT NOT NULL DEFAULT 'csv'`,
+    `ALTER TABLE transactions ADD COLUMN external_id TEXT`,
+    `ALTER TABLE transactions ADD COLUMN raw_data TEXT`,
+    `ALTER TABLE transactions ADD COLUMN fingerprint TEXT`,
+    `ALTER TABLE transactions ADD COLUMN merchant_normalized TEXT`,
+    `ALTER TABLE transactions ADD COLUMN pending INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE transactions ADD COLUMN pending_external_id TEXT`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }

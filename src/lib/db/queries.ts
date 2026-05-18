@@ -92,6 +92,12 @@ function hashTx(accountId: string, date: string, amount: number, description: st
     .slice(0, 32);
 }
 
+// Re-export the Plaid-ready fingerprint primitive so callers don't reach
+// into lib/db internals.
+import { computeFingerprint as _computeFingerprint, normalizeMerchant as _normalizeMerchant } from './fingerprint';
+export const computeFingerprint = _computeFingerprint;
+export const normalizeMerchant = _normalizeMerchant;
+
 export interface SaveBatchResult {
   batchId: string;
   inserted: number;
@@ -117,16 +123,18 @@ export function saveImportBatch(
   const insertTx = db.prepare(
     `INSERT OR IGNORE INTO transactions (
       id, account_id, posting_date, transaction_date, description, amount, type, balance,
-      merchant_name, category, entity_tag, is_internal, internal_linked_id,
+      merchant_name, merchant_normalized, category, entity_tag, is_internal, internal_linked_id,
       income_source, confirmed_entity, confirmed_category, business_purpose,
       receipt_ref, audit_status, audit_flags, audit_score, notes,
-      zelle_person, zelle_type, imported_at, updated_at, import_batch_id, hash
+      zelle_person, zelle_type, imported_at, updated_at, import_batch_id, hash,
+      source, external_id, raw_data, fingerprint, pending
     ) VALUES (
       @id, @account_id, @posting_date, @transaction_date, @description, @amount, @type, @balance,
-      @merchant_name, @category, @entity_tag, @is_internal, NULL,
+      @merchant_name, @merchant_normalized, @category, @entity_tag, @is_internal, NULL,
       @income_source, NULL, NULL, NULL,
       NULL, 'UNREVIEWED', @audit_flags, @audit_score, NULL,
-      @zelle_person, @zelle_type, @imported_at, @updated_at, @import_batch_id, @hash
+      @zelle_person, @zelle_type, @imported_at, @updated_at, @import_batch_id, @hash,
+      'csv', NULL, @raw_data, @fingerprint, 0
     )`
   );
 
@@ -137,6 +145,9 @@ export function saveImportBatch(
     for (const r of rows) {
       const hash = hashTx(r.accountId, r.postingDate, r.amount, r.description);
       const id = crypto.randomUUID();
+      const merchantRaw = r.merchantName || r.description;
+      const merchantNormalized = _normalizeMerchant(merchantRaw);
+      const fingerprint = _computeFingerprint(r.amount, r.postingDate, merchantRaw);
       const res = insertTx.run({
         id,
         account_id: r.accountId,
@@ -147,6 +158,7 @@ export function saveImportBatch(
         type: r.type,
         balance: r.balance,
         merchant_name: r.merchantName,
+        merchant_normalized: merchantNormalized,
         category: r.category,
         entity_tag: r.entityTag,
         is_internal: r.isInternal ? 1 : 0,
@@ -159,12 +171,25 @@ export function saveImportBatch(
         updated_at: now,
         import_batch_id: batchId,
         hash,
+        raw_data: JSON.stringify(r),
+        fingerprint,
       });
       if (res.changes > 0) inserted += 1;
       else duplicates += 1;
     }
   });
   txWrite();
+
+  // Also log to the source-aware ingestion_log table (CLAUDE.md contract).
+  // import_batches is kept for backward compat with existing UI references.
+  try {
+    db.prepare(`
+      INSERT INTO ingestion_log (id, source, identifier, started_at, completed_at,
+        records_inserted, records_merged, records_duplicate, records_skipped, records_orphaned)
+      VALUES (?, 'csv', ?, ?, ?, ?, 0, ?, 0, 0)
+    `).run(crypto.randomUUID(), filename, now, Date.now(), inserted, duplicates);
+  } catch (_e) { /* table may not exist on very old dbs */ }
+
   return { batchId, inserted, duplicates };
 }
 
