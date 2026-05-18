@@ -87,48 +87,12 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
     orderDir,
     limit: 5000,
   };
-  const rawRows = listTransactions(filters);
-
-  // True running balance for the selected account.
-  //
-  // When a single account is filtered, we pull the COMPLETE chronological
-  // list for that account (irrespective of other filters / hidden rows),
-  // anchor at the oldest row's reported Chase balance, and walk forward
-  // computing balance[i] = balance[i-1] + amount[i]. Each visible row then
-  // gets looked up from that map.
-  //
-  // This gives every row a balance that reflects the real account state at
-  // its moment, with no gaps from hidden rows. If Chase's own per-row
-  // balances were already correct (they usually are), this is identical to
-  // what was imported. If a same-day ordering disagreement causes drift,
-  // this re-computes it cleanly.
-  let rows = rawRows;
-  if (filters.accountId) {
-    const full = listTransactions({
-      accountId: filters.accountId,
-      hideInternal: false,
-      orderDir: 'ASC',
-      limit: 50000,
-    });
-    if (full.length > 0) {
-      const balanceById = new Map<string, number>();
-      // Anchor: the oldest row's reported Chase balance was AFTER it posted.
-      // So the pre-anchor balance = anchor.balance - anchor.amount.
-      const anchor = full[0];
-      if (anchor.balance != null) {
-        balanceById.set(anchor.id, anchor.balance);
-        let running = anchor.balance;
-        for (let i = 1; i < full.length; i++) {
-          running = running + full[i].amount;
-          balanceById.set(full[i].id, running);
-        }
-      }
-      rows = rawRows.map((r) => {
-        const computed = balanceById.get(r.id);
-        return computed != null ? { ...r, balance: computed } : r;
-      });
-    }
-  }
+  // Balances are the per-row Chase truth as imported. No re-computation —
+  // every previous attempt at synthesizing a running balance broke down
+  // because same-day rows have no deterministic secondary sort, so any
+  // walk-forward or walk-backward diverged from what Chase actually
+  // reported. The imported balance is the bank's word at that moment.
+  const rows = listTransactions(filters);
   const total = countTransactions({ hideInternal });
   const buckets = reviewBucketCounts();
 

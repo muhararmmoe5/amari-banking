@@ -25,7 +25,7 @@ export default function VirtualTable({ rows }: { rows: Transaction[] }) {
         <Cell title="The Chase account this transaction posted on">Paid from</Cell>
         <Cell>Merchant / Description</Cell>
         <Cell className="text-right">Amount</Cell>
-        <Cell className="text-right" title="Account balance after this transaction posted. When a single account is selected, this is computed from the COMPLETE chronological list for that account (including any rows hidden by filters), so the column reflects real account state at each row's moment. Gaps in visible rows can still show large jumps — that's because in-between transactions are filtered out of view but were part of the real flow.">Balance after</Cell>
+        <Cell className="text-right" title="Account balance after this transaction posted — as reported by Chase at import. If you've filtered the list (review tab, status, etc.), jumps row-to-row mean filtered-out transactions happened in between; that's the truth, not a bug.">Balance after</Cell>
         <Cell title="Which business this expense is booked to">Books to</Cell>
         <Cell>Sub category</Cell>
         <Cell>Status</Cell>

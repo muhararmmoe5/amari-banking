@@ -168,7 +168,7 @@ export default function Sidebar({
           </div>
           <LogOut size={12} className="text-ink-mute group-hover:text-expense transition" />
         </button>
-        <div className="mono text-[10px] text-ink-ghost px-2 pt-2">v.real-bal · main</div>
+        <div className="mono text-[10px] text-ink-ghost px-2 pt-2">v.chase-truth · main</div>
       </div>
     </aside>
   );
