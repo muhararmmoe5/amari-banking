@@ -10,7 +10,7 @@ import type { Transaction, EntityType, AuditStatus } from '@/types';
 import { ACCOUNTS, ENTITY_LABELS, ENTITY_COLORS, BUSINESS_ENTITIES, getAccount } from '@/constants/accounts';
 import { PERSONAL_CATEGORIES, BUSINESS_CATEGORIES } from '@/constants/categories';
 import { fmtMoney, fmtDate } from '@/lib/format';
-import { saveTransaction } from './actions';
+import { saveTransaction, recurringAllocationPreviewAction } from './actions';
 import { listSplitsAction } from './splitActions';
 import { useToast } from '@/components/Toast';
 import Portal from '@/components/Portal';
@@ -1154,6 +1154,11 @@ function RecurrenceSection({
                 </select>
               </Field>
             </div>
+            <EntityAllocationPreview
+              txId={tx.id}
+              expectedAmount={Number(String(state.recurringExpectedAmount).replace(/[^0-9.\-]/g, '')) || Math.abs(tx.amount)}
+              frequency={state.recurringFrequency || 'MONTHLY'}
+            />
             <div
               className="mt-3 flex items-center gap-2"
               style={{
@@ -1615,5 +1620,65 @@ function CPASection({
         </div>
       )}
     </SectionCard>
+  );
+}
+
+// ──────────────── Entity allocation preview (Recurrence) ────────────────
+function EntityAllocationPreview({
+  txId, expectedAmount, frequency,
+}: { txId: string; expectedAmount: number; frequency: string }) {
+  const [items, setItems] = useState<Array<{ entity: string; monthlyShare: number; sharePct: number }> | null>(null);
+
+  useEffect(() => {
+    let cancel = false;
+    recurringAllocationPreviewAction(txId, expectedAmount, frequency)
+      .then((rows: any[]) => { if (!cancel) setItems(rows as any); })
+      .catch(() => { if (!cancel) setItems([]); });
+    return () => { cancel = true; };
+  }, [txId, expectedAmount, frequency]);
+
+  if (!items || items.length === 0) return null;
+  const total = items.reduce((s, x) => s + x.monthlyShare, 0);
+  if (total <= 0) return null;
+
+  return (
+    <div
+      className="mt-3"
+      style={{
+        padding: '10px 12px',
+        background: 'rgba(167,139,250,0.06)',
+        border: '0.5px solid rgba(167,139,250,0.25)',
+        borderRadius: 8,
+      }}
+    >
+      <div
+        className="field-label"
+        style={{ marginBottom: 8, color: 'var(--purple, #a78bfa)' }}
+      >
+        Forecast rolls up to
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {items.map((it, i) => {
+          const color = (ENTITY_COLORS as any)[it.entity] || '#6f6e68';
+          const label = (ENTITY_LABELS as any)[it.entity] || it.entity;
+          return (
+            <div key={i} className="flex items-center gap-2 text-[11.5px]">
+              <span style={{ width: 7, height: 7, borderRadius: 50, background: color }} />
+              <span style={{ color: 'var(--ink)' }}>{label}</span>
+              <span className="text-ink-mute">{(it.sharePct * 100).toFixed(0)}%</span>
+              <span className="flex-1" />
+              <span className="num font-medium" style={{ color: 'var(--ink)' }}>
+                {fmtMoney(it.monthlyShare)}/mo
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {items.length > 1 ? (
+        <div className="text-[10px] text-ink-mute mt-2">
+          Allocated by the splits below — change a split's entity to re-route.
+        </div>
+      ) : null}
+    </div>
   );
 }

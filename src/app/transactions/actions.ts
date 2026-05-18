@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { updateTransaction, type UpdateTxPatch } from '@/lib/db/queries';
+import { previewRecurringAllocation } from '@/lib/db/forecasts';
 import { requireUser } from '@/lib/auth';
 
 export async function saveTransaction(id: string, patch: UpdateTxPatch) {
@@ -9,6 +10,15 @@ export async function saveTransaction(id: string, patch: UpdateTxPatch) {
   revalidatePath('/transactions');
   revalidatePath('/audit');
   revalidatePath('/');
+}
+
+export async function recurringAllocationPreviewAction(
+  txId: string,
+  expectedAmount: number,
+  frequency: string,
+) {
+  requireUser();
+  return previewRecurringAllocation(txId, expectedAmount, frequency);
 }
 
 export async function bulkApplyTagsAction(txIds: string[], patch: UpdateTxPatch): Promise<{ updated: number }> {
