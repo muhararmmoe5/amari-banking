@@ -1555,7 +1555,7 @@ function NotesSection({
 }) {
   const filled = notesOnly
     ? (state.notes ? 1 : 0)
-    : [state.businessPurpose, state.docRef, state.notes].filter(Boolean).length;
+    : [state.docRef, state.notes].filter(Boolean).length;
   return (
     <SectionCard
       open={open}
@@ -1565,21 +1565,7 @@ function NotesSection({
     >
       {!notesOnly ? (
         <>
-          <Field label="Business purpose">
-            <select
-              value={state.businessPurpose || ''}
-              onChange={(e) => setState({ businessPurpose: e.target.value }, { businessPurpose: e.target.value || null })}
-            >
-              <option value="">— pick —</option>
-              {[
-                'Vendor payment', 'Contractor payment', 'Employee compensation', 'Client acquisition',
-                'Software license', 'Equipment purchase', 'Business meal', 'Travel for business',
-                'Tax payment', 'Loan repayment', 'Family support', 'Personal expense',
-              ].map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </Field>
-
-          <div className="grid grid-cols-2 gap-3.5 mt-3">
+          <div className="grid grid-cols-2 gap-3.5">
             <Field label="Doc reference">
               <input
                 type="text"
