@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Sparkles } from 'lucide-react';
 import type { Transaction } from '@/types';
 import { ACCOUNTS, ENTITY_COLORS } from '@/constants/accounts';
@@ -8,7 +9,6 @@ import { Money } from '@/components/Money';
 import { EntityBadge } from '@/components/EntityBadge';
 import { FlagBadge } from '@/components/FlagBadge';
 import { fmtDateShort, fmtMoney } from '@/lib/format';
-import TransactionDetailDrawer from './TransactionDetailDrawer';
 
 export const ROW_GRID = '92px 100px 1fr 120px 120px 170px 140px 130px 70px 110px 90px';
 
@@ -40,7 +40,6 @@ function statusStyleFor(tx: Transaction): StatusStyle {
 }
 
 export function TransactionRow({ tx }: { tx: Transaction }) {
-  const [detailOpen, setDetailOpen] = useState(false);
   const [hover, setHover] = useState(false);
   const acct = ACCOUNTS.find((a) => a.id === tx.accountId);
   const bookedEntity = (tx.confirmedEntity || tx.entityTag) as keyof typeof ENTITY_COLORS;
@@ -48,17 +47,11 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
   const status = statusStyleFor(tx);
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={() => setDetailOpen(true)}
+    <Link
+      href={`/transactions/${tx.id}`}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailOpen(true); }
-      }}
-      className="grid items-center cursor-pointer focus:outline-none"
+      className="grid items-center focus:outline-none"
       style={{
         gridTemplateColumns: ROW_GRID,
         borderTop: '1px solid rgba(255,255,255,0.055)',
@@ -189,8 +182,6 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
 
       {/* Flag */}
       <div className="px-3 py-3"><FlagBadge score={tx.auditScore} /></div>
-
-      {detailOpen ? <TransactionDetailDrawer tx={tx} onClose={() => setDetailOpen(false)} /> : null}
-    </div>
+    </Link>
   );
 }
