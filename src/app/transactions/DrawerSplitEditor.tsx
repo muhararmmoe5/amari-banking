@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState, useTransition } from 'react';
-import { Plus, X, User, Building2, Split as SplitIcon, Lock, ArrowRight, StickyNote, Repeat } from 'lucide-react';
+import { Plus, X, User, Building2, Split as SplitIcon, Lock, ArrowRight, StickyNote, Repeat, GitBranch, Activity } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import { fmtMoney } from '@/lib/format';
 import {
@@ -110,6 +110,13 @@ export default function DrawerSplitEditor({ transactionId, transactionAmount }: 
         if (patch.recurringLabel !== undefined) actionPatch.recurringLabel = patch.recurringLabel;
         if (patch.recurringAlertDays !== undefined) actionPatch.recurringAlertDays = patch.recurringAlertDays;
         if (patch.recurringExpectedCents !== undefined) actionPatch.recurringExpectedCents = patch.recurringExpectedCents;
+        if (patch.needToGetFrom !== undefined) actionPatch.needToGetFrom = patch.needToGetFrom;
+        if (patch.hop2Person !== undefined) actionPatch.hop2Person = patch.hop2Person;
+        if (patch.hop3Entity !== undefined) actionPatch.hop3Entity = patch.hop3Entity;
+        if (patch.passedOnward !== undefined) actionPatch.passedOnward = patch.passedOnward;
+        if (patch.passthroughEntity !== undefined) actionPatch.passthroughEntity = patch.passthroughEntity;
+        if (patch.passthroughPurpose !== undefined) actionPatch.passthroughPurpose = patch.passthroughPurpose;
+        if (patch.passthroughNotes !== undefined) actionPatch.passthroughNotes = patch.passthroughNotes;
         await updateSplitAction(rowId, actionPatch);
         saveEnd(id);
       } catch (e: any) { saveError(id, e?.message); }
@@ -414,9 +421,253 @@ function SplitRow({
         <SplitRecurrence split={split} onPatch={onPatch} />
       ) : null}
 
+      {/* Per-split money flow — reimbursement + downstream chain */}
+      {path ? (
+        <SplitMoneyFlow split={split} onPatch={onPatch} />
+      ) : null}
+
+      {/* Per-split passed onward — economic hit landed on a different entity */}
+      {path ? (
+        <SplitPassedOnward split={split} onPatch={onPatch} />
+      ) : null}
+
       {/* Per-split notes — tag each part on its own */}
       {path ? (
         <SplitNotes split={split} onPatch={onPatch} />
+      ) : null}
+    </div>
+  );
+}
+
+function SplitMoneyFlow({
+  split, onPatch,
+}: {
+  split: TransactionSplit;
+  onPatch: (p: Partial<TransactionSplit>) => void;
+}) {
+  const hasAny = !!(split.needToGetFrom || split.hop2Person || split.hop3Entity);
+  const [open, setOpen] = useState(hasAny);
+
+  return (
+    <div
+      className="mt-2.5"
+      style={{
+        padding: '10px 12px',
+        background: hasAny ? 'rgba(96,165,250,0.05)' : 'rgba(255,255,255,0.02)',
+        border: '0.5px solid ' + (hasAny ? 'rgba(96,165,250,0.25)' : 'var(--border-subtle, rgba(255,255,255,0.07))'),
+        borderRadius: 7,
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 w-full text-left"
+      >
+        <GitBranch size={11} style={{ color: hasAny ? 'var(--blue, #60a5fa)' : 'var(--ink-mute)' }} />
+        <span
+          className="field-label"
+          style={{ marginBottom: 0, color: hasAny ? 'var(--blue, #60a5fa)' : undefined }}
+        >
+          Money flow for this part
+        </span>
+        <span className="flex-1" />
+        <span className="text-[10.5px] text-ink-mute">
+          {hasAny ? 'configured' : 'reimbursement / chain'}
+        </span>
+        <span className="text-ink-mute text-[10px]" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 180ms ease' }}>▾</span>
+      </button>
+
+      {open ? (
+        <div className="flex flex-col mt-2" style={{ gap: 8 }}>
+          <div>
+            <div className="field-label" style={{ marginBottom: 4 }}>Need to get from</div>
+            <select
+              value={split.needToGetFrom || ''}
+              onChange={(e) => onPatch({ needToGetFrom: e.target.value || null })}
+              style={{ fontSize: 12, height: 28 }}
+            >
+              <option value="">No need</option>
+              {BUSINESS_ENTITIES.map((e) => (
+                <option key={e} value={`${(ENTITY_LABELS as any)[e]} (reimburse from)`}>
+                  {(ENTITY_LABELS as any)[e]} (reimburse from)
+                </option>
+              ))}
+              <option value="Personal funds">Personal (reimburse from)</option>
+            </select>
+            <div className="text-[10px] text-ink-mute mt-1">Who reimburses this account for this part</div>
+          </div>
+
+          <div
+            className="mt-1"
+            style={{
+              padding: '8px 10px',
+              background: 'var(--bg-2)',
+              border: '0.5px solid var(--border-subtle, rgba(255,255,255,0.07))',
+              borderRadius: 6,
+            }}
+          >
+            <div className="field-label" style={{ marginBottom: 6 }}>Money chain · who got it next?</div>
+            <div className="grid grid-cols-2" style={{ gap: 8 }}>
+              <div>
+                <div className="field-label" style={{ marginBottom: 4 }}>Hop 2 · pays to person</div>
+                <PersonPicker
+                  value={split.hop2Person || ''}
+                  onChange={(name) => onPatch({ hop2Person: name || null })}
+                  placeholder="— stayed in entity —"
+                  compact
+                />
+                <div className="text-[10px] text-ink-mute mt-1">As salary / wages</div>
+              </div>
+              <div>
+                <div className="field-label" style={{ marginBottom: 4 }}>Hop 3 · forwards to</div>
+                <select
+                  value={split.hop3Entity || ''}
+                  onChange={(e) => onPatch({ hop3Entity: e.target.value || null })}
+                  style={{ fontSize: 12, height: 28 }}
+                >
+                  <option value="">— didn&apos;t flow onward —</option>
+                  {BUSINESS_ENTITIES.map((e) => (
+                    <option key={e} value={e}>{(ENTITY_LABELS as any)[e]}</option>
+                  ))}
+                </select>
+                <div className="text-[10px] text-ink-mute mt-1">Where it ultimately lands</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SplitPassedOnward({
+  split, onPatch,
+}: {
+  split: TransactionSplit;
+  onPatch: (p: Partial<TransactionSplit>) => void;
+}) {
+  const active = !!split.passedOnward;
+  const [purpose, setPurpose] = useState(split.passthroughPurpose || '');
+  const [notes, setNotes] = useState(split.passthroughNotes || '');
+
+  return (
+    <div
+      className="mt-2.5"
+      style={{
+        padding: '10px 12px',
+        background: active ? 'rgba(251,191,36,0.06)' : 'rgba(255,255,255,0.02)',
+        border: '0.5px solid ' + (active ? 'rgba(251,191,36,0.30)' : 'var(--border-subtle, rgba(255,255,255,0.07))'),
+        borderRadius: 7,
+      }}
+    >
+      <div className="flex items-center gap-1.5 mb-2">
+        <Activity size={11} style={{ color: active ? 'var(--warn)' : 'var(--ink-mute)' }} />
+        <span
+          className="field-label"
+          style={{ marginBottom: 0, color: active ? 'var(--warn)' : undefined }}
+        >
+          Passed onward for this part
+        </span>
+        <span className="flex-1" />
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => onPatch({
+              passedOnward: false,
+              passthroughEntity: null,
+              passthroughPurpose: null,
+              passthroughNotes: null,
+            })}
+            className="btn btn-sm"
+            style={{
+              padding: '3px 8px',
+              fontSize: 10.5,
+              background: !active ? 'var(--bg-2)' : 'transparent',
+              borderColor: !active ? 'var(--ink-3)' : 'var(--border-default, rgba(255,255,255,0.12))',
+              color: !active ? 'var(--ink)' : 'var(--ink-3)',
+            }}
+          >
+            Stayed here
+          </button>
+          <button
+            type="button"
+            onClick={() => onPatch({ passedOnward: true })}
+            className="btn btn-sm"
+            style={{
+              padding: '3px 8px',
+              fontSize: 10.5,
+              background: active ? 'rgba(251,191,36,0.16)' : 'transparent',
+              borderColor: active ? 'rgba(251,191,36,0.40)' : 'var(--border-default, rgba(255,255,255,0.12))',
+              color: active ? 'var(--warn)' : 'var(--ink-3)',
+            }}
+          >
+            Hit elsewhere
+          </button>
+        </div>
+      </div>
+
+      {active ? (
+        <div className="flex flex-col mt-1" style={{ gap: 8 }}>
+          <div>
+            <div className="field-label" style={{ marginBottom: 4 }}>Economic hit entity</div>
+            <div className="grid grid-cols-2" style={{ gap: 6 }}>
+              {BUSINESS_ENTITIES.map((k) => {
+                const c = (ENTITY_COLORS as any)[k];
+                const sel = split.passthroughEntity === k;
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => onPatch({ passthroughEntity: k })}
+                    className="inline-flex items-center gap-1.5 text-left"
+                    style={{
+                      padding: '6px 9px',
+                      borderRadius: 6,
+                      background: sel ? `color-mix(in oklab, ${c} 14%, var(--bg-2))` : 'var(--bg-2)',
+                      border: '0.5px solid ' + (sel ? c : 'var(--border-default, rgba(255,255,255,0.12))'),
+                      color: sel ? 'var(--ink)' : 'var(--ink-2)',
+                      fontSize: 11.5,
+                      fontWeight: 500,
+                    }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: 50, background: c }} />
+                    {(ENTITY_LABELS as any)[k]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <div className="field-label" style={{ marginBottom: 4 }}>Onward · purpose</div>
+            <input
+              type="text"
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+              onBlur={() => {
+                const next = purpose.trim() || null;
+                if (next !== (split.passthroughPurpose || null)) onPatch({ passthroughPurpose: next });
+              }}
+              placeholder="e.g. Pay restaurant owner debt"
+              style={{ fontSize: 12, height: 28 }}
+            />
+          </div>
+
+          <div>
+            <div className="field-label" style={{ marginBottom: 4 }}>Onward · notes</div>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onBlur={() => {
+                const next = notes.trim() || null;
+                if (next !== (split.passthroughNotes || null)) onPatch({ passthroughNotes: next });
+              }}
+              rows={2}
+              placeholder="Why was this passed onward?"
+              style={{ fontSize: 12, resize: 'vertical', minHeight: 46 }}
+            />
+          </div>
+        </div>
       ) : null}
     </div>
   );

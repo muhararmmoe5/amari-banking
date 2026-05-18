@@ -431,25 +431,27 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
             />
           ) : null}
 
-          {/* ⑤ Money flow — when split, source-of-money sub-section is hidden
-              because each split row already carries its own funding entity. */}
-          <MoneyFlowSection
-            tx={tx}
-            state={state}
-            setState={setState}
-            open={openMap.flow}
-            setOpen={() => toggle('flow')}
-            hideSource={!!isSplit}
-          />
-
-          {/* ⑥ Passed onward */}
-          <PassedOnwardSection
-            tx={tx}
-            state={state}
-            setState={setState}
-            open={openMap.passthrough}
-            setOpen={() => toggle('passthrough')}
-          />
+          {/* ⑤ Money flow & ⑥ Passed onward — hidden at the transaction level
+              when split. Each split row carries its own funding entity,
+              reimbursement, money chain, and passthrough below. */}
+          {!isSplit ? (
+            <>
+              <MoneyFlowSection
+                tx={tx}
+                state={state}
+                setState={setState}
+                open={openMap.flow}
+                setOpen={() => toggle('flow')}
+              />
+              <PassedOnwardSection
+                tx={tx}
+                state={state}
+                setState={setState}
+                open={openMap.passthrough}
+                setOpen={() => toggle('passthrough')}
+              />
+            </>
+          ) : null}
 
           {/* ⑧ Notes — when split, each part carries its own notes so the
               top-level section collapses to just a free-text note. */}
@@ -1208,8 +1210,9 @@ function RecurrenceSection({
 
 // ──────────────────── ⑤ Money flow ────────────────────
 function MoneyFlowSection({
-  tx, state, setState, open, setOpen, hideSource = false,
-}: { tx: Transaction; state: any; setState: any; open: boolean; setOpen: () => void; hideSource?: boolean }) {
+  tx, state, setState, open, setOpen,
+}: { tx: Transaction; state: any; setState: any; open: boolean; setOpen: () => void }) {
+  const hideSource = false;
   // Source-of-money entity selection: drives the bank account picker on the right
   const sourceEntity: string = state.sourceEntityForPay || (() => {
     // Try to derive from sourceOfMoney string if a previous value exists

@@ -325,6 +325,13 @@ export function getDb(): Database.Database {
     `ALTER TABLE transaction_splits ADD COLUMN recurring_label TEXT`,
     `ALTER TABLE transaction_splits ADD COLUMN recurring_alert_days INTEGER`,
     `ALTER TABLE transaction_splits ADD COLUMN recurring_expected_cents INTEGER`,
+    `ALTER TABLE transaction_splits ADD COLUMN need_to_get_from TEXT`,
+    `ALTER TABLE transaction_splits ADD COLUMN hop2_person TEXT`,
+    `ALTER TABLE transaction_splits ADD COLUMN hop3_entity TEXT`,
+    `ALTER TABLE transaction_splits ADD COLUMN passed_onward INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE transaction_splits ADD COLUMN passthrough_entity TEXT`,
+    `ALTER TABLE transaction_splits ADD COLUMN passthrough_purpose TEXT`,
+    `ALTER TABLE transaction_splits ADD COLUMN passthrough_notes TEXT`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }

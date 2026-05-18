@@ -28,6 +28,15 @@ export interface TransactionSplit {
   recurringLabel: string | null;
   recurringAlertDays: number | null;
   recurringExpectedCents: number | null;
+  /** Money flow per-part — reimbursement entity + downstream money chain. */
+  needToGetFrom: string | null;
+  hop2Person: string | null;
+  hop3Entity: string | null;
+  /** Passed onward per-part — when the economic hit lands on a different entity. */
+  passedOnward: boolean;
+  passthroughEntity: string | null;
+  passthroughPurpose: string | null;
+  passthroughNotes: string | null;
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
@@ -55,6 +64,13 @@ function rowToSplit(r: any): TransactionSplit {
     recurringLabel: r.recurring_label ?? null,
     recurringAlertDays: r.recurring_alert_days ?? null,
     recurringExpectedCents: r.recurring_expected_cents ?? null,
+    needToGetFrom: r.need_to_get_from ?? null,
+    hop2Person: r.hop2_person ?? null,
+    hop3Entity: r.hop3_entity ?? null,
+    passedOnward: !!r.passed_onward,
+    passthroughEntity: r.passthrough_entity ?? null,
+    passthroughPurpose: r.passthrough_purpose ?? null,
+    passthroughNotes: r.passthrough_notes ?? null,
     sortOrder: r.sort_order,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -89,6 +105,13 @@ export interface SplitInput {
   recurringLabel?: string | null;
   recurringAlertDays?: number | null;
   recurringExpectedCents?: number | null;
+  needToGetFrom?: string | null;
+  hop2Person?: string | null;
+  hop3Entity?: string | null;
+  passedOnward?: boolean;
+  passthroughEntity?: string | null;
+  passthroughPurpose?: string | null;
+  passthroughNotes?: string | null;
   sortOrder?: number;
 }
 
@@ -103,8 +126,10 @@ export function createSplit(input: SplitInput): TransactionSplit {
         period_start, period_end, source_entity, source_account_id,
         is_recurring, recurring_frequency, recurring_next_date,
         recurring_label, recurring_alert_days, recurring_expected_cents,
+        need_to_get_from, hop2_person, hop3_entity,
+        passed_onward, passthrough_entity, passthrough_purpose, passthrough_notes,
         sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     input.transactionId,
@@ -126,6 +151,13 @@ export function createSplit(input: SplitInput): TransactionSplit {
     input.recurringLabel?.trim() || null,
     input.recurringAlertDays ?? null,
     input.recurringExpectedCents ?? null,
+    input.needToGetFrom?.trim() || null,
+    input.hop2Person?.trim() || null,
+    input.hop3Entity || null,
+    input.passedOnward ? 1 : 0,
+    input.passthroughEntity || null,
+    input.passthroughPurpose?.trim() || null,
+    input.passthroughNotes?.trim() || null,
     input.sortOrder ?? 0,
     now,
     now,
@@ -152,6 +184,13 @@ export interface UpdateSplitPatch {
   recurringLabel?: string | null;
   recurringAlertDays?: number | null;
   recurringExpectedCents?: number | null;
+  needToGetFrom?: string | null;
+  hop2Person?: string | null;
+  hop3Entity?: string | null;
+  passedOnward?: boolean;
+  passthroughEntity?: string | null;
+  passthroughPurpose?: string | null;
+  passthroughNotes?: string | null;
   sortOrder?: number;
 }
 
@@ -178,6 +217,13 @@ export function updateSplit(id: string, patch: UpdateSplitPatch): void {
     recurringLabel: 'recurring_label',
     recurringAlertDays: 'recurring_alert_days',
     recurringExpectedCents: 'recurring_expected_cents',
+    needToGetFrom: 'need_to_get_from',
+    hop2Person: 'hop2_person',
+    hop3Entity: 'hop3_entity',
+    passedOnward: 'passed_onward',
+    passthroughEntity: 'passthrough_entity',
+    passthroughPurpose: 'passthrough_purpose',
+    passthroughNotes: 'passthrough_notes',
     sortOrder: 'sort_order',
   };
   for (const [k, col] of Object.entries(map)) {
