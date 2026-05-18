@@ -55,6 +55,20 @@ function rowToTransaction(r: any): Transaction {
     passthroughPersonId: r.passthrough_person_id ?? null,
     passthroughNotes: r.passthrough_notes ?? null,
     fundedByTransactionId: r.funded_by_transaction_id ?? null,
+    bookingDateMode: r.booking_date_mode ?? null,
+    isRecurring: !!r.is_recurring,
+    recurringFrequency: r.recurring_frequency ?? null,
+    recurringNextDate: r.recurring_next_date ?? null,
+    recurringLabel: r.recurring_label ?? null,
+    recurringAlertDays: r.recurring_alert_days ?? null,
+    businessDepartment: r.business_department ?? null,
+    businessCat1Key: r.business_cat1_key ?? null,
+    personalCat1Key: r.personal_cat1_key ?? null,
+    taxTreatment: r.tax_treatment ?? null,
+    taxForm: r.tax_form ?? null,
+    autoDetectRule: !!r.auto_detect_rule,
+    cpaReviewedAt: r.cpa_reviewed_at ?? null,
+    cpaReviewerName: r.cpa_reviewer_name ?? null,
     importedAt: r.imported_at,
     updatedAt: r.updated_at,
     importBatchId: r.import_batch_id,
@@ -336,6 +350,20 @@ export interface UpdateTxPatch {
   passthroughPersonId?: string | null;
   passthroughNotes?: string | null;
   fundedByTransactionId?: string | null;
+  bookingDateMode?: 'DAY' | 'MONTH' | null;
+  isRecurring?: boolean;
+  recurringFrequency?: string | null;
+  recurringNextDate?: string | null;
+  recurringLabel?: string | null;
+  recurringAlertDays?: number | null;
+  businessDepartment?: string | null;
+  businessCat1Key?: string | null;
+  personalCat1Key?: string | null;
+  taxTreatment?: string | null;
+  taxForm?: string | null;
+  autoDetectRule?: boolean;
+  cpaReviewedAt?: string | null;
+  cpaReviewerName?: string | null;
 }
 
 export function updateTransaction(id: string, patch: UpdateTxPatch): void {
@@ -386,6 +414,20 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   if (patch.passthroughPersonId !== undefined) { fields.push('passthrough_person_id = @passthrough_person_id'); params.passthrough_person_id = patch.passthroughPersonId; }
   if (patch.passthroughNotes !== undefined) { fields.push('passthrough_notes = @passthrough_notes'); params.passthrough_notes = patch.passthroughNotes; }
   if (patch.fundedByTransactionId !== undefined) { fields.push('funded_by_transaction_id = @funded_by_transaction_id'); params.funded_by_transaction_id = patch.fundedByTransactionId; }
+  if (patch.bookingDateMode !== undefined) { fields.push('booking_date_mode = @booking_date_mode'); params.booking_date_mode = patch.bookingDateMode; }
+  if (patch.isRecurring !== undefined) { fields.push('is_recurring = @is_recurring'); params.is_recurring = patch.isRecurring ? 1 : 0; }
+  if (patch.recurringFrequency !== undefined) { fields.push('recurring_frequency = @recurring_frequency'); params.recurring_frequency = patch.recurringFrequency; }
+  if (patch.recurringNextDate !== undefined) { fields.push('recurring_next_date = @recurring_next_date'); params.recurring_next_date = patch.recurringNextDate; }
+  if (patch.recurringLabel !== undefined) { fields.push('recurring_label = @recurring_label'); params.recurring_label = patch.recurringLabel; }
+  if (patch.recurringAlertDays !== undefined) { fields.push('recurring_alert_days = @recurring_alert_days'); params.recurring_alert_days = patch.recurringAlertDays; }
+  if (patch.businessDepartment !== undefined) { fields.push('business_department = @business_department'); params.business_department = patch.businessDepartment; }
+  if (patch.businessCat1Key !== undefined) { fields.push('business_cat1_key = @business_cat1_key'); params.business_cat1_key = patch.businessCat1Key; }
+  if (patch.personalCat1Key !== undefined) { fields.push('personal_cat1_key = @personal_cat1_key'); params.personal_cat1_key = patch.personalCat1Key; }
+  if (patch.taxTreatment !== undefined) { fields.push('tax_treatment = @tax_treatment'); params.tax_treatment = patch.taxTreatment; }
+  if (patch.taxForm !== undefined) { fields.push('tax_form = @tax_form'); params.tax_form = patch.taxForm; }
+  if (patch.autoDetectRule !== undefined) { fields.push('auto_detect_rule = @auto_detect_rule'); params.auto_detect_rule = patch.autoDetectRule ? 1 : 0; }
+  if (patch.cpaReviewedAt !== undefined) { fields.push('cpa_reviewed_at = @cpa_reviewed_at'); params.cpa_reviewed_at = patch.cpaReviewedAt; }
+  if (patch.cpaReviewerName !== undefined) { fields.push('cpa_reviewer_name = @cpa_reviewer_name'); params.cpa_reviewer_name = patch.cpaReviewerName; }
   if (fields.length === 0) return;
   fields.push('updated_at = @updated_at');
   db.prepare(`UPDATE transactions SET ${fields.join(', ')} WHERE id = @id`).run(params);

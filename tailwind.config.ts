@@ -6,53 +6,55 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Warm-dark layered surfaces (less blue, more depth)
+        // Warm-dark layered surfaces — per drawer spec, slightly warmer
         bg: {
-          0: '#0a0a0c',
-          1: '#111114',
-          2: '#16161a',
-          3: '#1c1c21',
-          4: '#232328',
+          0: '#0f0e0d',
+          1: '#161513',
+          2: '#1d1b18',
+          3: '#252320',
+          4: '#2e2b27',
         },
-        line: 'rgba(255,255,255,0.055)',
-        'line-strong': 'rgba(255,255,255,0.10)',
-        'line-2': 'rgba(255,255,255,0.16)',
+        line: 'rgba(255,255,255,0.07)',
+        'line-strong': 'rgba(255,255,255,0.12)',
+        'line-2': 'rgba(255,255,255,0.20)',
         ink: {
-          DEFAULT: '#f0eee9',
-          dim: '#b0afa6',
-          mute: '#6f6e68',
-          ghost: '#44443f',
+          DEFAULT: '#f0ece4',
+          dim: '#b8b0a4',
+          mute: '#7a746c',
+          ghost: '#4a4540',
         },
         // Warm editorial entity palette
         entity: {
-          bytes: '#c9a87a',      // warm gold
-          rocket: '#6b8aa8',     // slate-blue
-          delicious: '#c98a7a',  // terracotta
-          amari: '#b18ac9',      // orchid
-          'bytes-rest': '#7a8c6b', // sage
-          personal: '#c9b8a8',   // warm cream
-          multi: '#c9a87a',      // share with bytes
+          bytes: '#c9a87a',
+          rocket: '#6b8aa8',
+          delicious: '#c98a7a',
+          amari: '#b18ac9',
+          'bytes-rest': '#7a8c6b',
+          personal: '#c9b8a8',
+          multi: '#c9a87a',
           unknown: '#6f6e68',
         },
-        // Primary accent (same hex as bytes — the flagship)
         accent: {
           DEFAULT: '#c9a87a',
           dim: '#88724a',
         },
-        // Functional money colors (desaturated for the warm palette)
-        income: '#7fb892',
-        expense: '#d18876',
-        warn: '#f2b96d',
-        crit: '#d18876',
+        gold: '#c9a87a',
+        // Functional / semantic — per drawer spec
+        income: '#4ade80',
+        expense: '#f87171',
+        warn: '#fbbf24',
+        info: '#60a5fa',
+        purple: '#a78bfa',
+        crit: '#f87171',
         flag: {
-          critBg: 'rgba(209,136,118,0.10)',
-          critText: '#d18876',
-          highBg: 'rgba(242,185,109,0.10)',
-          highText: '#f2b96d',
+          critBg: 'rgba(248,113,113,0.10)',
+          critText: '#f87171',
+          highBg: 'rgba(251,191,36,0.10)',
+          highText: '#fbbf24',
           medBg: 'rgba(252,211,77,0.08)',
           medText: '#eab308',
-          okBg: 'rgba(127,184,146,0.10)',
-          okText: '#7fb892',
+          okBg: 'rgba(74,222,128,0.10)',
+          okText: '#4ade80',
         },
       },
       fontFamily: {

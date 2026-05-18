@@ -1,134 +1,108 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
-import { X, Check } from 'lucide-react';
+import {
+  X, ChevronDown, Check, Lock, Plus, ArrowDown, ArrowRight,
+  User, Building2, Repeat, Calendar, Wallet, Receipt, Paperclip,
+  Split, Tag, Award, Link2,
+} from 'lucide-react';
 import type { Transaction, EntityType, AuditStatus } from '@/types';
 import { ACCOUNTS, ENTITY_LABELS, ENTITY_COLORS, BUSINESS_ENTITIES, getAccount } from '@/constants/accounts';
+import { PERSONAL_CATEGORIES, BUSINESS_CATEGORIES } from '@/constants/categories';
 import { fmtMoney, fmtDate } from '@/lib/format';
 import { saveTransaction } from './actions';
 import { useToast } from '@/components/Toast';
-import SplitEditor from '../audit/SplitEditor';
-import SourceTraceContent from './SourceTraceContent';
-import DownstreamTraceContent from './DownstreamTraceContent';
+import Portal from '@/components/Portal';
 import ManualSourceLink from './ManualSourceLink';
 import ManualDownstreamList from './ManualDownstreamList';
+import SplitEditor from '../audit/SplitEditor';
 import SameDayPanel from './SameDayPanel';
-import Portal from '@/components/Portal';
-import { ArrowDownToLine } from 'lucide-react';
-import OptionSelect from '@/components/OptionSelect';
 
-const ENTITY_OPTIONS: EntityType[] = [
-  'BYTES_AI', 'ROCKET_WIRELESS', 'DELICIOUS_BYTES', 'AMARI_VENTURES',
-  'BYTES_REST_TECH', 'PERSONAL', 'MULTI_ENTITY', 'BUSINESS_SHARED', 'UNKNOWN',
-];
+type SectionKey = 'source' | 'booked' | 'recurrence' | 'flow' | 'passthrough' | 'split' | 'notes' | 'cpa';
 
-const STATUS_OPTIONS: AuditStatus[] = [
-  'UNREVIEWED', 'TAGGED', 'CONFIRMED', 'NEEDS_RECEIPT', 'PERSONAL_NO_DEDUCT', 'DISPUTED',
-];
-
-const ACCOUNT_NAME_OPTIONS = ACCOUNTS.map((a) => `···${a.last4} — ${a.label}`);
+const STATUS_PILL: Record<AuditStatus, { label: string; cls: string }> = {
+  UNREVIEWED: { label: 'Unreviewed', cls: 'pill-unreviewed' },
+  TAGGED: { label: 'Tagged', cls: 'pill-tagged' },
+  CONFIRMED: { label: 'Confirmed', cls: 'pill-confirmed' },
+  NEEDS_RECEIPT: { label: 'Needs receipt', cls: 'pill-needs-receipt' },
+  PERSONAL_NO_DEDUCT: { label: 'Personal', cls: 'pill-personal' },
+  DISPUTED: { label: 'Disputed', cls: 'pill-disputed' },
+};
 
 export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transaction; onClose: () => void }) {
-  const [confirmedEntity, setConfirmedEntity] = useState<EntityType>((tx.confirmedEntity || tx.entityTag) as EntityType);
-  const [status, setStatus] = useState<AuditStatus>(tx.auditStatus);
-  const [purpose, setPurpose] = useState(tx.businessPurpose || '');
-  const [docRef, setDocRef] = useState(tx.receiptRef || '');
-  const [individual, setIndividual] = useState(tx.individual || '');
-  const [sub1, setSub1] = useState(tx.subCategory1 || '');
-  const [sub2, setSub2] = useState(tx.subCategory2 || '');
-  const [sourceOfMoney, setSourceOfMoney] = useState(tx.sourceOfMoney || '');
-  const [needFrom, setNeedFrom] = useState(tx.needToGetFrom || '');
-  const [notes, setNotes] = useState(tx.notes || '');
-  const [cpaReviewed, setCpaReviewed] = useState(tx.cpaReviewed);
-  const [taggedDate, setTaggedDate] = useState(tx.taggedDate || '');
-  const [sourcePersonId, setSourcePersonId] = useState(tx.sourcePersonId || '');
-  const [sourceBusiness, setSourceBusiness] = useState(tx.sourceBusiness || '');
-  const [sourceAccountId, setSourceAccountId] = useState(tx.sourceAccountId || '');
-  const [budgetId, setBudgetId] = useState(tx.budgetId || '');
-  const [fundingCommitmentId, setFundingCommitmentId] = useState(tx.fundingCommitmentId || '');
-  const [isSalary, setIsSalary] = useState(tx.isSalary);
-  const [salaryEntity, setSalaryEntity] = useState(tx.salaryEntity || '');
-  const [salaryPersonId, setSalaryPersonId] = useState(tx.salaryPersonId || '');
-  const [passthroughEntity, setPassthroughEntity] = useState(tx.passthroughEntity || '');
-  const [passthroughPurpose, setPassthroughPurpose] = useState(tx.passthroughPurpose || '');
-  const [passthroughPersonId, setPassthroughPersonId] = useState(tx.passthroughPersonId || '');
-  const [passthroughNotes, setPassthroughNotes] = useState(tx.passthroughNotes || '');
-  const [budgets, setBudgets] = useState<{ id: string; name: string; kind: string; entity: string | null }[] | null>(null);
-  const [commitments, setCommitments] = useState<{ id: string; entity: string; personName: string | null }[] | null>(null);
-  const [optionLists, setOptionLists] = useState<Record<string, string[]>>({
-    individual: [], sub_category_1: [], sub_category_2: [], business_purpose: [], source_of_money: [], need_to_get_from: [],
-  });
-  // sub_category_2 options grouped by parent (sub_category_1 value). Used to scope the Sub Category 2 dropdown.
-  const [subCat2ByParent, setSubCat2ByParent] = useState<Map<string, string[]>>(new Map());
-  const [subCat2NoParent, setSubCat2NoParent] = useState<string[]>([]);
-  const [people, setPeople] = useState<{ id: string; name: string; role: string }[] | null>(null);
-  const [, startTx] = useTransition();
   const { saveStart, saveEnd, saveError } = useToast();
+  const [, startTx] = useTransition();
   const acct = getAccount(tx.accountId);
-  const entityColor = ENTITY_COLORS[(tx.confirmedEntity || tx.entityTag) as EntityType] || '#888';
 
+  // Editable state seeded from tx
+  const [state, setStateRaw] = useState({
+    auditStatus: tx.auditStatus as AuditStatus,
+    bookingDateMode: (tx.bookingDateMode || 'MONTH') as 'DAY' | 'MONTH',
+    taggedDate: tx.taggedDate || '',
+    personalOrBusiness: (tx.confirmedEntity === 'PERSONAL' ? 'PERSONAL' : tx.confirmedEntity ? 'BUSINESS' : null) as 'PERSONAL' | 'BUSINESS' | null,
+    confirmedEntity: (tx.confirmedEntity || tx.entityTag) as EntityType,
+    businessDepartment: tx.businessDepartment || '',
+    businessCat1Key: tx.businessCat1Key || '',
+    businessSubCat2: tx.subCategory2 || '',
+    taxTreatment: tx.taxTreatment || '',
+    taxForm: tx.taxForm || '',
+    individual: tx.individual || '',
+    personalCat1Key: tx.personalCat1Key || '',
+    personalSubCat: tx.subCategory2 || '',
+    counterpartyPersonId: tx.sourcePersonId || '',
+    isRecurring: tx.isRecurring || false,
+    recurringFrequency: tx.recurringFrequency || 'MONTHLY',
+    recurringNextDate: tx.recurringNextDate || '',
+    recurringLabel: tx.recurringLabel || '',
+    recurringAlertDays: tx.recurringAlertDays || 3,
+    moneySource: tx.sourceOfMoney || '',
+    needToGetFrom: tx.needToGetFrom || '',
+    hop2Person: tx.salaryPersonId || '',
+    hop3Entity: tx.passthroughEntity || '',
+    passedOnward: !!tx.passthroughEntity,
+    passthroughEntity: tx.passthroughEntity || '',
+    passthroughPurpose: tx.passthroughPurpose || '',
+    passthroughNotes: tx.passthroughNotes || '',
+    businessPurpose: tx.businessPurpose || '',
+    docRef: tx.receiptRef || '',
+    notes: tx.notes || '',
+    autoDetect: tx.autoDetectRule || false,
+    cpaReviewed: tx.cpaReviewed || false,
+    cpaReviewerName: tx.cpaReviewerName || '',
+    cpaReviewedAt: tx.cpaReviewedAt || '',
+  });
+
+  const [openMap, setOpenMap] = useState<Record<SectionKey, boolean>>({
+    source: true,
+    booked: true,
+    recurrence: false,
+    flow: false,
+    passthrough: !!tx.passthroughEntity,
+    split: false,
+    notes: false,
+    cpa: false,
+  });
+  const toggle = (k: SectionKey) => setOpenMap((m) => ({ ...m, [k]: !m[k] }));
+
+  // Persist helper — calls saveTransaction with the proper patch keys
   function persist(patch: any) {
     const id = saveStart();
     startTx(async () => {
       try {
         await saveTransaction(tx.id, patch);
         saveEnd(id);
-      } catch (e: any) { saveError(id, e?.message); }
+      } catch (e: any) {
+        saveError(id, e?.message);
+      }
     });
   }
 
-  function applyStatus(s: AuditStatus) {
-    setStatus(s);
-    persist({ auditStatus: s });
+  function setState(patch: Partial<typeof state>, dbPatch?: any) {
+    setStateRaw((s) => ({ ...s, ...patch }));
+    if (dbPatch) persist(dbPatch);
   }
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/people', { credentials: 'same-origin' })
-      .then((r) => r.json())
-      .then((d) => { if (!cancelled) setPeople(d.people || []); })
-      .catch(() => { if (!cancelled) setPeople([]); });
-    fetch('/api/budgets', { credentials: 'same-origin' })
-      .then((r) => r.json())
-      .then((d) => { if (!cancelled) setBudgets(d.budgets || []); })
-      .catch(() => { if (!cancelled) setBudgets([]); });
-    fetch('/api/commitments', { credentials: 'same-origin' })
-      .then((r) => r.json())
-      .then((d) => { if (!cancelled) setCommitments(d.commitments || []); })
-      .catch(() => { if (!cancelled) setCommitments([]); });
-    fetch('/api/options', { credentials: 'same-origin' })
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        const grouped = d.options || {};
-        const next: Record<string, string[]> = {};
-        for (const k of ['individual', 'sub_category_1', 'sub_category_2', 'business_purpose', 'source_of_money', 'need_to_get_from']) {
-          next[k] = (grouped[k] || []).map((o: any) => o.value);
-        }
-        setOptionLists(next);
-        // Build sub_category_2 buckets keyed by parent
-        const byParent = new Map<string, string[]>();
-        const noParent: string[] = [];
-        for (const o of (grouped.sub_category_2 || []) as Array<{ value: string; parentValue: string | null }>) {
-          if (o.parentValue) {
-            const list = byParent.get(o.parentValue) || [];
-            list.push(o.value);
-            byParent.set(o.parentValue, list);
-          } else {
-            noParent.push(o.value);
-          }
-        }
-        setSubCat2ByParent(byParent);
-        setSubCat2NoParent(noParent);
-      })
-      .catch(() => { /* leave empty */ });
-    return () => { cancelled = true; };
-  }, []);
-
-  function addToList(field: string, value: string) {
-    setOptionLists((prev) => prev[field]?.includes(value) ? prev : { ...prev, [field]: [...(prev[field] || []), value] });
-  }
-
+  // Keyboard handler
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName;
@@ -140,834 +114,1270 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function applyStatus(s: AuditStatus) {
+    setState({ auditStatus: s }, { auditStatus: s });
+  }
+
+  // Progress dots — 5 required completion criteria
+  const completed = (
+    (tx.postingDate ? 1 : 0) +
+    (state.personalOrBusiness ? 1 : 0) +
+    (state.confirmedEntity || state.personalOrBusiness === 'PERSONAL' ? 1 : 0) +
+    (state.businessSubCat2 || state.personalSubCat ? 1 : 0) +
+    (state.auditStatus !== 'UNREVIEWED' ? 1 : 0)
+  );
+
+  const isExpense = tx.amount < 0;
+  const stPill = STATUS_PILL[state.auditStatus] || STATUS_PILL.UNREVIEWED;
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-md animate-fade-in" onClick={onClose}>
-        <div
-          className="absolute top-0 right-0 bottom-0 w-[min(680px,100vw)] bg-bg-1 border-l border-line-strong flex flex-col shadow-elev-3 animate-slide-in-right"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          onKeyUp={(e) => e.stopPropagation()}
-          onKeyPress={(e) => e.stopPropagation()}
-        >
-          {/* Header (fixed at top) */}
-          <div className="shrink-0 surface-glass border-b border-line px-5 py-3.5 flex items-center justify-between">
-            <div className="text-sm font-semibold tracking-tight">Transaction details</div>
-            <button
-              onClick={onClose}
-              className="text-ink-mute hover:text-ink p-1.5 rounded-md hover:bg-bg-2 transition"
-            ><X size={16} /></button>
+      <div className="backdrop animate-fade-in" onClick={onClose} />
+      <div
+        className="drawer-panel"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        onKeyUp={(e) => e.stopPropagation()}
+      >
+        {/* Sticky header */}
+        <div className="dr-head">
+          <div className="flex justify-between items-start gap-4">
+            <div className="min-w-0 flex-1">
+              <h2 className="t-lg" style={{ margin: 0, letterSpacing: '-0.015em', color: 'var(--ink)' }}>
+                {tx.merchantName || tx.description.slice(0, 60)}
+              </h2>
+              <p className="num text-[11px] text-ink-mute mt-1 truncate" style={{ maxWidth: 340 }}>
+                {tx.description}
+              </p>
+            </div>
+            <div
+              className="t-display whitespace-nowrap"
+              style={{ color: isExpense ? 'var(--expense)' : 'var(--income)' }}
+            >
+              {fmtMoney(tx.amount)}
+            </div>
           </div>
 
-          {/* Body (scrollable, fills remaining space) */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-bg-0/40">
-            {/* Section 1 — Summary */}
-            <div className="card p-5 space-y-3" style={{ borderColor: `${entityColor}40` }}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-semibold text-lg tracking-tight">{tx.merchantName || tx.description.slice(0, 80)}</div>
-                  <div className="text-xs text-ink-mute mt-1 break-words">{tx.description}</div>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className={`num-display text-3xl font-bold ${tx.amount >= 0 ? 'text-income' : 'text-expense'}`}>
-                    {fmtMoney(tx.amount)}
-                  </div>
-                  {tx.balance != null ? (
-                    <div className="num-display text-2xs text-ink-mute mt-0.5">balance after: {fmtMoney(tx.balance)}</div>
-                  ) : null}
-                </div>
-              </div>
-              <div className="text-2xs text-ink-dim flex flex-wrap gap-x-3 gap-y-1 pt-3 border-t border-line">
-                {tx.transactionDate && tx.transactionDate !== tx.postingDate ? (
-                  <span title="Extracted from description — when the charge/transfer actually happened.">
-                    💳 Transaction: <span className="mono">{fmtDate(tx.transactionDate)}</span>
-                  </span>
-                ) : null}
-                <span title="From Chase — when the bank processed this transaction. Cannot be changed.">
-                  🏦 Posted: <span className="mono">{fmtDate(tx.postingDate)}</span>
+          <div className="flex items-center gap-2.5 mt-2.5 flex-wrap">
+            <span className={`pill ${stPill.cls}`}>
+              <span className="w-[5px] h-[5px] rounded-full" style={{ background: 'currentColor' }} /> {stPill.label}
+            </span>
+            <span className="text-[11px] text-ink-mute">
+              ····{tx.accountId}{acct ? ` · ${acct.label}` : ''}
+            </span>
+            {tx.balance != null ? (
+              <>
+                <span className="text-[11px] text-ink-ghost">·</span>
+                <span className="text-[10.5px] text-ink-mute">
+                  balance after <span className="num">{fmtMoney(tx.balance)}</span>
                 </span>
-                <span>Paid from <span className="mono">···{tx.accountId}</span>{acct ? ` (${acct.label})` : ''}</span>
-                <span>Posted as {tx.category.replace(/^(EXPENSE_|INCOME_)/, '').replace(/_/g, ' ').toLowerCase()}</span>
-              </div>
+              </>
+            ) : null}
+            <span className="flex-1" />
+            {/* Progress dots */}
+            <div className="flex items-center gap-1">
+              {Array.from({ length: 5 }, (_, i) => (
+                <span
+                  key={i}
+                  className="rounded-full"
+                  style={{
+                    width: 6,
+                    height: 6,
+                    background: i < completed ? 'var(--gold)' : 'var(--bg-4)',
+                    transition: 'background 120ms ease',
+                  }}
+                />
+              ))}
+              <span className="text-[10.5px] text-ink-mute ml-1">{completed}/5</span>
             </div>
-
-            {/* Money flow chain — visual when salary and/or passthrough is set */}
-            {(isSalary || passthroughEntity) ? (
-              <MoneyFlowChain
-                payingEntity={(tx.confirmedEntity || tx.entityTag) as keyof typeof ENTITY_LABELS}
-                isSalary={isSalary}
-                salaryRecipientName={salaryPersonId ? (people || []).find((p) => p.id === salaryPersonId)?.name || null : null}
-                salaryEntityLabel={salaryEntity ? ENTITY_LABELS[salaryEntity as keyof typeof ENTITY_LABELS] : null}
-                passthroughEntityLabel={
-                  passthroughEntity && passthroughEntity !== 'PENDING'
-                    ? ENTITY_LABELS[passthroughEntity as keyof typeof ENTITY_LABELS] || passthroughEntity
-                    : null
-                }
-                passthroughPurpose={passthroughPurpose}
-                passthroughRecipientName={passthroughPersonId ? (people || []).find((p) => p.id === passthroughPersonId)?.name || null : null}
-              />
-            ) : null}
-
-            {/* Section 2 — Source of money (expenses only) — MANUAL splits */}
-            {tx.amount < 0 ? (
-              <SectionCard
-                title="Source of money"
-                subtitle="Tag this expense to one or more income sources, each with its own dollar amount"
-                accent="income"
-              >
-                <ManualSourceLink txId={tx.id} expenseAmount={tx.amount} />
-              </SectionCard>
-            ) : null}
-
-            {/* Section 2b — What this money funded (inflows only) — MANUAL list */}
-            {tx.amount > 0 ? (
-              <SectionCard
-                title="What this money funded"
-                subtitle="Expenses you've tagged as funded by this inflow"
-                accent="warn"
-              >
-                <ManualDownstreamList inflowTxId={tx.id} inflowAmount={tx.amount} />
-              </SectionCard>
-            ) : null}
-
-            {/* Section 3 — Review status */}
-            <SectionCard title="Review status" subtitle="Status, CPA sign-off, and the booking date for accounting">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Field label="Status">
-                  <select value={status} onChange={(e) => { applyStatus(e.target.value as AuditStatus); }} className="w-full">
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s} value={s}>{s.replace(/_/g, ' ').toLowerCase()}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="CPA reviewed">
-                  <button
-                    type="button"
-                    onClick={() => { const v = !cpaReviewed; setCpaReviewed(v); persist({ cpaReviewed: v }); }}
-                    className={`w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition ${
-                      cpaReviewed
-                        ? 'bg-income/15 border-income/40 text-income'
-                        : 'bg-bg-2 border-line text-ink-dim hover:text-ink'
-                    }`}
-                  >
-                    {cpaReviewed ? <><Check size={14} /> Yes — reviewed</> : 'No — not reviewed'}
-                  </button>
-                </Field>
-                <Field label="Booking date" hint="when this should be booked for accounting">
-                  <input
-                    type="date"
-                    value={taggedDate}
-                    onChange={(e) => setTaggedDate(e.target.value)}
-                    onBlur={() => persist({ taggedDate: taggedDate || null })}
-                    className="w-full"
-                  />
-                </Field>
-              </div>
-            </SectionCard>
-
-            {/* Section 4 — Categorization */}
-            <SectionCard title="Categorization" subtitle="Personal or business · who it's about · how it's classified">
-              <div className="space-y-3">
-                {/* Personal / Business toggle */}
-                <Field label="Is this personal or business?" className="md:col-span-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConfirmedEntity('PERSONAL');
-                        persist({ confirmedEntity: 'PERSONAL' });
-                      }}
-                      className={`px-3 py-2 rounded-md border text-sm font-medium transition ${
-                        confirmedEntity === 'PERSONAL'
-                          ? 'bg-entity-personal/15 border-entity-personal/40 text-ink'
-                          : 'bg-bg-2 border-line text-ink-dim hover:bg-bg-3 hover:text-ink'
-                      }`}
-                    >
-                      👤 Personal
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // If switching from Personal, default to the original entity_tag
-                        const v = (confirmedEntity === 'PERSONAL' ? (tx.entityTag as EntityType) : confirmedEntity) || 'BYTES_AI';
-                        setConfirmedEntity(v === 'PERSONAL' ? 'BYTES_AI' : v);
-                        persist({ confirmedEntity: v === 'PERSONAL' ? 'BYTES_AI' : v });
-                      }}
-                      className={`px-3 py-2 rounded-md border text-sm font-medium transition ${
-                        confirmedEntity !== 'PERSONAL'
-                          ? 'bg-accent/15 border-accent/40 text-ink'
-                          : 'bg-bg-2 border-line text-ink-dim hover:bg-bg-3 hover:text-ink'
-                      }`}
-                      style={confirmedEntity !== 'PERSONAL' ? { background: 'rgba(201,168,122,0.15)', borderColor: 'rgba(201,168,122,0.4)' } : undefined}
-                    >
-                      🏢 Business
-                    </button>
-                  </div>
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                {confirmedEntity === 'PERSONAL' ? (
-                  <Field label="Whose personal expense?" hint="pick a person on the Team page">
-                    <select
-                      value={sourcePersonId}
-                      onChange={(e) => {
-                        setSourcePersonId(e.target.value);
-                        persist({ sourcePersonId: e.target.value || null });
-                      }}
-                      className="w-full"
-                    >
-                      <option value="">— pick a person —</option>
-                      {(people || []).map((p) => (
-                        <option key={p.id} value={p.id}>{p.name} ({p.role.toLowerCase()})</option>
-                      ))}
-                    </select>
-                  </Field>
-                ) : (
-                  <Field label="Which business entity?" hint="books to this entity's P&L">
-                    <select
-                      value={confirmedEntity}
-                      onChange={(e) => { const v = e.target.value as EntityType; setConfirmedEntity(v); persist({ confirmedEntity: v }); }}
-                      className="w-full"
-                    >
-                      {ENTITY_OPTIONS.filter((o) => o !== 'PERSONAL').map((o) => (
-                        <option key={o} value={o}>{ENTITY_LABELS[o]}</option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-                <Field
-                  label={tx.amount > 0 ? 'Source person (income)' : 'Counterparty person'}
-                  hint={tx.amount > 0 ? 'who this money came FROM' : 'who this money went TO, if applicable'}
-                >
-                  <select
-                    value={sourcePersonId}
-                    onChange={(e) => {
-                      setSourcePersonId(e.target.value);
-                      persist({ sourcePersonId: e.target.value || null });
-                    }}
-                    className="w-full"
-                  >
-                    <option value="">— None —</option>
-                    {(people || []).map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.role.toLowerCase()})
-                      </option>
-                    ))}
-                  </select>
-                  {(people && people.length === 0) ? (
-                    <div className="text-2xs text-ink-mute mt-1">No people yet — add them on the <a href="/team" className="text-entity-bytes hover:underline">Team page</a>.</div>
-                  ) : null}
-                </Field>
-                <Field label="Individual" hint="who is this about">
-                  <OptionSelect
-                    field="individual"
-                    value={individual}
-                    options={optionLists.individual || []}
-                    builtInOptions={{ label: 'People on the team', values: (people || []).map((p) => p.name) }}
-                    onChange={(v) => { setIndividual(v); persist({ individual: v || null }); }}
-                    onOptionAdded={(v) => addToList('individual', v)}
-                    placeholder="— pick a person / vendor —"
-                  />
-                </Field>
-                <Field label="Sub category 1" hint="bucket — pick first">
-                  <OptionSelect
-                    field="sub_category_1"
-                    value={sub1}
-                    options={optionLists.sub_category_1 || []}
-                    onChange={(v) => {
-                      setSub1(v);
-                      if (v && sub2) {
-                        const validChildren = subCat2ByParent.get(v) || [];
-                        if (!validChildren.includes(sub2)) {
-                          setSub2('');
-                          persist({ subCategory1: v || null, subCategory2: null });
-                          return;
-                        }
-                      }
-                      persist({ subCategory1: v || null });
-                    }}
-                    onOptionAdded={(v) => addToList('sub_category_1', v)}
-                  />
-                </Field>
-                <Field label="Sub category 2" hint={sub1 ? `filtered to ${sub1}` : undefined}>
-                  <OptionSelect
-                    field="sub_category_2"
-                    value={sub2}
-                    options={sub1 ? (subCat2ByParent.get(sub1) || []) : subCat2NoParent}
-                    newOptionParent={sub1 || null}
-                    secondaryGroups={
-                      sub1
-                        ? Array.from(subCat2ByParent.entries())
-                            .filter(([parent]) => parent !== sub1)
-                            .map(([parent, values]) => ({ label: parent, values }))
-                        : undefined
-                    }
-                    onChange={(v) => { setSub2(v); persist({ subCategory2: v || null }); }}
-                    onOptionAdded={(v) => {
-                      addToList('sub_category_2', v);
-                      if (sub1) {
-                        setSubCat2ByParent((prev) => {
-                          const next = new Map(prev);
-                          next.set(sub1, [...(next.get(sub1) || []), v]);
-                          return next;
-                        });
-                      } else {
-                        setSubCat2NoParent((prev) => prev.includes(v) ? prev : [...prev, v]);
-                      }
-                    }}
-                  />
-                </Field>
-              </div>
-            </SectionCard>
-
-            {/* Section 5 — Money flow */}
-            <SectionCard
-              title={tx.amount > 0 ? 'Inflow source' : 'Money flow'}
-              subtitle={tx.amount > 0 ? 'Which business + account sent the money' : 'Which pool paid for this and where funds need to come from'}
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {tx.amount > 0 ? (
-                  <>
-                    <Field label="Source business · who sent this">
-                      <select
-                        value={sourceBusiness}
-                        onChange={(e) => { setSourceBusiness(e.target.value); persist({ sourceBusiness: e.target.value || null }); }}
-                        className="w-full"
-                      >
-                        <option value="">— pick —</option>
-                        <option value="BYTES_AI">Bytes AI</option>
-                        <option value="ROCKET_WIRELESS">Rocket Wireless</option>
-                        <option value="DELICIOUS_BYTES">Delicious Bytes LLC</option>
-                        <option value="AMARI_VENTURES">Amari Ventures</option>
-                        <option value="BYTES_REST_TECH">Bytes Restaurant Tech</option>
-                        <option value="PERSONAL">Personal</option>
-                        <option value="EXTERNAL">External / N/A (outside business)</option>
-                      </select>
-                    </Field>
-                    <Field label="Source account · which bank sent it">
-                      <select
-                        value={sourceAccountId}
-                        onChange={(e) => { setSourceAccountId(e.target.value); persist({ sourceAccountId: e.target.value || null }); }}
-                        className="w-full"
-                      >
-                        <option value="">— pick —</option>
-                        {ACCOUNTS.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {ENTITY_LABELS[a.entity]} — ···{a.last4}
-                          </option>
-                        ))}
-                        <option value="EXTERNAL">External / N/A (outside account)</option>
-                      </select>
-                    </Field>
-                    <Field
-                      label="Investor contribution"
-                      className="md:col-span-2"
-                      hint={commitments && commitments.length === 0 ? 'no active commitments — record one on the Cap Table' : 'count this wire toward an investor’s commitment'}
-                    >
-                      <select
-                        value={fundingCommitmentId}
-                        onChange={(e) => {
-                          setFundingCommitmentId(e.target.value);
-                          persist({ fundingCommitmentId: e.target.value || null } as any);
-                        }}
-                        className="w-full"
-                        disabled={!commitments || commitments.length === 0}
-                      >
-                        <option value="">— not an investor contribution —</option>
-                        {(commitments || []).map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.personName || 'Unknown investor'} → {ENTITY_LABELS[c.entity as keyof typeof ENTITY_LABELS] || c.entity}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                  </>
-                ) : (
-                  <>
-                    <Field label="Source of money to pay">
-                      <OptionSelect
-                        field="source_of_money"
-                        value={sourceOfMoney}
-                        options={optionLists.source_of_money || []}
-                        builtInOptions={{
-                          label: 'Money pools (entity · type)',
-                          values: [
-                            ...BUSINESS_ENTITIES.flatMap((e) => [
-                              `${ENTITY_LABELS[e]} revenue`,
-                              `${ENTITY_LABELS[e]} investment income`,
-                            ]),
-                            ...(commitments || []).map((c) =>
-                              `${ENTITY_LABELS[c.entity as keyof typeof ENTITY_LABELS] || c.entity} investment income — ${c.personName || 'unknown investor'}`
-                            ),
-                          ],
-                        }}
-                        onChange={(v) => { setSourceOfMoney(v); persist({ sourceOfMoney: v || null }); }}
-                        onOptionAdded={(v) => addToList('source_of_money', v)}
-                      />
-                    </Field>
-                    {/* Secondary investor picker — only shown when source matches "<Entity> investment income" (without trailing person) */}
-                    {(() => {
-                      const m = sourceOfMoney.match(/^(.+?) investment income$/);
-                      if (!m) return null;
-                      const entityLabel = m[1];
-                      const matchingEntity = (BUSINESS_ENTITIES as readonly string[]).find((e) => ENTITY_LABELS[e as keyof typeof ENTITY_LABELS] === entityLabel);
-                      const matchingCommitments = (commitments || []).filter((c) => c.entity === matchingEntity);
-                      return (
-                        <Field
-                          label={`Which investment? · scoped to ${entityLabel}`}
-                          hint={matchingCommitments.length === 0 ? 'no commitments recorded for this entity' : undefined}
-                        >
-                          <select
-                            value=""
-                            onChange={(e) => {
-                              const personName = e.target.value;
-                              if (!personName) return;
-                              const newSource = `${entityLabel} investment income — ${personName}`;
-                              setSourceOfMoney(newSource);
-                              persist({ sourceOfMoney: newSource });
-                            }}
-                            className="w-full"
-                            disabled={matchingCommitments.length === 0}
-                          >
-                            <option value="">— pick an investor —</option>
-                            {matchingCommitments.map((c) => (
-                              <option key={c.id} value={c.personName || 'unknown investor'}>
-                                {c.personName || 'unknown investor'}
-                              </option>
-                            ))}
-                          </select>
-                          {matchingCommitments.length === 0 ? (
-                            <div className="text-2xs text-ink-mute mt-1">
-                              No investor commitments yet for {entityLabel}. Add one on the <a href={`/cap/${matchingEntity}`} className="text-entity-bytes hover:underline">Cap Table</a> page.
-                            </div>
-                          ) : null}
-                        </Field>
-                      );
-                    })()}
-                    <Field label="Need to get from">
-                      <OptionSelect
-                        field="need_to_get_from"
-                        value={needFrom}
-                        options={optionLists.need_to_get_from || []}
-                        builtInOptions={{
-                          label: 'Your businesses & people',
-                          values: [
-                            ...BUSINESS_ENTITIES.map((e) => ENTITY_LABELS[e]),
-                            ...(people || []).map((p) => p.name),
-                          ],
-                        }}
-                        onChange={(v) => { setNeedFrom(v); persist({ needToGetFrom: v || null }); }}
-                        onOptionAdded={(v) => addToList('need_to_get_from', v)}
-                      />
-                    </Field>
-                  </>
-                )}
-                {tx.amount < 0 ? (
-                  <div className="md:col-span-2 rounded-xl border border-line/60 p-3 bg-bg-2/30">
-                    <div className="section-label mb-2">
-                      Money chain · who got it next?
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <Field label="Hop 2 · pays to person (as salary)" hint="who personally received this money">
-                        <select
-                          value={salaryPersonId}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setSalaryPersonId(v);
-                            // Auto-set isSalary when a person is picked, clear it when blank
-                            if (v && !isSalary) {
-                              setIsSalary(true);
-                              persist({ salaryPersonId: v, isSalary: true, salaryEntity: salaryEntity || (tx.confirmedEntity || tx.entityTag) });
-                              if (!salaryEntity) setSalaryEntity((tx.confirmedEntity || tx.entityTag) as string);
-                            } else {
-                              persist({ salaryPersonId: v || null });
-                            }
-                          }}
-                          className="w-full"
-                        >
-                          <option value="">— stayed in entity, no person hop —</option>
-                          {(people || []).map((p) => (
-                            <option key={p.id} value={p.id}>{p.name}{p.role ? ` (${p.role.toLowerCase()})` : ''}</option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label="Hop 3 · then forwards to entity" hint="where the money ultimately lands">
-                        <select
-                          value={passthroughEntity === 'PENDING' ? '' : passthroughEntity}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setPassthroughEntity(v);
-                            if (!v) {
-                              setPassthroughPurpose('');
-                              setPassthroughPersonId('');
-                              persist({ passthroughEntity: null, passthroughPurpose: null, passthroughPersonId: null });
-                            } else {
-                              persist({ passthroughEntity: v });
-                            }
-                          }}
-                          className="w-full"
-                        >
-                          <option value="">— didn&apos;t flow onward —</option>
-                          {ENTITY_OPTIONS.map((en) => (
-                            <option key={en} value={en}>{ENTITY_LABELS[en]}</option>
-                          ))}
-                        </select>
-                      </Field>
-                      {passthroughEntity && passthroughEntity !== 'PENDING' ? (
-                        <Field label="Hop 3 · purpose" className="md:col-span-2">
-                          <input
-                            type="text"
-                            value={passthroughPurpose}
-                            onChange={(e) => setPassthroughPurpose(e.target.value)}
-                            onBlur={() => persist({ passthroughPurpose: passthroughPurpose || null })}
-                            placeholder="e.g. Pay restaurant owner debt"
-                            className="w-full"
-                          />
-                        </Field>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
-                <Field
-                  label={tx.amount < 0 ? 'Under an existing budget?' : 'Counts toward an income target?'}
-                  className="md:col-span-2"
-                  hint={budgets && budgets.length === 0 ? 'no budgets yet — create one at /budgets' : undefined}
-                >
-                  <select
-                    value={budgetId}
-                    onChange={(e) => { setBudgetId(e.target.value); persist({ budgetId: e.target.value || null }); }}
-                    className="w-full"
-                    disabled={budgets === null}
-                  >
-                    <option value="">No — not in any budget</option>
-                    {budgets?.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        Yes — {b.name}{b.entity ? ` (${b.entity.replace(/_/g, ' ').toLowerCase()})` : ''} · {b.kind === 'INCOME' ? 'income' : 'expense'}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
-            </SectionCard>
-
-            {/* Section 6 — Salary & payroll */}
-            <SectionCard
-              title="Salary & payroll"
-              subtitle="Tag this as a salary / wage payment with entity + recipient"
-              collapsibleHidden={!isSalary}
-              accent={isSalary ? 'bytes' : undefined}
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Field label="Is this a salary?" className="md:col-span-2">
-                  <select
-                    value={isSalary ? '1' : '0'}
-                    onChange={(e) => {
-                      const v = e.target.value === '1';
-                      setIsSalary(v);
-                      if (!v) {
-                        setSalaryEntity('');
-                        setSalaryPersonId('');
-                        persist({ isSalary: false, salaryEntity: null, salaryPersonId: null });
-                      } else {
-                        persist({ isSalary: true });
-                      }
-                    }}
-                    className="w-full"
-                  >
-                    <option value="0">No</option>
-                    <option value="1">Yes — this is a salary / wage payment</option>
-                  </select>
-                </Field>
-                {isSalary ? (
-                  <>
-                    <Field label="Salary · for which entity">
-                      <select
-                        value={salaryEntity}
-                        onChange={(e) => { setSalaryEntity(e.target.value); persist({ salaryEntity: e.target.value || null }); }}
-                        className="w-full"
-                      >
-                        <option value="">— pick —</option>
-                        {ENTITY_OPTIONS.map((e) => (
-                          <option key={e} value={e}>{ENTITY_LABELS[e]}</option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label="Salary · who is it for">
-                      <select
-                        value={salaryPersonId}
-                        onChange={(e) => { setSalaryPersonId(e.target.value); persist({ salaryPersonId: e.target.value || null }); }}
-                        className="w-full"
-                      >
-                        <option value="">— pick —</option>
-                        {(people || []).map((p) => (
-                          <option key={p.id} value={p.id}>{p.name}{p.role ? ` (${p.role.toLowerCase()})` : ''}</option>
-                        ))}
-                      </select>
-                    </Field>
-                  </>
-                ) : null}
-              </div>
-            </SectionCard>
-
-            {/* Section 7 — Passthrough / Sub-tag */}
-            <SectionCard
-              title="Passed onward · sub-tag for another entity"
-              subtitle="When the wire is on one entity but the economic hit belongs to another"
-              accent={passthroughEntity ? 'warn' : undefined}
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Field label="Was this passed onward?" className="md:col-span-2">
-                  <select
-                    value={passthroughEntity ? '1' : '0'}
-                    onChange={(e) => {
-                      if (e.target.value === '0') {
-                        setPassthroughEntity('');
-                        setPassthroughPurpose('');
-                        setPassthroughPersonId('');
-                        setPassthroughNotes('');
-                        persist({ passthroughEntity: null, passthroughPurpose: null, passthroughPersonId: null, passthroughNotes: null });
-                      } else {
-                        setPassthroughEntity('PENDING');
-                      }
-                    }}
-                    className="w-full"
-                  >
-                    <option value="0">No — money stayed in this entity</option>
-                    <option value="1">Yes — funds were passed onward to another entity / debt</option>
-                  </select>
-                  <div className="text-2xs text-ink-mute mt-2">
-                    Example: Bytes AI pays you a salary, you use that money to fund Delicious Bytes LLC. The bank wire is on Bytes AI, but the economic hit lands on Delicious Bytes.
-                  </div>
-                </Field>
-                {passthroughEntity ? (
-                  <>
-                    <Field label="Onward · which entity ultimately pays">
-                      <select
-                        value={passthroughEntity === 'PENDING' ? '' : passthroughEntity}
-                        onChange={(e) => { setPassthroughEntity(e.target.value); persist({ passthroughEntity: e.target.value || null }); }}
-                        className="w-full"
-                      >
-                        <option value="">— pick —</option>
-                        {ENTITY_OPTIONS.map((en) => (
-                          <option key={en} value={en}>{ENTITY_LABELS[en]}</option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label="Onward · purpose">
-                      <input
-                        type="text"
-                        value={passthroughPurpose}
-                        onChange={(e) => setPassthroughPurpose(e.target.value)}
-                        onBlur={() => persist({ passthroughPurpose: passthroughPurpose || null })}
-                        placeholder="e.g. Pay restaurant owner debt"
-                        className="w-full"
-                      />
-                    </Field>
-                    <Field label="Onward · recipient / person">
-                      <select
-                        value={passthroughPersonId}
-                        onChange={(e) => { setPassthroughPersonId(e.target.value); persist({ passthroughPersonId: e.target.value || null }); }}
-                        className="w-full"
-                      >
-                        <option value="">— none —</option>
-                        {(people || []).map((p) => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label="Onward · notes">
-                      <input
-                        type="text"
-                        value={passthroughNotes}
-                        onChange={(e) => setPassthroughNotes(e.target.value)}
-                        onBlur={() => persist({ passthroughNotes: passthroughNotes || null })}
-                        placeholder="optional context"
-                        className="w-full"
-                      />
-                    </Field>
-                  </>
-                ) : null}
-              </div>
-            </SectionCard>
-
-            {/* Section 8 — Notes & docs */}
-            <SectionCard title="Notes & documentation" subtitle="Business purpose, receipt link, and freeform notes">
-              <div className="grid grid-cols-1 gap-3">
-                <Field label="Business purpose">
-                  <OptionSelect
-                    field="business_purpose"
-                    value={purpose}
-                    options={optionLists.business_purpose || []}
-                    onChange={(v) => { setPurpose(v); persist({ businessPurpose: v || null }); }}
-                    onOptionAdded={(v) => addToList('business_purpose', v)}
-                    placeholder="— pick a purpose —"
-                  />
-                </Field>
-                <Field label="Doc reference">
-                  <input
-                    type="text"
-                    value={docRef}
-                    onChange={(e) => setDocRef(e.target.value)}
-                    onBlur={() => persist({ receiptRef: docRef || null })}
-                    className="w-full"
-                    placeholder="INV-123 / link to file"
-                  />
-                </Field>
-                <Field label="Notes">
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    onBlur={() => persist({ notes: notes || null })}
-                    className="w-full"
-                    rows={3}
-                    placeholder="anything else"
-                  />
-                </Field>
-              </div>
-            </SectionCard>
-
-            <datalist id="acct-list">
-              {ACCOUNT_NAME_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
-            </datalist>
-
-            {/* Split editor */}
-            <SplitEditor transactionId={tx.id} transactionAmount={tx.amount} />
-
-            {/* Same-day bulk apply */}
-            <SameDayPanel
-              txId={tx.id}
-              postingDate={tx.postingDate}
-              accountId={tx.accountId}
-              currentTags={{
-                confirmedEntity,
-                subCategory1: sub1 || null,
-                subCategory2: sub2 || null,
-                individual: individual || null,
-                sourceOfMoney: sourceOfMoney || null,
-                needToGetFrom: needFrom || null,
-                businessPurpose: purpose || null,
-                taggedDate: taggedDate || null,
-                cpaReviewed,
-              }}
-            />
-
-            {/* Quick status buttons + hint */}
-            <div className="border-t border-line pt-3 flex flex-wrap items-center gap-2">
-              <button className="btn btn-primary" onClick={() => applyStatus('CONFIRMED')}>
-                <kbd>1</kbd> ✅ Confirm
-              </button>
-              <button className="btn" onClick={() => applyStatus('NEEDS_RECEIPT')}>
-                <kbd>2</kbd> 🔴 Needs receipt
-              </button>
-              <button className="btn" onClick={() => applyStatus('PERSONAL_NO_DEDUCT')}>
-                <kbd>3</kbd> ❌ Personal
-              </button>
-              <div className="text-2xs text-ink-mute ml-auto">Esc to close · changes save automatically</div>
-            </div>
+            <button onClick={onClose} className="btn btn-ghost btn-sm" style={{ padding: 4 }}>
+              <X size={14} />
+            </button>
           </div>
-          {/* Body close */}
+        </div>
+
+        {/* Body */}
+        <div className="dr-body">
+          {/* ① Dates */}
+          <DatesSection tx={tx} state={state} setState={setState} />
+
+          {/* ② Source of money — funding splits */}
+          <SectionCard
+            accent="green"
+            open={openMap.source}
+            setOpen={() => toggle('source')}
+            icon={<Lock size={13} style={{ color: 'var(--ink-3)' }} />}
+            title="Source of money"
+            badge="truth"
+            badgeColor="pill-truth"
+            summary={summaryForSource(tx)}
+          >
+            <div className="text-[11.5px] text-ink-mute mb-3.5">
+              Tag this expense to one or more income sources, each with its own dollar amount.
+            </div>
+            {isExpense ? (
+              <ManualSourceLink txId={tx.id} expenseAmount={tx.amount} />
+            ) : (
+              <ManualDownstreamList inflowTxId={tx.id} inflowAmount={tx.amount} />
+            )}
+          </SectionCard>
+
+          {/* ③ Booked attribution */}
+          <BookedAttributionSection
+            state={state}
+            setState={setState}
+            open={openMap.booked}
+            setOpen={() => toggle('booked')}
+          />
+
+          {/* ④ Recurrence */}
+          <RecurrenceSection
+            tx={tx}
+            state={state}
+            setState={setState}
+            open={openMap.recurrence}
+            setOpen={() => toggle('recurrence')}
+          />
+
+          {/* ⑤ Money flow */}
+          <MoneyFlowSection
+            tx={tx}
+            state={state}
+            setState={setState}
+            open={openMap.flow}
+            setOpen={() => toggle('flow')}
+          />
+
+          {/* ⑥ Passed onward */}
+          <PassedOnwardSection
+            tx={tx}
+            state={state}
+            setState={setState}
+            open={openMap.passthrough}
+            setOpen={() => toggle('passthrough')}
+          />
+
+          {/* ⑦ Split */}
+          <SectionCard
+            accent={undefined}
+            open={openMap.split}
+            setOpen={() => toggle('split')}
+            icon={<Split size={13} style={{ color: 'var(--ink-3)' }} />}
+            title="Split transaction"
+            summary="Divide this charge across entities, categories, or periods"
+          >
+            <SplitEditor transactionId={tx.id} transactionAmount={tx.amount} />
+          </SectionCard>
+
+          {/* ⑧ Notes */}
+          <NotesSection
+            tx={tx}
+            state={state}
+            setState={setState}
+            open={openMap.notes}
+            setOpen={() => toggle('notes')}
+          />
+
+          {/* Review checklist */}
+          <ReviewChecklist state={state} tx={tx} />
+
+          {/* Same-day apply */}
+          <SameDayPanel
+            txId={tx.id}
+            postingDate={tx.postingDate}
+            accountId={tx.accountId}
+            currentTags={{
+              confirmedEntity: state.confirmedEntity,
+              subCategory1: state.businessCat1Key || state.personalCat1Key || null,
+              subCategory2: state.businessSubCat2 || state.personalSubCat || null,
+              individual: state.individual || null,
+              sourceOfMoney: state.moneySource || null,
+              needToGetFrom: state.needToGetFrom || null,
+              businessPurpose: state.businessPurpose || null,
+              taggedDate: state.taggedDate || null,
+              cpaReviewed: state.cpaReviewed,
+            }}
+          />
+
+          {/* CPA */}
+          <CPASection
+            state={state}
+            setState={setState}
+            open={openMap.cpa}
+            setOpen={() => toggle('cpa')}
+          />
+
+          <div className="h-4" />
+        </div>
+
+        {/* Footer */}
+        <div className="dr-foot">
+          <button
+            type="button"
+            className="btn btn-confirm"
+            onClick={() => applyStatus('CONFIRMED')}
+          >
+            <span className="kbd" style={{ background: 'rgba(74,222,128,0.18)', color: 'var(--income)' }}>1</span>
+            <Check size={11} /> Confirm
+          </button>
+          <button type="button" className="btn" onClick={() => applyStatus('NEEDS_RECEIPT')}>
+            <span className="kbd">2</span>
+            <Receipt size={11} /> Needs receipt
+          </button>
+          <button type="button" className="btn" onClick={() => applyStatus('PERSONAL_NO_DEDUCT')}>
+            <span className="kbd">3</span>
+            <User size={11} /> Personal
+          </button>
+          <span className="flex-1" />
+          <span className="text-[10.5px] text-ink-mute inline-flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-ink-ghost" />
+            Changes save automatically
+          </span>
         </div>
       </div>
     </Portal>
   );
 }
 
-function MoneyFlowChain({
-  payingEntity, isSalary, salaryRecipientName, salaryEntityLabel, passthroughEntityLabel, passthroughPurpose, passthroughRecipientName,
-}: {
-  payingEntity: keyof typeof ENTITY_LABELS;
-  isSalary: boolean;
-  salaryRecipientName: string | null;
-  salaryEntityLabel: string | null;
-  passthroughEntityLabel: string | null;
-  passthroughPurpose: string;
-  passthroughRecipientName: string | null;
-}) {
-  const payerLabel = salaryEntityLabel || ENTITY_LABELS[payingEntity] || String(payingEntity);
-  const nodes: { kind: 'entity' | 'person'; label: string; sub?: string }[] = [];
-  nodes.push({ kind: 'entity', label: payerLabel, sub: 'pays from' });
-  if (isSalary) {
-    nodes.push({ kind: 'person', label: salaryRecipientName || 'Recipient', sub: 'salary / wages' });
-  }
-  if (passthroughEntityLabel) {
-    nodes.push({
-      kind: 'entity',
-      label: passthroughEntityLabel,
-      sub: passthroughPurpose || (passthroughRecipientName ? `pays ${passthroughRecipientName}` : 'economic hit lands here'),
-    });
-  }
-  return (
-    <div className="card overflow-hidden border-warn/30">
-      <div className="px-5 pt-4 pb-3 border-b border-line/60 flex items-center gap-2">
-        <span className="text-sm font-semibold tracking-tight">Money flow chain</span>
-        <span className="pill text-2xs bg-warn/15 text-warn border border-warn/30">multi-hop</span>
-      </div>
-      <div className="p-5">
-        <div className="flex items-stretch gap-2 overflow-x-auto pb-2">
-          {nodes.map((n, i) => (
-            <div key={i} className="flex items-stretch gap-2 shrink-0">
-              <div className={`flex-1 min-w-[140px] rounded-xl border p-3 ${n.kind === 'entity' ? 'border-entity-bytes/30 bg-entity-bytes/5' : 'border-entity-amari/30 bg-entity-amari/5'}`}>
-                <div className="text-2xs uppercase tracking-wider text-ink-mute">
-                  {n.kind === 'entity' ? '🏢 Entity' : '👤 Person'}
-                </div>
-                <div className="text-sm font-semibold mt-0.5 truncate">{n.label}</div>
-                {n.sub ? <div className="text-2xs text-ink-mute mt-1">{n.sub}</div> : null}
-              </div>
-              {i < nodes.length - 1 ? (
-                <div className="flex items-center text-ink-mute text-xl select-none">→</div>
-              ) : null}
-            </div>
-          ))}
-        </div>
-        <div className="text-2xs text-ink-mute mt-2">
-          The cash wire is on <span className="text-ink">{payerLabel}</span>&apos;s books.
-          {isSalary && salaryRecipientName ? <> It&apos;s booked as salary to <span className="text-ink">{salaryRecipientName}</span>.</> : null}
-          {passthroughEntityLabel ? <> The economic hit ultimately lands on <span className="text-ink">{passthroughEntityLabel}</span>.</> : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
+// ──────────────────── SectionCard helper ────────────────────
 function SectionCard({
-  title, subtitle, accent, collapsibleHidden, children,
+  accent, open, setOpen, title, badge, badgeColor, icon, summary, children,
 }: {
-  title: string;
-  subtitle?: string;
-  accent?: 'bytes' | 'income' | 'warn';
-  collapsibleHidden?: boolean;
+  accent?: 'gold' | 'green' | 'warn' | 'purple' | 'blue';
+  open: boolean;
+  setOpen: () => void;
+  title: React.ReactNode;
+  badge?: string;
+  badgeColor?: string;
+  icon?: React.ReactNode;
+  summary?: string;
   children: React.ReactNode;
 }) {
-  if (collapsibleHidden) return null;
-  const accentBorder =
-    accent === 'bytes' ? 'border-entity-bytes/30' :
-    accent === 'income' ? 'border-income/30' :
-    accent === 'warn' ? 'border-warn/30' : '';
   return (
-    <div className={`card overflow-hidden ${accentBorder}`}>
-      <div className="px-5 pt-4 pb-3 border-b border-line/60">
-        <div className="text-sm font-semibold tracking-tight">{title}</div>
-        {subtitle ? <div className="text-2xs text-ink-mute mt-0.5">{subtitle}</div> : null}
+    <div className={`card ${accent || ''}`}>
+      <div className="card-head" onClick={setOpen}>
+        {icon && <span style={{ display: 'inline-flex' }}>{icon}</span>}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="t-md" style={{ color: 'var(--ink)' }}>{title}</span>
+            {badge && <span className={`pill ${badgeColor || ''}`} style={{ fontSize: 10 }}>{badge}</span>}
+          </div>
+          {!open && summary && (
+            <div className="text-[11.5px] text-ink-mute mt-0.5">{summary}</div>
+          )}
+        </div>
+        <ChevronDown
+          size={14}
+          className="text-ink-mute"
+          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 180ms ease' }}
+        />
       </div>
-      <div className="p-5">
-        {children}
+      <div className={`collapse-section ${open ? 'open' : ''}`}>
+        <div>
+          <div className="card-body">{children}</div>
+        </div>
       </div>
     </div>
   );
 }
 
-function Field({ label, children, className = '', hint }: { label: string; children: React.ReactNode; className?: string; hint?: string }) {
+function Field({
+  label, hint, labelGold, children, span,
+}: {
+  label: React.ReactNode;
+  hint?: React.ReactNode;
+  labelGold?: boolean;
+  children: React.ReactNode;
+  span?: number;
+}) {
   return (
-    <label className={`block ${className}`}>
-      <div className="section-label mb-1.5 flex items-center gap-1.5">
-        <span>{label}</span>
-        {hint ? <span className="text-ink-mute normal-case tracking-normal text-2xs">· {hint}</span> : null}
+    <div style={{ gridColumn: span ? `span ${span}` : 'auto' }}>
+      <div className={`field-label ${labelGold ? 'gold' : ''}`}>{label}</div>
+      {children}
+      {hint && <div className="field-hint">{hint}</div>}
+    </div>
+  );
+}
+
+function summaryForSource(tx: Transaction): string {
+  if (tx.amount > 0) return 'Inflow · expenses link in from this wire';
+  return 'Tag this expense to its income source';
+}
+
+// ──────────────────── Section ① — Dates ────────────────────
+function DatesSection({ tx, state, setState }: { tx: Transaction; state: any; setState: any }) {
+  const mode = state.bookingDateMode || 'MONTH';
+  const bookedDate = state.taggedDate || tx.taggedDate || '';
+  const displayBooked = bookedDate
+    ? mode === 'MONTH'
+      ? new Date(bookedDate + (bookedDate.length === 7 ? '-01' : '')).toLocaleString('en-US', { month: 'long', year: 'numeric' })
+      : new Date(bookedDate).toLocaleDateString()
+    : '—';
+  const chargeDate = tx.transactionDate;
+
+  return (
+    <div className="px-1 pb-1.5">
+      <div className="grid grid-cols-3 gap-3">
+        <Field label="Charge date" hint="From transaction description">
+          <div
+            className="num"
+            style={{
+              padding: '8px 10px',
+              borderRadius: 7,
+              background: 'var(--bg-3)',
+              border: '0.5px solid var(--border-subtle)',
+              color: 'var(--ink-2)',
+              fontSize: 13,
+            }}
+          >
+            {chargeDate ? fmtDate(chargeDate) : '—'}
+          </div>
+        </Field>
+        <Field label="Posted date" hint="From bank · read-only">
+          <div
+            className="num"
+            style={{
+              padding: '8px 10px',
+              borderRadius: 7,
+              background: 'var(--bg-3)',
+              border: '0.5px solid var(--border-subtle)',
+              color: 'var(--ink-2)',
+              fontSize: 13,
+            }}
+          >
+            {fmtDate(tx.postingDate)}
+          </div>
+        </Field>
+        <Field
+          labelGold
+          label={<span>Booked date <span style={{ color: 'var(--gold)' }}>✏</span></span>}
+          hint={mode === 'MONTH' ? 'Books to the 1st · useful for subscriptions' : 'Books to the specific day'}
+        >
+          {mode === 'MONTH' ? (
+            <input
+              type="month"
+              value={bookedDate.slice(0, 7)}
+              onChange={(e) => {
+                const v = e.target.value ? `${e.target.value}-01` : '';
+                setState({ taggedDate: v }, { taggedDate: v || null });
+              }}
+              className="num"
+              style={{
+                background: 'var(--bg-3)',
+                border: '0.5px solid rgba(201,168,122,0.5)',
+                boxShadow: '0 0 0 2px rgba(201,168,122,0.12)',
+                fontWeight: 500,
+              }}
+            />
+          ) : (
+            <input
+              type="date"
+              value={bookedDate}
+              onChange={(e) => setState({ taggedDate: e.target.value }, { taggedDate: e.target.value || null })}
+              className="num"
+              style={{
+                background: 'var(--bg-3)',
+                border: '0.5px solid rgba(201,168,122,0.5)',
+                boxShadow: '0 0 0 2px rgba(201,168,122,0.12)',
+                fontWeight: 500,
+              }}
+            />
+          )}
+          <div className="mt-1.5 flex gap-1">
+            <button
+              type="button"
+              onClick={() => setState({ bookingDateMode: 'DAY' }, { bookingDateMode: 'DAY' })}
+              className="btn btn-sm"
+              style={{
+                flex: 1,
+                justifyContent: 'center',
+                background: mode === 'DAY' ? 'rgba(201,168,122,0.16)' : 'var(--bg-3)',
+                borderColor: mode === 'DAY' ? 'rgba(201,168,122,0.4)' : 'var(--border-subtle)',
+                color: mode === 'DAY' ? 'var(--gold)' : 'var(--ink-3)',
+              }}
+            >
+              Specific day {mode === 'DAY' && <Check size={10} className="ml-1" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => setState({ bookingDateMode: 'MONTH' }, { bookingDateMode: 'MONTH' })}
+              className="btn btn-sm"
+              style={{
+                flex: 1,
+                justifyContent: 'center',
+                background: mode === 'MONTH' ? 'rgba(201,168,122,0.16)' : 'var(--bg-3)',
+                borderColor: mode === 'MONTH' ? 'rgba(201,168,122,0.4)' : 'var(--border-subtle)',
+                color: mode === 'MONTH' ? 'var(--gold)' : 'var(--ink-3)',
+              }}
+            >
+              Month only {mode === 'MONTH' && <Check size={10} className="ml-1" />}
+            </button>
+          </div>
+        </Field>
       </div>
-      <div>{children}</div>
-    </label>
+    </div>
+  );
+}
+
+// ──────────────────── ③ Booked Attribution ────────────────────
+function BookedAttributionSection({
+  state, setState, open, setOpen,
+}: { state: any; setState: any; open: boolean; setOpen: () => void }) {
+  const isB = state.personalOrBusiness === 'BUSINESS';
+  const isP = state.personalOrBusiness === 'PERSONAL';
+
+  const summary = isB
+    ? `Business · ${state.confirmedEntity ? ENTITY_LABELS[state.confirmedEntity as EntityType] : '—'} · ${state.businessSubCat2 || 'no sub'}`
+    : isP
+      ? `Personal · ${state.personalCat1Key ? (PERSONAL_CATEGORIES[state.personalCat1Key]?.label || state.personalCat1Key) : 'no cat'} · ${state.personalSubCat || 'no sub'}`
+      : 'Pick a path';
+
+  return (
+    <SectionCard
+      accent={isP ? 'purple' : 'gold'}
+      open={open}
+      setOpen={setOpen}
+      title="Booked attribution"
+      badge="you decide"
+      badgeColor="pill-gold"
+      summary={summary}
+    >
+      {/* Path toggle */}
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <PathButton
+          active={isP}
+          color="var(--purple)"
+          icon={<User size={16} />}
+          label="Personal"
+          onClick={() => setState({ personalOrBusiness: 'PERSONAL', confirmedEntity: 'PERSONAL' }, { confirmedEntity: 'PERSONAL' })}
+        />
+        <PathButton
+          active={isB}
+          color="var(--gold)"
+          icon={<Building2 size={16} />}
+          label="Business"
+          onClick={() => {
+            const v = state.confirmedEntity === 'PERSONAL' ? 'BYTES_AI' : state.confirmedEntity;
+            setState({ personalOrBusiness: 'BUSINESS', confirmedEntity: v }, { confirmedEntity: v });
+          }}
+        />
+      </div>
+
+      {isB && <BusinessPath state={state} setState={setState} />}
+      {isP && <PersonalPath state={state} setState={setState} />}
+      {!state.personalOrBusiness && (
+        <div className="text-[12px] text-ink-mute text-center py-6">
+          Pick a path to start tagging.
+        </div>
+      )}
+
+      {/* Auto-detect */}
+      {state.personalOrBusiness && (
+        <div
+          className="mt-4.5 flex items-center gap-2.5"
+          style={{
+            padding: '10px 12px',
+            background: 'var(--bg-3)',
+            border: '0.5px solid var(--border-subtle)',
+            borderRadius: 8,
+          }}
+        >
+          <Repeat size={13} style={{ color: 'var(--gold)' }} />
+          <div className="flex-1 min-w-0">
+            <div className="text-[12px] font-medium">Auto-detect next time</div>
+            <div className="text-[10.5px] text-ink-mute">Same merchant → auto-apply this categorization</div>
+          </div>
+          <Toggle value={state.autoDetect} onChange={(v) => setState({ autoDetect: v }, { autoDetectRule: v })} />
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+function PathButton({
+  active, color, icon, label, onClick,
+}: { active: boolean; color: string; icon: React.ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '11px 14px',
+        borderRadius: 8,
+        background: active ? `color-mix(in oklab, ${color} 14%, var(--bg-3))` : 'var(--bg-3)',
+        border: '0.5px solid ' + (active ? color : 'var(--border-default)'),
+        color: active ? color : 'var(--ink-2)',
+        fontSize: 13,
+        fontWeight: 500,
+        cursor: 'pointer',
+        textAlign: 'left',
+        justifyContent: 'flex-start',
+        transition: 'all 120ms ease',
+      }}
+    >
+      {icon}
+      <span>{label}</span>
+      {active && <Check size={12} style={{ marginLeft: 'auto' }} />}
+    </button>
+  );
+}
+
+function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!value)}
+      style={{
+        width: 32,
+        height: 18,
+        borderRadius: 999,
+        background: value ? 'var(--gold)' : 'var(--bg-4)',
+        transition: 'background 150ms ease',
+        position: 'relative',
+        flex: '0 0 32px',
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: 2,
+          left: value ? 16 : 2,
+          width: 14,
+          height: 14,
+          borderRadius: 50,
+          background: value ? 'var(--bg-0)' : 'var(--ink-3)',
+          transition: 'left 150ms ease',
+        }}
+      />
+    </button>
+  );
+}
+
+function BusinessPath({ state, setState }: { state: any; setState: any }) {
+  const cat = state.businessCat1Key ? BUSINESS_CATEGORIES[state.businessCat1Key] : null;
+
+  return (
+    <div className="flex flex-col gap-3.5">
+      <div className="grid grid-cols-2 gap-3.5">
+        <Field label="Business entity">
+          <EntityPicker
+            value={state.confirmedEntity}
+            onChange={(v) => setState({ confirmedEntity: v }, { confirmedEntity: v })}
+          />
+        </Field>
+        <Field label="Department · optional">
+          <select
+            value={state.businessDepartment || ''}
+            onChange={(e) => setState({ businessDepartment: e.target.value }, { businessDepartment: e.target.value || null })}
+          >
+            <option value="">— optional —</option>
+            {['Engineering', 'Product', 'Sales & Marketing', 'Operations', 'G&A', 'Customer Success'].map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3.5">
+        <Field label="Category">
+          <select
+            value={state.businessCat1Key || ''}
+            onChange={(e) => setState(
+              { businessCat1Key: e.target.value, businessSubCat2: '' },
+              { businessCat1Key: e.target.value || null, subCategory2: null }
+            )}
+          >
+            <option value="">— select —</option>
+            {Object.entries(BUSINESS_CATEGORIES).map(([k, c]) => (
+              <option key={k} value={k}>{c.label}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Sub-category" hint={cat?.tax}>
+          <select
+            value={state.businessSubCat2 || ''}
+            onChange={(e) => setState({ businessSubCat2: e.target.value }, { subCategory2: e.target.value || null })}
+            disabled={!cat}
+          >
+            <option value="">— pick category first —</option>
+            {cat?.subs.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </Field>
+      </div>
+
+      {/* Chip grid for sub-cats */}
+      {cat && (
+        <div>
+          <div className="field-label">Quick pick · {cat.label}</div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {cat.subs.map((s) => (
+              <ChipButton
+                key={s}
+                active={state.businessSubCat2 === s}
+                color="var(--gold)"
+                onClick={() => setState({ businessSubCat2: s }, { subCategory2: s })}
+              >
+                {s}
+              </ChipButton>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PersonalPath({ state, setState }: { state: any; setState: any }) {
+  const cat = state.personalCat1Key ? PERSONAL_CATEGORIES[state.personalCat1Key] : null;
+  return (
+    <div className="flex flex-col gap-3.5">
+      <div className="grid grid-cols-2 gap-3.5">
+        <Field label="Category">
+          <select
+            value={state.personalCat1Key || ''}
+            onChange={(e) => setState(
+              { personalCat1Key: e.target.value, personalSubCat: '' },
+              { personalCat1Key: e.target.value || null, subCategory2: null }
+            )}
+          >
+            <option value="">— select —</option>
+            {Object.entries(PERSONAL_CATEGORIES).map(([k, c]) => (
+              <option key={k} value={k}>{c.label}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Sub-category">
+          <select
+            value={state.personalSubCat || ''}
+            onChange={(e) => setState({ personalSubCat: e.target.value }, { subCategory2: e.target.value || null })}
+            disabled={!cat}
+          >
+            <option value="">— pick category first —</option>
+            {cat?.subs.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </Field>
+      </div>
+
+      {cat && (
+        <div>
+          <div className="field-label">Quick pick · {cat.label}</div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {cat.subs.map((s) => (
+              <ChipButton
+                key={s}
+                active={state.personalSubCat === s}
+                color="var(--purple)"
+                onClick={() => setState({ personalSubCat: s }, { subCategory2: s })}
+              >
+                {s}
+              </ChipButton>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChipButton({
+  active, color, onClick, children,
+}: { active: boolean; color: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: '6px 9px',
+        borderRadius: 6,
+        background: active ? `color-mix(in oklab, ${color} 14%, var(--bg-3))` : 'var(--bg-3)',
+        border: '0.5px solid ' + (active ? color : 'var(--border-subtle)'),
+        color: active ? color : 'var(--ink-2)',
+        fontSize: 11.5,
+        fontWeight: 500,
+        textAlign: 'left',
+        cursor: 'pointer',
+        transition: 'all 100ms ease',
+        lineHeight: 1.3,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function EntityPicker({
+  value, onChange,
+}: { value: EntityType; onChange: (v: EntityType) => void }) {
+  return (
+    <div className="grid grid-cols-2 gap-1.5">
+      {BUSINESS_ENTITIES.map((k) => {
+        const color = ENTITY_COLORS[k];
+        const active = value === k;
+        return (
+          <button
+            key={k}
+            type="button"
+            onClick={() => onChange(k)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              padding: '7px 10px',
+              borderRadius: 6,
+              background: active ? `color-mix(in oklab, ${color} 14%, var(--bg-3))` : 'var(--bg-3)',
+              border: '0.5px solid ' + (active ? color : 'var(--border-default)'),
+              color: active ? 'var(--ink)' : 'var(--ink-2)',
+              fontSize: 12,
+              fontWeight: 500,
+              textAlign: 'left',
+              cursor: 'pointer',
+            }}
+          >
+            <span className="w-[7px] h-[7px] rounded-full" style={{ background: color }} />
+            {ENTITY_LABELS[k]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ──────────────────── ④ Recurrence ────────────────────
+function RecurrenceSection({
+  tx, state, setState, open, setOpen,
+}: { tx: Transaction; state: any; setState: any; open: boolean; setOpen: () => void }) {
+  const isRec = state.isRecurring;
+  const summary = isRec
+    ? `Recurring · ${(state.recurringFrequency || '').toLowerCase()} · next ${state.recurringNextDate || '—'}`
+    : 'One-time charge';
+
+  return (
+    <SectionCard
+      accent={isRec ? 'warn' : undefined}
+      open={open}
+      setOpen={setOpen}
+      title="Recurrence & forecast"
+      summary={summary}
+    >
+      <Field label="Charge type">
+        <div className="grid grid-cols-2 gap-2">
+          <PathButton
+            active={!isRec}
+            color="var(--ink-3)"
+            icon={null}
+            label="One-time charge"
+            onClick={() => setState({ isRecurring: false }, { isRecurring: false })}
+          />
+          <PathButton
+            active={isRec}
+            color="var(--warn)"
+            icon={<Repeat size={13} />}
+            label="Recurring charge"
+            onClick={() => setState({ isRecurring: true }, { isRecurring: true })}
+          />
+        </div>
+      </Field>
+
+      {isRec && (
+        <>
+          <div className="mt-3.5">
+            <Field label="Frequency">
+              <div
+                className="flex gap-1 p-0.5"
+                style={{
+                  background: 'var(--bg-3)',
+                  border: '0.5px solid var(--border-subtle)',
+                  borderRadius: 7,
+                }}
+              >
+                {['MONTHLY', 'WEEKLY', 'BIWEEKLY', 'QUARTERLY', 'ANNUAL'].map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setState({ recurringFrequency: f }, { recurringFrequency: f })}
+                    style={{
+                      flex: 1,
+                      padding: '4px 0',
+                      borderRadius: 5,
+                      background: state.recurringFrequency === f ? 'var(--bg-0)' : 'transparent',
+                      color: state.recurringFrequency === f ? 'var(--ink)' : 'var(--ink-3)',
+                      fontSize: 11,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {f.charAt(0) + f.slice(1).toLowerCase()}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          </div>
+
+          <div
+            className="mt-3.5"
+            style={{
+              padding: 12,
+              background: 'rgba(251,191,36,0.06)',
+              border: '0.5px dashed rgba(251,191,36,0.30)',
+              borderRadius: 8,
+            }}
+          >
+            <div className="field-label" style={{ color: 'var(--warn)', marginBottom: 10 }}>Forecast setup</div>
+            <div className="grid grid-cols-2 gap-3.5">
+              <Field label="Expected amount">
+                <input
+                  className="num"
+                  value={fmtMoney(Math.abs(tx.amount))}
+                  readOnly
+                />
+              </Field>
+              <Field label="Next due date">
+                <input
+                  type="date"
+                  value={state.recurringNextDate || ''}
+                  onChange={(e) => setState({ recurringNextDate: e.target.value }, { recurringNextDate: e.target.value || null })}
+                />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3.5 mt-3">
+              <Field label="Forecast label">
+                <input
+                  type="text"
+                  value={state.recurringLabel || ''}
+                  onChange={(e) => setState({ recurringLabel: e.target.value })}
+                  onBlur={() => setState({}, { recurringLabel: state.recurringLabel || null })}
+                  placeholder="e.g. Family home rent"
+                />
+              </Field>
+              <Field label="Alert days before">
+                <select
+                  value={state.recurringAlertDays}
+                  onChange={(e) => setState({ recurringAlertDays: Number(e.target.value) }, { recurringAlertDays: Number(e.target.value) })}
+                >
+                  <option value="1">1 day before</option>
+                  <option value="3">3 days before</option>
+                  <option value="7">7 days before</option>
+                  <option value="14">14 days before</option>
+                </select>
+              </Field>
+            </div>
+            <div
+              className="mt-3 flex items-center gap-2"
+              style={{
+                padding: '8px 10px',
+                background: 'var(--bg-3)',
+                borderRadius: 6,
+                fontSize: 10.5,
+                color: 'var(--ink-2)',
+              }}
+            >
+              <Calendar size={11} style={{ color: 'var(--warn)' }} />
+              Will appear in your Bills Calendar and cash flow forecast starting next month
+            </div>
+          </div>
+        </>
+      )}
+    </SectionCard>
+  );
+}
+
+// ──────────────────── ⑤ Money flow ────────────────────
+function MoneyFlowSection({
+  tx, state, setState, open, setOpen,
+}: { tx: Transaction; state: any; setState: any; open: boolean; setOpen: () => void }) {
+  return (
+    <SectionCard
+      open={open}
+      setOpen={setOpen}
+      title="Money flow"
+      summary={state.moneySource ? `Source: ${state.moneySource}` : 'Not set'}
+    >
+      <div className="grid grid-cols-2 gap-3.5">
+        <Field label="Source of money to pay" hint="Which entity pool is paying">
+          <select
+            value={state.moneySource || ''}
+            onChange={(e) => setState({ moneySource: e.target.value }, { sourceOfMoney: e.target.value || null })}
+          >
+            <option value="">— select —</option>
+            <optgroup label="Money pools">
+              {BUSINESS_ENTITIES.flatMap((e) => [
+                <option key={`${e}-rev`} value={`${ENTITY_LABELS[e]} revenue`}>{ENTITY_LABELS[e]} revenue</option>,
+                <option key={`${e}-inv`} value={`${ENTITY_LABELS[e]} investment income`}>{ENTITY_LABELS[e]} investment income</option>,
+              ])}
+              <option value="Personal funds">Personal funds</option>
+              <option value="Pre-import balance">Pre-import balance</option>
+            </optgroup>
+          </select>
+        </Field>
+        <Field label="Need to get from" hint="Who reimburses this account">
+          <select
+            value={state.needToGetFrom || ''}
+            onChange={(e) => setState({ needToGetFrom: e.target.value }, { needToGetFrom: e.target.value || null })}
+          >
+            <option value="">No need</option>
+            {BUSINESS_ENTITIES.map((e) => (
+              <option key={e} value={`${ENTITY_LABELS[e]} (reimburse from)`}>{ENTITY_LABELS[e]} (reimburse from)</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      {/* Money chain inset */}
+      <div
+        className="mt-4 p-3.5"
+        style={{
+          background: 'var(--bg-3)',
+          border: '0.5px solid var(--border-subtle)',
+          borderRadius: 8,
+        }}
+      >
+        <div className="field-label mb-3">Money chain · who got it next?</div>
+        <div className="grid grid-cols-2 gap-3.5">
+          <Field label="Hop 2 · pays to person" hint="As salary / wages">
+            <select
+              value={state.hop2Person || ''}
+              onChange={(e) => setState({ hop2Person: e.target.value }, { salaryPersonId: e.target.value || null, isSalary: !!e.target.value })}
+            >
+              <option value="">— stayed in entity —</option>
+              {/* Person list could be threaded in; using counterparty list shortcut */}
+              <option value="pending">— pick on Salary section —</option>
+            </select>
+          </Field>
+          <Field label="Hop 3 · then forwards to" hint="Where it ultimately lands">
+            <select
+              value={state.hop3Entity || ''}
+              onChange={(e) => setState({ hop3Entity: e.target.value, passedOnward: !!e.target.value }, { passthroughEntity: e.target.value || null })}
+            >
+              <option value="">— didn&apos;t flow onward —</option>
+              {BUSINESS_ENTITIES.map((en) => (
+                <option key={en} value={en}>{ENTITY_LABELS[en]}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
+// ──────────────────── ⑥ Passed onward ────────────────────
+function PassedOnwardSection({
+  tx, state, setState, open, setOpen,
+}: { tx: Transaction; state: any; setState: any; open: boolean; setOpen: () => void }) {
+  const active = state.passedOnward;
+  const summary = active && state.passthroughEntity
+    ? `Economic hit: ${ENTITY_LABELS[state.passthroughEntity as EntityType] || state.passthroughEntity}`
+    : 'Stayed in this entity';
+
+  return (
+    <SectionCard
+      accent={active ? 'warn' : undefined}
+      open={open}
+      setOpen={setOpen}
+      title="Passed onward"
+      summary={summary}
+    >
+      <div className="text-[11.5px] text-ink-mute mb-3.5">
+        When the wire is on one entity but the economic hit belongs to another.
+      </div>
+
+      <Field label="Was this passed onward?">
+        <div className="grid grid-cols-2 gap-2">
+          <PathButton
+            active={!active}
+            color="var(--ink-3)"
+            icon={null}
+            label="No — stayed here"
+            onClick={() => setState({ passedOnward: false, passthroughEntity: '' }, { passthroughEntity: null })}
+          />
+          <PathButton
+            active={active}
+            color="var(--warn)"
+            icon={null}
+            label="Yes — hit elsewhere"
+            onClick={() => setState({ passedOnward: true })}
+          />
+        </div>
+      </Field>
+
+      {active && (
+        <>
+          <div className="mt-3.5">
+            <Field label="Economic hit entity">
+              <EntityPicker
+                value={state.passthroughEntity || 'BYTES_AI'}
+                onChange={(v) => setState({ passthroughEntity: v }, { passthroughEntity: v })}
+              />
+            </Field>
+          </div>
+
+          {state.passthroughEntity && (
+            <div className="mt-3.5 flex flex-col gap-3">
+              <Field label="Onward · purpose">
+                <input
+                  type="text"
+                  value={state.passthroughPurpose || ''}
+                  onChange={(e) => setState({ passthroughPurpose: e.target.value })}
+                  onBlur={() => setState({}, { passthroughPurpose: state.passthroughPurpose || null })}
+                  placeholder="e.g. Pay restaurant owner debt"
+                />
+              </Field>
+
+              {/* Flow chain visual */}
+              <FlowChainVisual
+                fromEntity={(tx.confirmedEntity || tx.entityTag) as EntityType}
+                toEntity={state.passthroughEntity as EntityType}
+                purpose={state.passthroughPurpose}
+              />
+
+              <Field label="Onward · notes">
+                <textarea
+                  rows={2}
+                  value={state.passthroughNotes || ''}
+                  onChange={(e) => setState({ passthroughNotes: e.target.value })}
+                  onBlur={() => setState({}, { passthroughNotes: state.passthroughNotes || null })}
+                  placeholder="Why was this passed onward?"
+                  style={{ resize: 'vertical' }}
+                />
+              </Field>
+            </div>
+          )}
+        </>
+      )}
+    </SectionCard>
+  );
+}
+
+function FlowChainVisual({ fromEntity, toEntity, purpose }: { fromEntity: EntityType; toEntity: EntityType; purpose?: string }) {
+  const fromColor = ENTITY_COLORS[fromEntity] || '#c9a87a';
+  const toColor = ENTITY_COLORS[toEntity] || '#c9a87a';
+  return (
+    <div
+      style={{
+        padding: 16,
+        background: `linear-gradient(90deg, color-mix(in oklab, ${fromColor} 8%, var(--bg-3)), color-mix(in oklab, ${toColor} 8%, var(--bg-3)))`,
+        border: '0.5px solid rgba(251,191,36,0.30)',
+        borderRadius: 10,
+      }}
+    >
+      <div className="field-label" style={{ color: 'var(--warn)', marginBottom: 12 }}>Money flow chain</div>
+      <div className="flex items-center gap-2">
+        <FlowNode type="entity" color={fromColor} label={ENTITY_LABELS[fromEntity]} sub="pays from" />
+        <FlowArrow />
+        <FlowNode type="person" color="var(--purple)" label="You" sub="salary / wages" />
+        <FlowArrow />
+        <FlowNode type="entity" color={toColor} label={ENTITY_LABELS[toEntity]} sub="economic hit" />
+      </div>
+      <div
+        className="text-[11px] text-ink-dim italic mt-3 pt-2.5"
+        style={{ borderTop: '0.5px solid var(--border-subtle)', lineHeight: 1.5 }}
+      >
+        {ENTITY_LABELS[fromEntity]} pays salary, then it forwards to {ENTITY_LABELS[toEntity]}{purpose ? ` for ${purpose.toLowerCase()}` : ''}.
+      </div>
+    </div>
+  );
+}
+
+function FlowNode({ type, color, label, sub }: { type: 'entity' | 'person'; color: string; label: string; sub: string }) {
+  return (
+    <div className="flex-1 text-center">
+      <div
+        style={{
+          background: `color-mix(in oklab, ${color} 14%, var(--bg-2))`,
+          border: '0.5px solid ' + color,
+          borderRadius: 8,
+          padding: '10px 8px',
+        }}
+      >
+        <div
+          className="grid place-items-center mx-auto mb-1.5"
+          style={{ width: 26, height: 26, borderRadius: 6, background: color, color: 'var(--bg-0)' }}
+        >
+          {type === 'entity' ? <Building2 size={13} /> : <User size={13} />}
+        </div>
+        <div className="text-[11.5px] font-semibold text-ink">{label}</div>
+        <div className="text-[9.5px] text-ink-mute mt-px">{sub}</div>
+      </div>
+    </div>
+  );
+}
+
+function FlowArrow() {
+  return (
+    <div className="text-ink-ghost px-0.5" style={{ flex: '0 0 auto' }}>
+      <ArrowRight size={14} />
+    </div>
+  );
+}
+
+// ──────────────────── ⑧ Notes ────────────────────
+function NotesSection({
+  tx, state, setState, open, setOpen,
+}: { tx: Transaction; state: any; setState: any; open: boolean; setOpen: () => void }) {
+  const filled = [state.businessPurpose, state.docRef, state.notes].filter(Boolean).length;
+  return (
+    <SectionCard
+      open={open}
+      setOpen={setOpen}
+      title="Notes & documentation"
+      summary={filled === 0 ? 'No notes' : `${filled} field${filled > 1 ? 's' : ''} filled`}
+    >
+      <Field label="Business purpose">
+        <select
+          value={state.businessPurpose || ''}
+          onChange={(e) => setState({ businessPurpose: e.target.value }, { businessPurpose: e.target.value || null })}
+        >
+          <option value="">— pick —</option>
+          {[
+            'Vendor payment', 'Contractor payment', 'Employee compensation', 'Client acquisition',
+            'Software license', 'Equipment purchase', 'Business meal', 'Travel for business',
+            'Tax payment', 'Loan repayment', 'Family support', 'Personal expense',
+          ].map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+      </Field>
+
+      <div className="grid grid-cols-2 gap-3.5 mt-3">
+        <Field label="Doc reference">
+          <input
+            type="text"
+            value={state.docRef || ''}
+            onChange={(e) => setState({ docRef: e.target.value })}
+            onBlur={() => setState({}, { receiptRef: state.docRef || null })}
+            placeholder="INV-123 / link to file"
+          />
+        </Field>
+        <Field label="Receipt">
+          <button type="button" className="btn w-full justify-center">
+            <Paperclip size={12} /> Upload receipt
+          </button>
+        </Field>
+      </div>
+
+      <div className="mt-3">
+        <Field label="Notes">
+          <textarea
+            rows={3}
+            value={state.notes || ''}
+            onChange={(e) => setState({ notes: e.target.value })}
+            onBlur={() => setState({}, { notes: state.notes || null })}
+            placeholder="Anything else worth remembering"
+            style={{ resize: 'vertical' }}
+          />
+        </Field>
+      </div>
+    </SectionCard>
+  );
+}
+
+// ──────────────────── Review checklist ────────────────────
+function ReviewChecklist({ state, tx }: { state: any; tx: Transaction }) {
+  const items = [
+    { ok: true, label: 'Dates confirmed' },
+    { ok: !!state.personalOrBusiness, label: 'Personal / Business set' },
+    { ok: state.personalOrBusiness === 'PERSONAL' || !!state.confirmedEntity, label: 'Entity / person chosen' },
+    { ok: !!(state.businessSubCat2 || state.personalSubCat), label: 'Category selected' },
+    { ok: !!state.docRef, label: 'Doc reference added' },
+  ];
+  return (
+    <div className="px-1 pt-1">
+      <div className="field-label mb-2">Completion checklist</div>
+      <div className="flex flex-col gap-1.5">
+        {items.map((it, i) => (
+          <div key={i} className="flex items-center gap-2.5 text-[12px]">
+            {it.ok ? (
+              <span
+                className="grid place-items-center rounded-full"
+                style={{
+                  width: 14,
+                  height: 14,
+                  background: 'rgba(74,222,128,0.15)',
+                  color: 'var(--income)',
+                  flex: '0 0 14px',
+                }}
+              >
+                <Check size={9} />
+              </span>
+            ) : (
+              <span
+                className="rounded"
+                style={{
+                  width: 14,
+                  height: 14,
+                  border: '0.5px solid var(--border-default)',
+                  flex: '0 0 14px',
+                }}
+              />
+            )}
+            <span
+              style={{
+                color: it.ok ? 'var(--ink-3)' : 'var(--ink-2)',
+                textDecoration: it.ok ? 'line-through' : 'none',
+              }}
+            >
+              {it.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────── CPA Section ────────────────────
+function CPASection({
+  state, setState, open, setOpen,
+}: { state: any; setState: any; open: boolean; setOpen: () => void }) {
+  return (
+    <SectionCard
+      accent="blue"
+      open={open}
+      setOpen={setOpen}
+      icon={<Award size={13} style={{ color: 'var(--info)' }} />}
+      title="CPA review"
+      summary={state.cpaReviewed ? `Signed by ${state.cpaReviewerName || 'CPA'}` : 'Not yet reviewed'}
+    >
+      <div className="text-[11.5px] text-ink-mute mb-3.5">
+        Only your CPA can sign off — appears when they log in.
+      </div>
+      {state.cpaReviewed ? (
+        <div
+          className="flex items-center gap-3 p-3"
+          style={{
+            background: 'rgba(96,165,250,0.07)',
+            border: '0.5px solid rgba(96,165,250,0.30)',
+            borderRadius: 8,
+          }}
+        >
+          <span
+            className="grid place-items-center rounded-full"
+            style={{ width: 28, height: 28, background: 'rgba(96,165,250,0.18)', color: 'var(--info)' }}
+          >
+            <Check size={14} />
+          </span>
+          <div className="flex-1">
+            <div className="text-[12.5px] font-semibold">Reviewed</div>
+            <div className="text-[11px] text-ink-mute mt-0.5">
+              {state.cpaReviewerName || 'CPA'} · {state.cpaReviewedAt || 'recent'}
+            </div>
+          </div>
+          <span className="pill pill-blue">✓ Signed off</span>
+        </div>
+      ) : (
+        <div
+          className="flex items-center gap-3 p-3"
+          style={{ background: 'var(--bg-3)', border: '0.5px solid var(--border-subtle)', borderRadius: 8 }}
+        >
+          <div className="flex-1">
+            <div className="text-[12.5px] font-medium">Waiting for CPA sign-off</div>
+            <div className="text-[10.5px] text-ink-mute mt-0.5">CPA not signed in</div>
+          </div>
+        </div>
+      )}
+    </SectionCard>
   );
 }

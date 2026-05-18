@@ -301,6 +301,20 @@ export function getDb(): Database.Database {
     `ALTER TABLE transactions ADD COLUMN passthrough_notes TEXT`,
     `ALTER TABLE field_options ADD COLUMN parent_value TEXT`,
     `ALTER TABLE transactions ADD COLUMN funded_by_transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL`,
+    `ALTER TABLE transactions ADD COLUMN booking_date_mode TEXT`,
+    `ALTER TABLE transactions ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE transactions ADD COLUMN recurring_frequency TEXT`,
+    `ALTER TABLE transactions ADD COLUMN recurring_next_date TEXT`,
+    `ALTER TABLE transactions ADD COLUMN recurring_label TEXT`,
+    `ALTER TABLE transactions ADD COLUMN recurring_alert_days INTEGER`,
+    `ALTER TABLE transactions ADD COLUMN business_department TEXT`,
+    `ALTER TABLE transactions ADD COLUMN business_cat1_key TEXT`,
+    `ALTER TABLE transactions ADD COLUMN personal_cat1_key TEXT`,
+    `ALTER TABLE transactions ADD COLUMN tax_treatment TEXT`,
+    `ALTER TABLE transactions ADD COLUMN tax_form TEXT`,
+    `ALTER TABLE transactions ADD COLUMN auto_detect_rule INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE transactions ADD COLUMN cpa_reviewed_at TEXT`,
+    `ALTER TABLE transactions ADD COLUMN cpa_reviewer_name TEXT`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }
