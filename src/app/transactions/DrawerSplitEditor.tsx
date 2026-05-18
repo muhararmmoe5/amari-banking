@@ -813,7 +813,7 @@ function SplitRecurrence({
               />
             </div>
             <div>
-              <div className="field-label" style={{ marginBottom: 4 }}>Alert days before</div>
+              <div className="field-label" style={{ marginBottom: 4 }}>Primary alert</div>
               <select
                 value={split.recurringAlertDays ?? 3}
                 onChange={(e) => onPatch({ recurringAlertDays: Number(e.target.value) })}
@@ -823,8 +823,27 @@ function SplitRecurrence({
                 <option value="3">3 days before</option>
                 <option value="7">7 days before</option>
                 <option value="14">14 days before</option>
+                <option value="30">30 days before</option>
               </select>
             </div>
+          </div>
+          <div>
+            <div className="field-label" style={{ marginBottom: 4 }}>Second alert (optional)</div>
+            <select
+              value={split.recurringAlertDays2 ?? 0}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                onPatch({ recurringAlertDays2: v || null });
+              }}
+              style={{ fontSize: 12, height: 28 }}
+            >
+              <option value="0">— no second alert —</option>
+              <option value="1">1 day before</option>
+              <option value="3">3 days before</option>
+              <option value="7">7 days before</option>
+              <option value="14">14 days before</option>
+              <option value="30">30 days before</option>
+            </select>
           </div>
 
           <div className="text-[10px] text-ink-mute">

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import {
   X, ChevronDown, Check, Lock, Plus, ArrowDown, ArrowRight,
   User, Building2, Repeat, Calendar, Wallet, Receipt, Paperclip,
-  Split, Tag, Award, Link2, Sparkles,
+  Split, Tag, Award, Link2, Sparkles, ShieldCheck, AlertTriangle, Flag,
 } from 'lucide-react';
 import type { Transaction, EntityType, AuditStatus } from '@/types';
 import { ACCOUNTS, ENTITY_LABELS, ENTITY_COLORS, BUSINESS_ENTITIES, getAccount } from '@/constants/accounts';
@@ -20,7 +20,7 @@ import DrawerSplitEditor from './DrawerSplitEditor';
 import SameDayPanel from './SameDayPanel';
 import PersonPicker from '@/components/PersonPicker';
 
-type SectionKey = 'source' | 'booked' | 'recurrence' | 'flow' | 'passthrough' | 'split' | 'notes' | 'cpa';
+type SectionKey = 'source' | 'booked' | 'recurrence' | 'flow' | 'passthrough' | 'split' | 'notes' | 'review' | 'cpa';
 
 const STATUS_PILL: Record<AuditStatus, { label: string; cls: string }> = {
   UNREVIEWED: { label: 'Unreviewed', cls: 'pill-unreviewed' },
@@ -57,9 +57,16 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
     recurringNextDate: tx.recurringNextDate || '',
     recurringLabel: tx.recurringLabel || '',
     recurringAlertDays: tx.recurringAlertDays || 3,
+    recurringAlertDays2: tx.recurringAlertDays2 ?? 0, // 0 = no second alert
     recurringExpectedAmount: tx.recurringExpectedCents != null
       ? (tx.recurringExpectedCents / 100).toFixed(2)
       : Math.abs(tx.amount).toFixed(2),
+    reviewState: tx.reviewState || '',
+    reviewerName: tx.reviewerName || '',
+    reviewedAt: tx.reviewedAt || '',
+    needsEscalation: !!tx.needsEscalation,
+    escalationTo: tx.escalationTo || '',
+    escalationNotes: tx.escalationNotes || '',
     moneySource: tx.sourceOfMoney || '',
     sourceEntityForPay: '',     // derived initially, may be set by picker
     sourceAccountForPay: tx.sourceAccountId || '',
@@ -87,6 +94,7 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
     passthrough: !!tx.passthroughEntity,
     split: true,
     notes: false,
+    review: false,
     cpa: false,
   });
   const toggle = (k: SectionKey) => setOpenMap((m) => ({ ...m, [k]: !m[k] }));
@@ -483,6 +491,14 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
               taggedDate: state.taggedDate || null,
               cpaReviewed: state.cpaReviewed,
             }}
+          />
+
+          {/* Review & escalation */}
+          <ReviewSection
+            state={state}
+            setState={setState}
+            open={openMap.review}
+            setOpen={() => toggle('review')}
           />
 
           {/* CPA */}
@@ -1171,16 +1187,33 @@ function RecurrenceSection({
                   placeholder="e.g. Family home rent"
                 />
               </Field>
-              <Field label="Alert days before">
-                <select
-                  value={state.recurringAlertDays}
-                  onChange={(e) => setState({ recurringAlertDays: Number(e.target.value) }, { recurringAlertDays: Number(e.target.value) })}
-                >
-                  <option value="1">1 day before</option>
-                  <option value="3">3 days before</option>
-                  <option value="7">7 days before</option>
-                  <option value="14">14 days before</option>
-                </select>
+              <Field label="Alerts before due (up to 2)" hint="Pick a primary alert and an optional second alert">
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={state.recurringAlertDays}
+                    onChange={(e) => setState({ recurringAlertDays: Number(e.target.value) }, { recurringAlertDays: Number(e.target.value) })}
+                  >
+                    <option value="1">1 day before</option>
+                    <option value="3">3 days before</option>
+                    <option value="7">7 days before</option>
+                    <option value="14">14 days before</option>
+                    <option value="30">30 days before</option>
+                  </select>
+                  <select
+                    value={state.recurringAlertDays2 ?? 0}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      setState({ recurringAlertDays2: v }, { recurringAlertDays2: v || null });
+                    }}
+                  >
+                    <option value="0">— no second alert —</option>
+                    <option value="1">1 day before</option>
+                    <option value="3">3 days before</option>
+                    <option value="7">7 days before</option>
+                    <option value="14">14 days before</option>
+                    <option value="30">30 days before</option>
+                  </select>
+                </div>
               </Field>
             </div>
             <EntityAllocationPreview
@@ -1752,5 +1785,201 @@ function EntityAllocationPreview({
         </div>
       ) : null}
     </div>
+  );
+}
+
+// ──────────────── Review & Escalation ────────────────
+const REVIEW_STATES: Array<{
+  key: string;
+  label: string;
+  color: string;
+  bg: string;
+  border: string;
+  icon: React.ReactNode;
+}> = [
+  {
+    key: 'PENDING_REVIEW',
+    label: 'Pending review',
+    color: 'var(--warn)',
+    bg: 'rgba(251,191,36,0.10)',
+    border: 'rgba(251,191,36,0.30)',
+    icon: <AlertTriangle size={11} />,
+  },
+  {
+    key: 'REVIEWED',
+    label: 'Reviewed',
+    color: 'var(--blue, #60a5fa)',
+    bg: 'rgba(96,165,250,0.10)',
+    border: 'rgba(96,165,250,0.30)',
+    icon: <Check size={11} />,
+  },
+  {
+    key: 'REVIEWED_APPROVED',
+    label: 'Reviewed & approved',
+    color: 'var(--income)',
+    bg: 'rgba(74,222,128,0.10)',
+    border: 'rgba(74,222,128,0.30)',
+    icon: <ShieldCheck size={11} />,
+  },
+];
+
+function ReviewSection({
+  state, setState, open, setOpen,
+}: { state: any; setState: any; open: boolean; setOpen: () => void }) {
+  const current = REVIEW_STATES.find((s) => s.key === state.reviewState);
+  const needsEsc = !!state.needsEscalation;
+
+  function pickState(key: string) {
+    const reviewedAt = key === 'PENDING_REVIEW' ? null : new Date().toISOString();
+    setState(
+      { reviewState: key, reviewedAt: reviewedAt || '' },
+      { reviewState: key, reviewedAt: reviewedAt },
+    );
+  }
+
+  const summary = current
+    ? `${current.label}${state.reviewerName ? ` · ${state.reviewerName}` : ''}${needsEsc ? ' · escalation flagged' : ''}`
+    : 'Not yet reviewed';
+
+  return (
+    <SectionCard
+      accent={needsEsc ? 'warn' : current?.key === 'REVIEWED_APPROVED' ? 'green' : current ? 'blue' : undefined}
+      open={open}
+      setOpen={setOpen}
+      icon={<ShieldCheck size={13} />}
+      title="Review & escalation"
+      summary={summary}
+    >
+      <div className="text-[11.5px] text-ink-mute mb-3.5">
+        Track who reviewed this and whether it needs to be escalated for verification.
+      </div>
+
+      {/* State picker */}
+      <div className="field-label" style={{ marginBottom: 8 }}>Status</div>
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        {REVIEW_STATES.map((s) => {
+          const active = state.reviewState === s.key;
+          return (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => pickState(s.key)}
+              className="inline-flex items-center justify-center gap-1.5"
+              style={{
+                padding: '8px 10px',
+                borderRadius: 7,
+                background: active ? s.bg : 'var(--bg-3)',
+                border: '0.5px solid ' + (active ? s.border : 'var(--border-default, rgba(255,255,255,0.12))'),
+                color: active ? s.color : 'var(--ink-2)',
+                fontSize: 11.5,
+                fontWeight: 500,
+                lineHeight: 1.3,
+              }}
+            >
+              {s.icon}
+              <span className="text-left">{s.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Reviewer + when */}
+      {current ? (
+        <div className="grid grid-cols-2 gap-3.5 mb-4">
+          <Field label="Reviewed by" hint="Pick the person on the team or add a new one">
+            <PersonPicker
+              value={state.reviewerName || ''}
+              onChange={(name) => setState(
+                { reviewerName: name },
+                { reviewerName: name || null },
+              )}
+              placeholder="Pick reviewer"
+            />
+          </Field>
+          <Field label="Reviewed at" hint="Auto-stamped when you change status">
+            <input
+              type="text"
+              readOnly
+              value={state.reviewedAt ? new Date(state.reviewedAt).toLocaleString() : '—'}
+              className="num"
+              style={{ color: 'var(--ink-2)' }}
+            />
+          </Field>
+        </div>
+      ) : null}
+
+      {/* Escalation */}
+      <div
+        style={{
+          padding: '10px 12px',
+          background: needsEsc ? 'rgba(251,191,36,0.06)' : 'var(--bg-3)',
+          border: '0.5px solid ' + (needsEsc ? 'rgba(251,191,36,0.30)' : 'var(--border-subtle, rgba(255,255,255,0.07))'),
+          borderRadius: 8,
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <Flag size={12} style={{ color: needsEsc ? 'var(--warn)' : 'var(--ink-3)' }} />
+          <div className="flex-1 min-w-0">
+            <div className="text-[12px] font-medium" style={{ color: 'var(--ink)' }}>
+              Does this need escalation?
+            </div>
+            <div className="text-[10.5px] text-ink-mute mt-px">
+              Escalation flags this transaction for verification by another person.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const v = !needsEsc;
+              setState(
+                {
+                  needsEscalation: v,
+                  // clear escalation target when turning off
+                  escalationTo: v ? state.escalationTo : '',
+                  escalationNotes: v ? state.escalationNotes : '',
+                },
+                {
+                  needsEscalation: v,
+                  ...(v ? {} : { escalationTo: null, escalationNotes: null }),
+                },
+              );
+            }}
+            className="btn btn-sm"
+            style={{
+              background: needsEsc ? 'rgba(251,191,36,0.16)' : 'var(--bg-2)',
+              borderColor: needsEsc ? 'rgba(251,191,36,0.40)' : 'var(--border-default, rgba(255,255,255,0.12))',
+              color: needsEsc ? 'var(--warn)' : 'var(--ink-2)',
+            }}
+          >
+            {needsEsc ? 'Escalation · ON' : 'No escalation'}
+          </button>
+        </div>
+
+        {needsEsc ? (
+          <div className="flex flex-col mt-3" style={{ gap: 10 }}>
+            <Field label="Escalate to" hint="Who needs to verify this">
+              <PersonPicker
+                value={state.escalationTo || ''}
+                onChange={(name) => setState(
+                  { escalationTo: name },
+                  { escalationTo: name || null },
+                )}
+                placeholder="Pick verifier"
+              />
+            </Field>
+            <Field label="Escalation notes · optional">
+              <textarea
+                rows={2}
+                value={state.escalationNotes || ''}
+                onChange={(e) => setState({ escalationNotes: e.target.value })}
+                onBlur={() => setState({}, { escalationNotes: state.escalationNotes || null })}
+                placeholder="What needs to be verified or clarified?"
+                style={{ fontSize: 12, resize: 'vertical', minHeight: 50 }}
+              />
+            </Field>
+          </div>
+        ) : null}
+      </div>
+    </SectionCard>
   );
 }

@@ -27,6 +27,7 @@ export interface TransactionSplit {
   recurringNextDate: string | null;
   recurringLabel: string | null;
   recurringAlertDays: number | null;
+  recurringAlertDays2: number | null;
   recurringExpectedCents: number | null;
   /** Money flow per-part — reimbursement entity + downstream money chain. */
   needToGetFrom: string | null;
@@ -63,6 +64,7 @@ function rowToSplit(r: any): TransactionSplit {
     recurringNextDate: r.recurring_next_date ?? null,
     recurringLabel: r.recurring_label ?? null,
     recurringAlertDays: r.recurring_alert_days ?? null,
+    recurringAlertDays2: r.recurring_alert_days_2 ?? null,
     recurringExpectedCents: r.recurring_expected_cents ?? null,
     needToGetFrom: r.need_to_get_from ?? null,
     hop2Person: r.hop2_person ?? null,
@@ -104,6 +106,7 @@ export interface SplitInput {
   recurringNextDate?: string | null;
   recurringLabel?: string | null;
   recurringAlertDays?: number | null;
+  recurringAlertDays2?: number | null;
   recurringExpectedCents?: number | null;
   needToGetFrom?: string | null;
   hop2Person?: string | null;
@@ -125,11 +128,12 @@ export function createSplit(input: SplitInput): TransactionSplit {
         sub_category_1, sub_category_2, business_purpose, notes,
         period_start, period_end, source_entity, source_account_id,
         is_recurring, recurring_frequency, recurring_next_date,
-        recurring_label, recurring_alert_days, recurring_expected_cents,
+        recurring_label, recurring_alert_days, recurring_alert_days_2,
+        recurring_expected_cents,
         need_to_get_from, hop2_person, hop3_entity,
         passed_onward, passthrough_entity, passthrough_purpose, passthrough_notes,
         sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     input.transactionId,
@@ -150,6 +154,7 @@ export function createSplit(input: SplitInput): TransactionSplit {
     input.recurringNextDate || null,
     input.recurringLabel?.trim() || null,
     input.recurringAlertDays ?? null,
+    input.recurringAlertDays2 ?? null,
     input.recurringExpectedCents ?? null,
     input.needToGetFrom?.trim() || null,
     input.hop2Person?.trim() || null,
@@ -183,6 +188,7 @@ export interface UpdateSplitPatch {
   recurringNextDate?: string | null;
   recurringLabel?: string | null;
   recurringAlertDays?: number | null;
+  recurringAlertDays2?: number | null;
   recurringExpectedCents?: number | null;
   needToGetFrom?: string | null;
   hop2Person?: string | null;
@@ -216,6 +222,7 @@ export function updateSplit(id: string, patch: UpdateSplitPatch): void {
     recurringNextDate: 'recurring_next_date',
     recurringLabel: 'recurring_label',
     recurringAlertDays: 'recurring_alert_days',
+    recurringAlertDays2: 'recurring_alert_days_2',
     recurringExpectedCents: 'recurring_expected_cents',
     needToGetFrom: 'need_to_get_from',
     hop2Person: 'hop2_person',

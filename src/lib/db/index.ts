@@ -332,6 +332,14 @@ export function getDb(): Database.Database {
     `ALTER TABLE transaction_splits ADD COLUMN passthrough_entity TEXT`,
     `ALTER TABLE transaction_splits ADD COLUMN passthrough_purpose TEXT`,
     `ALTER TABLE transaction_splits ADD COLUMN passthrough_notes TEXT`,
+    `ALTER TABLE transactions ADD COLUMN recurring_alert_days_2 INTEGER`,
+    `ALTER TABLE transaction_splits ADD COLUMN recurring_alert_days_2 INTEGER`,
+    `ALTER TABLE transactions ADD COLUMN review_state TEXT`,
+    `ALTER TABLE transactions ADD COLUMN reviewer_name TEXT`,
+    `ALTER TABLE transactions ADD COLUMN reviewed_at TEXT`,
+    `ALTER TABLE transactions ADD COLUMN needs_escalation INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE transactions ADD COLUMN escalation_to TEXT`,
+    `ALTER TABLE transactions ADD COLUMN escalation_notes TEXT`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }
