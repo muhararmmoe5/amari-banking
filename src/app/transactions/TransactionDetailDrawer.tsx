@@ -10,6 +10,8 @@ import { useToast } from '@/components/Toast';
 import SplitEditor from '../audit/SplitEditor';
 import SourceTraceContent from './SourceTraceContent';
 import DownstreamTraceContent from './DownstreamTraceContent';
+import ManualSourceLink from './ManualSourceLink';
+import ManualDownstreamList from './ManualDownstreamList';
 import SameDayPanel from './SameDayPanel';
 import Portal from '@/components/Portal';
 import { ArrowDownToLine } from 'lucide-react';
@@ -209,25 +211,25 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
               />
             ) : null}
 
-            {/* Section 2 — Source of money (expenses only) */}
+            {/* Section 2 — Source of money (expenses only) — MANUAL link */}
             {tx.amount < 0 ? (
               <SectionCard
                 title="Source of money"
-                subtitle="FIFO trace of which prior inflow funded this expense"
+                subtitle="Tag this expense to the specific income transaction that funded it"
                 accent="income"
               >
-                <SourceTraceContent txId={tx.id} compact />
+                <ManualSourceLink txId={tx.id} currentFundedById={tx.fundedByTransactionId} />
               </SectionCard>
             ) : null}
 
-            {/* Section 2b — What this money funded (inflows only, downstream trace) */}
+            {/* Section 2b — What this money funded (inflows only) — MANUAL list */}
             {tx.amount > 0 ? (
               <SectionCard
                 title="What this money funded"
-                subtitle="FIFO downstream trace — every expense that drew from this inflow"
+                subtitle="Expenses you've tagged as funded by this inflow"
                 accent="warn"
               >
-                <DownstreamTraceContent txId={tx.id} />
+                <ManualDownstreamList inflowTxId={tx.id} inflowAmount={tx.amount} />
               </SectionCard>
             ) : null}
 

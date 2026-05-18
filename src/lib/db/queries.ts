@@ -385,53 +385,59 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   if (patch.passthroughPurpose !== undefined) { fields.push('passthrough_purpose = @passthrough_purpose'); params.passthrough_purpose = patch.passthroughPurpose; }
   if (patch.passthroughPersonId !== undefined) { fields.push('passthrough_person_id = @passthrough_person_id'); params.passthrough_person_id = patch.passthroughPersonId; }
   if (patch.passthroughNotes !== undefined) { fields.push('passthrough_notes = @passthrough_notes'); params.passthrough_notes = patch.passthroughNotes; }
+  if (patch.fundedByTransactionId !== undefined) { fields.push('funded_by_transaction_id = @funded_by_transaction_id'); params.funded_by_transaction_id = patch.fundedByTransactionId; }
   if (fields.length === 0) return;
   fields.push('updated_at = @updated_at');
   db.prepare(`UPDATE transactions SET ${fields.join(', ')} WHERE id = @id`).run(params);
-
-  // If sourceOfMoney was set on an inflow, cascade it forward to all untagged
-  // transactions on the same account up to (but not including) the next inflow
-  // that has its own source_of_money set. This is the "sticky source tag"
-  // behavior the user asked for.
-  if (patch.sourceOfMoney) {
-    propagateSourceOfMoneyForward(id, patch.sourceOfMoney);
-  }
 }
 
-/** Cascade a source_of_money value forward from an inflow to subsequent
- *  untagged transactions on the same account. Only fills NULLs; never
- *  overwrites a value the user has already chosen. Stops at the next inflow
- *  that already carries its own source_of_money. */
-export function propagateSourceOfMoneyForward(txId: string, source: string): { updated: number } {
+/** Find the inflow transaction that an expense was manually linked to via
+ *  funded_by_transaction_id. Returns null if the expense isn't linked. */
+export function fundedByInflow(txId: string): {
+  id: string; postingDate: string; description: string; merchant: string | null;
+  amount: number; accountId: string;
+} | null {
   const db = getDb();
-  const seed = db.prepare(
-    'SELECT account_id, posting_date, amount FROM transactions WHERE id = ?'
-  ).get(txId) as any;
-  if (!seed || seed.amount <= 0) return { updated: 0 };  // only cascade from inflows
+  const r = db.prepare(`
+    SELECT i.id, i.posting_date, i.description, i.merchant_name, i.amount, i.account_id
+    FROM transactions t
+    JOIN transactions i ON i.id = t.funded_by_transaction_id
+    WHERE t.id = ?
+  `).get(txId) as any;
+  if (!r) return null;
+  return {
+    id: r.id,
+    postingDate: r.posting_date,
+    description: r.description,
+    merchant: r.merchant_name,
+    amount: r.amount,
+    accountId: r.account_id,
+  };
+}
 
-  // All subsequent rows on this account, in chronological order.
-  const subsequent = db.prepare(`
-    SELECT id, amount, source_of_money
+/** List expense transactions that the user has manually linked to a given
+ *  inflow via funded_by_transaction_id. Used on inflow drawer to show
+ *  "this money was used to pay for…" with no FIFO assumption. */
+export function expensesFundedByInflow(inflowTxId: string): Array<{
+  id: string; postingDate: string; description: string; merchant: string | null;
+  amount: number; accountId: string; confirmedEntity: string | null;
+}> {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT id, posting_date, description, merchant_name, amount, account_id, confirmed_entity, entity_tag
     FROM transactions
-    WHERE account_id = ?
-      AND (posting_date > ? OR (posting_date = ? AND id > ?))
-    ORDER BY posting_date ASC, id ASC
-  `).all(seed.account_id, seed.posting_date, seed.posting_date, txId) as any[];
-
-  const upd = db.prepare(
-    'UPDATE transactions SET source_of_money = ?, updated_at = ? WHERE id = ? AND source_of_money IS NULL'
-  );
-  const now = Date.now();
-  let updated = 0;
-  for (const r of subsequent) {
-    // Stop when we hit a later inflow that already has its own source tag.
-    if (r.amount > 0 && r.source_of_money) break;
-    if (!r.source_of_money) {
-      const res = upd.run(source, now, r.id);
-      if (res.changes > 0) updated += 1;
-    }
-  }
-  return { updated };
+    WHERE funded_by_transaction_id = ?
+    ORDER BY posting_date DESC, id DESC
+  `).all(inflowTxId) as any[];
+  return rows.map((r) => ({
+    id: r.id,
+    postingDate: r.posting_date,
+    description: r.description,
+    merchant: r.merchant_name,
+    amount: r.amount,
+    accountId: r.account_id,
+    confirmedEntity: r.confirmed_entity || r.entity_tag,
+  }));
 }
 
 // ===== Account / aggregate queries for dashboard =====
