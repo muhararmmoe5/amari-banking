@@ -18,6 +18,7 @@ import ManualSourceLink, { type ManualSourceLinkHandle } from './ManualSourceLin
 import ManualDownstreamList from './ManualDownstreamList';
 import DrawerSplitEditor from './DrawerSplitEditor';
 import SameDayPanel from './SameDayPanel';
+import PersonPicker from '@/components/PersonPicker';
 
 type SectionKey = 'source' | 'booked' | 'recurrence' | 'flow' | 'passthrough' | 'split' | 'notes' | 'cpa';
 
@@ -427,13 +428,15 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
             setOpen={() => toggle('recurrence')}
           />
 
-          {/* ⑤ Money flow */}
+          {/* ⑤ Money flow — when split, source-of-money sub-section is hidden
+              because each split row already carries its own funding entity. */}
           <MoneyFlowSection
             tx={tx}
             state={state}
             setState={setState}
             open={openMap.flow}
             setOpen={() => toggle('flow')}
+            hideSource={!!isSplit}
           />
 
           {/* ⑥ Passed onward */}
@@ -445,13 +448,15 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
             setOpen={() => toggle('passthrough')}
           />
 
-          {/* ⑧ Notes */}
+          {/* ⑧ Notes — when split, each part carries its own notes so the
+              top-level section collapses to just a free-text note. */}
           <NotesSection
             tx={tx}
             state={state}
             setState={setState}
             open={openMap.notes}
             setOpen={() => toggle('notes')}
+            notesOnly={!!isSplit}
           />
 
           {/* Review checklist */}
@@ -903,6 +908,17 @@ function BusinessPath({ state, setState }: { state: any; setState: any }) {
           </div>
         </div>
       )}
+
+      <Field
+        label="Individual · who is this about / counterparty"
+        hint="Pick from your team or add a new person — you can email-invite them later"
+      >
+        <PersonPicker
+          value={state.individual || ''}
+          onChange={(name) => setState({ individual: name }, { individual: name || null })}
+          placeholder="Pick or add a person"
+        />
+      </Field>
     </div>
   );
 }
@@ -911,6 +927,14 @@ function PersonalPath({ state, setState }: { state: any; setState: any }) {
   const cat = state.personalCat1Key ? PERSONAL_CATEGORIES[state.personalCat1Key] : null;
   return (
     <div className="flex flex-col" style={{ gap: 14 }}>
+      <Field label="Whose personal expense / paid to" hint="Pick from your team or add a new person">
+        <PersonPicker
+          value={state.individual || ''}
+          onChange={(name) => setState({ individual: name }, { individual: name || null })}
+          placeholder="Pick or add a person"
+        />
+      </Field>
+
       <div className="grid grid-cols-2" style={{ gap: 14 }}>
         <Field label="Category">
           <select
@@ -1181,8 +1205,8 @@ function RecurrenceSection({
 
 // ──────────────────── ⑤ Money flow ────────────────────
 function MoneyFlowSection({
-  tx, state, setState, open, setOpen,
-}: { tx: Transaction; state: any; setState: any; open: boolean; setOpen: () => void }) {
+  tx, state, setState, open, setOpen, hideSource = false,
+}: { tx: Transaction; state: any; setState: any; open: boolean; setOpen: () => void; hideSource?: boolean }) {
   // Source-of-money entity selection: drives the bank account picker on the right
   const sourceEntity: string = state.sourceEntityForPay || (() => {
     // Try to derive from sourceOfMoney string if a previous value exists
@@ -1215,43 +1239,67 @@ function MoneyFlowSection({
       open={open}
       setOpen={setOpen}
       title="Money flow"
-      summary={state.moneySource ? `Source: ${state.moneySource}` : 'Not set'}
+      summary={
+        hideSource
+          ? 'Source set per split below'
+          : state.moneySource ? `Source: ${state.moneySource}` : 'Not set'
+      }
     >
-      <div className="field-label mb-2">Source of money to pay</div>
-      <div className="grid grid-cols-2" style={{ gap: 14 }}>
-        <Field label="① Entity" hint="Which entity's pool is paying">
-          <select
-            value={sourceEntity}
-            onChange={(e) => pickEntity(e.target.value)}
-          >
-            <option value="">— pick entity —</option>
-            {BUSINESS_ENTITIES.map((e) => (
-              <option key={e} value={e}>{ENTITY_LABELS[e]}</option>
-            ))}
-            <option value="PERSONAL">Personal</option>
-            <option value="EXTERNAL">External / other</option>
-          </select>
-        </Field>
-        <Field
-          label="② Bank account"
-          hint={sourceEntity && sourceEntity !== 'EXTERNAL' && accountsForEntity.length === 0 ? 'no accounts on this entity yet' : `${accountsForEntity.length} account${accountsForEntity.length === 1 ? '' : 's'}`}
+      {hideSource ? (
+        <div
+          className="mb-3"
+          style={{
+            padding: '8px 12px',
+            background: 'rgba(167,139,250,0.06)',
+            border: '0.5px solid rgba(167,139,250,0.20)',
+            borderRadius: 7,
+            fontSize: 11,
+            color: 'var(--ink-2)',
+            lineHeight: 1.5,
+          }}
         >
-          <select
-            value={state.sourceAccountForPay || ''}
-            onChange={(e) => {
-              const accountId = e.target.value;
-              setState({ sourceAccountForPay: accountId }, { sourceAccountId: accountId || null });
-            }}
-            disabled={!sourceEntity || sourceEntity === 'EXTERNAL'}
-          >
-            <option value="">— pick account —</option>
-            {accountsForEntity.map((a) => (
-              <option key={a.id} value={a.id}>···{a.last4} — {a.label}</option>
-            ))}
-            <option value="EXTERNAL">External / N/A</option>
-          </select>
-        </Field>
-      </div>
+          Each split part already carries its own funding entity. Use this section
+          for reimbursement and the downstream money chain only.
+        </div>
+      ) : (
+        <>
+          <div className="field-label mb-2">Source of money to pay</div>
+          <div className="grid grid-cols-2" style={{ gap: 14 }}>
+            <Field label="① Entity" hint="Which entity's pool is paying">
+              <select
+                value={sourceEntity}
+                onChange={(e) => pickEntity(e.target.value)}
+              >
+                <option value="">— pick entity —</option>
+                {BUSINESS_ENTITIES.map((e) => (
+                  <option key={e} value={e}>{ENTITY_LABELS[e]}</option>
+                ))}
+                <option value="PERSONAL">Personal</option>
+                <option value="EXTERNAL">External / other</option>
+              </select>
+            </Field>
+            <Field
+              label="② Bank account"
+              hint={sourceEntity && sourceEntity !== 'EXTERNAL' && accountsForEntity.length === 0 ? 'no accounts on this entity yet' : `${accountsForEntity.length} account${accountsForEntity.length === 1 ? '' : 's'}`}
+            >
+              <select
+                value={state.sourceAccountForPay || ''}
+                onChange={(e) => {
+                  const accountId = e.target.value;
+                  setState({ sourceAccountForPay: accountId }, { sourceAccountId: accountId || null });
+                }}
+                disabled={!sourceEntity || sourceEntity === 'EXTERNAL'}
+              >
+                <option value="">— pick account —</option>
+                {accountsForEntity.map((a) => (
+                  <option key={a.id} value={a.id}>···{a.last4} — {a.label}</option>
+                ))}
+                <option value="EXTERNAL">External / N/A</option>
+              </select>
+            </Field>
+          </div>
+        </>
+      )}
 
       <div className="mt-4">
         <Field label="Need to get from" hint="Who reimburses this account">
@@ -1458,49 +1506,67 @@ function FlowArrow() {
 
 // ──────────────────── ⑧ Notes ────────────────────
 function NotesSection({
-  tx, state, setState, open, setOpen,
-}: { tx: Transaction; state: any; setState: any; open: boolean; setOpen: () => void }) {
-  const filled = [state.businessPurpose, state.docRef, state.notes].filter(Boolean).length;
+  tx, state, setState, open, setOpen, notesOnly = false,
+}: {
+  tx: Transaction;
+  state: any;
+  setState: any;
+  open: boolean;
+  setOpen: () => void;
+  /** When true (transaction is split), collapse to a single Notes field
+   *  because business purpose / doc ref / receipts live on each split. */
+  notesOnly?: boolean;
+}) {
+  const filled = notesOnly
+    ? (state.notes ? 1 : 0)
+    : [state.businessPurpose, state.docRef, state.notes].filter(Boolean).length;
   return (
     <SectionCard
       open={open}
       setOpen={setOpen}
-      title="Notes & documentation"
+      title={notesOnly ? 'Notes' : 'Notes & documentation'}
       summary={filled === 0 ? 'No notes' : `${filled} field${filled > 1 ? 's' : ''} filled`}
     >
-      <Field label="Business purpose">
-        <select
-          value={state.businessPurpose || ''}
-          onChange={(e) => setState({ businessPurpose: e.target.value }, { businessPurpose: e.target.value || null })}
+      {!notesOnly ? (
+        <>
+          <Field label="Business purpose">
+            <select
+              value={state.businessPurpose || ''}
+              onChange={(e) => setState({ businessPurpose: e.target.value }, { businessPurpose: e.target.value || null })}
+            >
+              <option value="">— pick —</option>
+              {[
+                'Vendor payment', 'Contractor payment', 'Employee compensation', 'Client acquisition',
+                'Software license', 'Equipment purchase', 'Business meal', 'Travel for business',
+                'Tax payment', 'Loan repayment', 'Family support', 'Personal expense',
+              ].map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3.5 mt-3">
+            <Field label="Doc reference">
+              <input
+                type="text"
+                value={state.docRef || ''}
+                onChange={(e) => setState({ docRef: e.target.value })}
+                onBlur={() => setState({}, { receiptRef: state.docRef || null })}
+                placeholder="INV-123 / link to file"
+              />
+            </Field>
+            <Field label="Receipt">
+              <button type="button" className="btn w-full justify-center">
+                <Paperclip size={12} /> Upload receipt
+              </button>
+            </Field>
+          </div>
+        </>
+      ) : null}
+
+      <div className={notesOnly ? '' : 'mt-3'}>
+        <Field
+          label="Notes"
+          hint={notesOnly ? 'Per-part notes live on each split below — this field is just for general remarks.' : undefined}
         >
-          <option value="">— pick —</option>
-          {[
-            'Vendor payment', 'Contractor payment', 'Employee compensation', 'Client acquisition',
-            'Software license', 'Equipment purchase', 'Business meal', 'Travel for business',
-            'Tax payment', 'Loan repayment', 'Family support', 'Personal expense',
-          ].map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
-      </Field>
-
-      <div className="grid grid-cols-2 gap-3.5 mt-3">
-        <Field label="Doc reference">
-          <input
-            type="text"
-            value={state.docRef || ''}
-            onChange={(e) => setState({ docRef: e.target.value })}
-            onBlur={() => setState({}, { receiptRef: state.docRef || null })}
-            placeholder="INV-123 / link to file"
-          />
-        </Field>
-        <Field label="Receipt">
-          <button type="button" className="btn w-full justify-center">
-            <Paperclip size={12} /> Upload receipt
-          </button>
-        </Field>
-      </div>
-
-      <div className="mt-3">
-        <Field label="Notes">
           <textarea
             rows={3}
             value={state.notes || ''}

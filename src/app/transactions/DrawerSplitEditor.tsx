@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState, useTransition } from 'react';
-import { Plus, X, User, Building2, Split as SplitIcon, Lock, ArrowRight } from 'lucide-react';
+import { Plus, X, User, Building2, Split as SplitIcon, Lock, ArrowRight, StickyNote } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import { fmtMoney } from '@/lib/format';
 import {
@@ -23,6 +23,7 @@ import type { TransactionSplit } from '@/lib/db/splits';
 import type { EntityType } from '@/types';
 import { ENTITY_LABELS, ENTITY_COLORS, BUSINESS_ENTITIES, ACCOUNTS } from '@/constants/accounts';
 import { BUSINESS_CATEGORIES, PERSONAL_CATEGORIES } from '@/constants/categories';
+import PersonPicker from '@/components/PersonPicker';
 
 interface Props {
   transactionId: string;
@@ -100,6 +101,7 @@ export default function DrawerSplitEditor({ transactionId, transactionAmount }: 
         if (patch.subCategory1 !== undefined) actionPatch.subCategory1 = patch.subCategory1;
         if (patch.subCategory2 !== undefined) actionPatch.subCategory2 = patch.subCategory2;
         if (patch.businessPurpose !== undefined) actionPatch.businessPurpose = patch.businessPurpose;
+        if (patch.notes !== undefined) actionPatch.notes = patch.notes;
         if (patch.sourceEntity !== undefined) actionPatch.sourceEntity = patch.sourceEntity;
         if (patch.sourceAccountId !== undefined) actionPatch.sourceAccountId = patch.sourceAccountId;
         await updateSplitAction(rowId, actionPatch);
@@ -400,6 +402,41 @@ function SplitRow({
       {path ? (
         <SplitSourceOfMoney split={split} onPatch={onPatch} />
       ) : null}
+
+      {/* Per-split notes — tag each part on its own */}
+      {path ? (
+        <SplitNotes split={split} onPatch={onPatch} />
+      ) : null}
+    </div>
+  );
+}
+
+function SplitNotes({
+  split, onPatch,
+}: {
+  split: TransactionSplit;
+  onPatch: (p: Partial<TransactionSplit>) => void;
+}) {
+  const [val, setVal] = useState(split.notes || '');
+  return (
+    <div className="mt-2.5">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <StickyNote size={11} className="text-ink-mute" />
+        <span className="field-label" style={{ marginBottom: 0 }}>
+          Notes for this part
+        </span>
+      </div>
+      <textarea
+        value={val}
+        rows={2}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={() => {
+          const next = val.trim() || null;
+          if (next !== (split.notes || null)) onPatch({ notes: next });
+        }}
+        placeholder="Why this part exists, who it's really for, anything to remember…"
+        style={{ fontSize: 12, resize: 'vertical', minHeight: 50 }}
+      />
     </div>
   );
 }
@@ -587,12 +624,11 @@ function BusinessRowBody({
         </select>
       </div>
 
-      <input
-        type="text"
+      <PersonPicker
         value={split.individual || ''}
-        onChange={(e) => onPatch({ individual: e.target.value || null })}
+        onChange={(name) => onPatch({ individual: name || null })}
         placeholder="Individual / counterparty (optional)"
-        style={{ height: 30, fontSize: 12 }}
+        compact
       />
     </div>
   );
@@ -607,12 +643,11 @@ function PersonalRowBody({
   const cat = split.subCategory1 ? PERSONAL_CATEGORIES[split.subCategory1] : null;
   return (
     <div className="flex flex-col gap-2">
-      <input
-        type="text"
+      <PersonPicker
         value={split.individual || ''}
-        onChange={(e) => onPatch({ individual: e.target.value || null })}
+        onChange={(name) => onPatch({ individual: name || null })}
         placeholder="Whose personal expense / counterparty"
-        style={{ height: 30, fontSize: 12 }}
+        compact
       />
       <div className="grid grid-cols-2 gap-2">
         <select
