@@ -15,6 +15,10 @@ export interface TransactionSplit {
   notes: string | null;
   periodStart: string | null;
   periodEnd: string | null;
+  /** Which entity is fronting the money for this part (e.g. AMARI_HOLDINGS).
+   *  When sourceEntity !== entity, the booking entity owes the source entity. */
+  sourceEntity: string | null;
+  sourceAccountId: string | null;
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
@@ -34,6 +38,8 @@ function rowToSplit(r: any): TransactionSplit {
     notes: r.notes,
     periodStart: r.period_start ?? null,
     periodEnd: r.period_end ?? null,
+    sourceEntity: r.source_entity ?? null,
+    sourceAccountId: r.source_account_id ?? null,
     sortOrder: r.sort_order,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -60,6 +66,8 @@ export interface SplitInput {
   notes?: string | null;
   periodStart?: string | null;
   periodEnd?: string | null;
+  sourceEntity?: string | null;
+  sourceAccountId?: string | null;
   sortOrder?: number;
 }
 
@@ -71,8 +79,9 @@ export function createSplit(input: SplitInput): TransactionSplit {
     `INSERT INTO transaction_splits
        (id, transaction_id, amount_cents, entity, category, individual,
         sub_category_1, sub_category_2, business_purpose, notes,
-        period_start, period_end, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        period_start, period_end, source_entity, source_account_id,
+        sort_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     input.transactionId,
@@ -86,6 +95,8 @@ export function createSplit(input: SplitInput): TransactionSplit {
     input.notes?.trim() || null,
     input.periodStart || null,
     input.periodEnd || null,
+    input.sourceEntity || null,
+    input.sourceAccountId || null,
     input.sortOrder ?? 0,
     now,
     now,
@@ -104,6 +115,8 @@ export interface UpdateSplitPatch {
   notes?: string | null;
   periodStart?: string | null;
   periodEnd?: string | null;
+  sourceEntity?: string | null;
+  sourceAccountId?: string | null;
   sortOrder?: number;
 }
 
@@ -122,6 +135,8 @@ export function updateSplit(id: string, patch: UpdateSplitPatch): void {
     notes: 'notes',
     periodStart: 'period_start',
     periodEnd: 'period_end',
+    sourceEntity: 'source_entity',
+    sourceAccountId: 'source_account_id',
     sortOrder: 'sort_order',
   };
   for (const [k, col] of Object.entries(map)) {

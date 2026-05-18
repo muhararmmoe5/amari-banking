@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState, useTransition } from 'react';
-import { Plus, X, User, Building2, Split as SplitIcon } from 'lucide-react';
+import { Plus, X, User, Building2, Split as SplitIcon, Lock, ArrowRight } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import { fmtMoney } from '@/lib/format';
 import {
@@ -21,7 +21,7 @@ import {
 } from './splitActions';
 import type { TransactionSplit } from '@/lib/db/splits';
 import type { EntityType } from '@/types';
-import { ENTITY_LABELS, ENTITY_COLORS, BUSINESS_ENTITIES } from '@/constants/accounts';
+import { ENTITY_LABELS, ENTITY_COLORS, BUSINESS_ENTITIES, ACCOUNTS } from '@/constants/accounts';
 import { BUSINESS_CATEGORIES, PERSONAL_CATEGORIES } from '@/constants/categories';
 
 interface Props {
@@ -100,6 +100,8 @@ export default function DrawerSplitEditor({ transactionId, transactionAmount }: 
         if (patch.subCategory1 !== undefined) actionPatch.subCategory1 = patch.subCategory1;
         if (patch.subCategory2 !== undefined) actionPatch.subCategory2 = patch.subCategory2;
         if (patch.businessPurpose !== undefined) actionPatch.businessPurpose = patch.businessPurpose;
+        if (patch.sourceEntity !== undefined) actionPatch.sourceEntity = patch.sourceEntity;
+        if (patch.sourceAccountId !== undefined) actionPatch.sourceAccountId = patch.sourceAccountId;
         await updateSplitAction(rowId, actionPatch);
         saveEnd(id);
       } catch (e: any) { saveError(id, e?.message); }
@@ -157,8 +159,58 @@ export default function DrawerSplitEditor({ transactionId, transactionAmount }: 
     );
   }
 
+  // Compute inter-entity owings rollup
+  const owings = new Map<string, number>(); // key: `${owner}>${source}` → cents
+  for (const s of splits) {
+    if (!s.sourceEntity || !s.entity) continue;
+    if (s.sourceEntity === s.entity) continue;
+    if (s.sourceEntity === 'UNKNOWN' || s.entity === 'UNKNOWN') continue;
+    const key = `${s.entity}>${s.sourceEntity}`;
+    owings.set(key, (owings.get(key) || 0) + Math.abs(s.amountCents));
+  }
+
   return (
     <div className="flex flex-col gap-2.5">
+      {/* Owings summary */}
+      {owings.size > 0 ? (
+        <div
+          style={{
+            padding: '8px 12px',
+            background: 'rgba(251,191,36,0.06)',
+            border: '0.5px solid rgba(251,191,36,0.25)',
+            borderRadius: 8,
+          }}
+        >
+          <div
+            className="field-label"
+            style={{ color: 'var(--warn)', marginBottom: 6 }}
+          >
+            Inter-entity owings created by this split
+          </div>
+          <div className="flex flex-col gap-1">
+            {Array.from(owings.entries()).map(([key, cents]) => {
+              const [owner, source] = key.split('>');
+              return (
+                <div key={key} className="flex items-center gap-1.5 text-[11.5px]">
+                  <span className="font-medium" style={{ color: 'var(--ink)' }}>
+                    {(ENTITY_LABELS as any)[owner] || owner}
+                  </span>
+                  <ArrowRight size={11} className="text-ink-mute" />
+                  <span>owes</span>
+                  <span className="font-medium" style={{ color: 'var(--ink)' }}>
+                    {(ENTITY_LABELS as any)[source] || source}
+                  </span>
+                  <span className="flex-1" />
+                  <span className="num font-semibold" style={{ color: 'var(--warn)' }}>
+                    {fmtMoney(cents / 100)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
       {/* Allocation bar */}
       <div
         style={{
@@ -341,6 +393,110 @@ function SplitRow({
       {!path ? (
         <div className="text-[11px] text-ink-mute text-center py-1">
           Pick personal or business to categorize this part
+        </div>
+      ) : null}
+
+      {/* Source of money for THIS part — supports inter-entity owings */}
+      {path ? (
+        <SplitSourceOfMoney split={split} onPatch={onPatch} />
+      ) : null}
+    </div>
+  );
+}
+
+function SplitSourceOfMoney({
+  split, onPatch,
+}: {
+  split: TransactionSplit;
+  onPatch: (p: Partial<TransactionSplit>) => void;
+}) {
+  const owner = split.entity;
+  const source = split.sourceEntity;
+  const owes = !!source && source !== owner && source !== 'UNKNOWN' && owner !== 'UNKNOWN';
+  const accountsForSource = source
+    ? ACCOUNTS.filter((a) => a.entity === source && a.isActive)
+    : [];
+
+  const ownerLabel = (ENTITY_LABELS as any)[owner] || owner;
+  const sourceLabel = source ? ((ENTITY_LABELS as any)[source] || source) : null;
+  const amount = Math.abs(split.amountCents) / 100;
+
+  return (
+    <div
+      className="mt-2.5"
+      style={{
+        padding: '10px 12px',
+        background: 'rgba(74,222,128,0.04)',
+        border: '0.5px solid rgba(74,222,128,0.20)',
+        borderRadius: 7,
+      }}
+    >
+      <div className="flex items-center gap-1.5 mb-2">
+        <Lock size={11} style={{ color: 'var(--income)' }} />
+        <span
+          className="field-label"
+          style={{ color: 'var(--income)', marginBottom: 0 }}
+        >
+          Source of money — who paid for this part
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <select
+          value={source || ''}
+          onChange={(e) => onPatch({
+            sourceEntity: e.target.value || null,
+            sourceAccountId: null,
+          })}
+          style={{ height: 30, fontSize: 12 }}
+        >
+          <option value="">— pick funding entity —</option>
+          <optgroup label="Suggested">
+            <option value="AMARI_HOLDINGS">Amari Muharram Holdings</option>
+          </optgroup>
+          <optgroup label="Business entities">
+            {BUSINESS_ENTITIES.filter((k) => k !== 'AMARI_HOLDINGS').map((k) => (
+              <option key={k} value={k}>{(ENTITY_LABELS as any)[k]}</option>
+            ))}
+          </optgroup>
+          <optgroup label="Other">
+            <option value="PERSONAL">Personal</option>
+          </optgroup>
+        </select>
+        <select
+          value={split.sourceAccountId || ''}
+          onChange={(e) => onPatch({ sourceAccountId: e.target.value || null })}
+          disabled={!source || accountsForSource.length === 0}
+          style={{ height: 30, fontSize: 12 }}
+        >
+          <option value="">
+            {!source
+              ? 'pick entity first'
+              : accountsForSource.length === 0
+                ? 'no accounts'
+                : 'Account (optional)'}
+          </option>
+          {accountsForSource.map((a) => (
+            <option key={a.id} value={a.id}>····{a.id} · {a.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {owes ? (
+        <div
+          className="mt-2 flex items-center gap-1.5 text-[11px]"
+          style={{ color: 'var(--warn)' }}
+        >
+          <span
+            style={{
+              width: 6, height: 6, borderRadius: 50, background: 'var(--warn)',
+            }}
+          />
+          <span className="font-medium">{ownerLabel}</span>
+          <ArrowRight size={11} className="opacity-60" />
+          <span>owes</span>
+          <span className="font-medium">{sourceLabel}</span>
+          <span className="num">{fmtMoney(amount)}</span>
         </div>
       ) : null}
     </div>
