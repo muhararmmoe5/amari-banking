@@ -546,7 +546,7 @@ function BookedAttributionSection({
       summary={summary}
     >
       {/* Path toggle */}
-      <div className="grid grid-cols-2 gap-2 mb-4">
+      <div className="grid grid-cols-2 gap-2" style={{ marginBottom: 18 }}>
         <PathButton
           active={isP}
           color="var(--purple)"
@@ -577,8 +577,9 @@ function BookedAttributionSection({
       {/* Auto-detect */}
       {state.personalOrBusiness && (
         <div
-          className="mt-4.5 flex items-center gap-2.5"
+          className="flex items-center gap-2.5"
           style={{
+            marginTop: 18,
             padding: '10px 12px',
             background: 'var(--bg-3)',
             border: '0.5px solid var(--border-subtle)',
@@ -663,8 +664,8 @@ function BusinessPath({ state, setState }: { state: any; setState: any }) {
   const cat = state.businessCat1Key ? BUSINESS_CATEGORIES[state.businessCat1Key] : null;
 
   return (
-    <div className="flex flex-col gap-3.5">
-      <div className="grid grid-cols-2 gap-3.5">
+    <div className="flex flex-col" style={{ gap: 14 }}>
+      <div className="grid grid-cols-2" style={{ gap: 14 }}>
         <Field label="Business entity">
           <EntityPicker
             value={state.confirmedEntity}
@@ -684,7 +685,7 @@ function BusinessPath({ state, setState }: { state: any; setState: any }) {
         </Field>
       </div>
 
-      <div className="grid grid-cols-2 gap-3.5">
+      <div className="grid grid-cols-2" style={{ gap: 14 }}>
         <Field label="Category">
           <select
             value={state.businessCat1Key || ''}
@@ -714,8 +715,8 @@ function BusinessPath({ state, setState }: { state: any; setState: any }) {
       {/* Chip grid for sub-cats */}
       {cat && (
         <div>
-          <div className="field-label">Quick pick · {cat.label}</div>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="field-label" style={{ marginBottom: 8 }}>Quick pick · {cat.label}</div>
+          <div className="grid grid-cols-3" style={{ gap: 6 }}>
             {cat.subs.map((s) => (
               <ChipButton
                 key={s}
@@ -736,8 +737,8 @@ function BusinessPath({ state, setState }: { state: any; setState: any }) {
 function PersonalPath({ state, setState }: { state: any; setState: any }) {
   const cat = state.personalCat1Key ? PERSONAL_CATEGORIES[state.personalCat1Key] : null;
   return (
-    <div className="flex flex-col gap-3.5">
-      <div className="grid grid-cols-2 gap-3.5">
+    <div className="flex flex-col" style={{ gap: 14 }}>
+      <div className="grid grid-cols-2" style={{ gap: 14 }}>
         <Field label="Category">
           <select
             value={state.personalCat1Key || ''}
@@ -766,8 +767,8 @@ function PersonalPath({ state, setState }: { state: any; setState: any }) {
 
       {cat && (
         <div>
-          <div className="field-label">Quick pick · {cat.label}</div>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="field-label" style={{ marginBottom: 8 }}>Quick pick · {cat.label}</div>
+          <div className="grid grid-cols-3" style={{ gap: 6 }}>
             {cat.subs.map((s) => (
               <ChipButton
                 key={s}
@@ -793,7 +794,8 @@ function ChipButton({
       type="button"
       onClick={onClick}
       style={{
-        padding: '6px 9px',
+        padding: '8px 10px',
+        minHeight: 34,
         borderRadius: 6,
         background: active ? `color-mix(in oklab, ${color} 14%, var(--bg-3))` : 'var(--bg-3)',
         border: '0.5px solid ' + (active ? color : 'var(--border-subtle)'),
@@ -803,7 +805,9 @@ function ChipButton({
         textAlign: 'left',
         cursor: 'pointer',
         transition: 'all 100ms ease',
-        lineHeight: 1.3,
+        lineHeight: 1.25,
+        display: 'inline-flex',
+        alignItems: 'center',
       }}
     >
       {children}
