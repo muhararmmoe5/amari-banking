@@ -381,3 +381,181 @@ export const BUSINESS_CATEGORIES: Record<string, CategoryBucket> = {
     ],
   },
 };
+
+/** Inflow categories for business inflows (Stripe payouts, marketplace
+ *  payouts, investor wires, etc.). Used when transaction.amount > 0 and
+ *  Booked Attribution is on the Business path. */
+export const BUSINESS_INCOME_CATEGORIES: Record<string, CategoryBucket> = {
+  SAAS: {
+    label: 'SaaS Revenue',
+    tax: 'Ordinary revenue',
+    subs: [
+      'Subscription revenue',
+      'Usage-based revenue',
+      'Setup / onboarding fee',
+      'Upgrade / expansion',
+      'Renewal',
+      'Stripe payout',
+    ],
+  },
+  MARKETPLACE: {
+    label: 'Marketplace Revenue',
+    tax: 'Ordinary revenue',
+    subs: [
+      'DoorDash payout',
+      'Grubhub payout',
+      'Uber Eats payout',
+      'Amazon settlement',
+      'Other marketplace settlement',
+    ],
+  },
+  WIRELESS: {
+    label: 'Wireless / TCETRA Revenue',
+    tax: 'Ordinary revenue',
+    subs: [
+      'TCETRA settlement',
+      'Wireless activation',
+      'Renewal / top-up',
+      'Inventory rebate',
+      'Carrier commission',
+    ],
+  },
+  SERVICES: {
+    label: 'Services / Consulting',
+    tax: 'Ordinary revenue',
+    subs: [
+      'Consulting fee',
+      'Implementation fee',
+      'Retainer',
+      'Hourly billing',
+      'One-off project',
+    ],
+  },
+  CAPITAL: {
+    label: 'Capital Investment',
+    tax: 'Not income — equity / debt',
+    subs: [
+      'Founder contribution',
+      'Investor wire — equity',
+      'SAFE note',
+      'Convertible note',
+      'Equity round',
+      'Tranche call',
+    ],
+  },
+  LOAN: {
+    label: 'Loan Proceeds',
+    tax: 'Not income — liability',
+    subs: [
+      'SBA loan disbursement',
+      'Line of credit draw',
+      'Personal loan to business',
+      'Vendor financing',
+      'Merchant cash advance',
+    ],
+  },
+  REFUND: {
+    label: 'Refund / Rebate',
+    tax: 'Offset to original expense',
+    subs: [
+      'Vendor refund',
+      'Tax refund',
+      'Insurance refund / payout',
+      'Marketplace rebate',
+      'Chargeback returned',
+    ],
+  },
+  INTEREST: {
+    label: 'Interest & Investment Income',
+    tax: 'Ordinary income',
+    subs: [
+      'Bank interest',
+      'Money market / treasuries',
+      'Brokerage dividend',
+      'Realized gain',
+    ],
+  },
+  INTERCO_IN: {
+    label: 'Inter-Entity Inflow',
+    tax: 'Track separately — not P&L',
+    subs: [
+      'Loan repayment from related entity',
+      'Capital contribution from sibling',
+      'Distribution received',
+      'Management fee in',
+      'Reimbursement from sibling',
+      'Intercompany transfer in',
+    ],
+  },
+  OTHER_IN: {
+    label: 'Other Income',
+    tax: 'Review case-by-case',
+    subs: [
+      'Grant / award',
+      'Settlement received',
+      'Foreign exchange gain',
+      'Asset sale proceeds',
+      'Miscellaneous',
+    ],
+  },
+};
+
+/** Personal inflow categories — salary deposits, distributions you take
+ *  from your own businesses, gifts, refunds, etc. */
+export const PERSONAL_INCOME_CATEGORIES: Record<string, CategoryBucket> = {
+  EARNED: {
+    label: 'Earned Income',
+    subs: [
+      'Salary / wages — W-2',
+      'Contractor income — 1099',
+      'Bonus / commission',
+      'Tip income',
+    ],
+  },
+  OWNER_DRAW: {
+    label: 'Owner Draws / Distributions',
+    subs: [
+      'Distribution — Bytes AI',
+      'Distribution — Rocket Wireless',
+      'Distribution — Delicious Bytes',
+      'Distribution — Amari Ventures',
+      'Distribution — Amari Muharram Holdings',
+      'Profit share',
+      'Tax distribution',
+    ],
+  },
+  INVESTMENT_IN: {
+    label: 'Investment Returns',
+    subs: [
+      'Brokerage dividend',
+      'Realized gain',
+      'Crypto sale',
+      'Real estate income',
+    ],
+  },
+  REFUND_IN: {
+    label: 'Refund / Rebate',
+    subs: [
+      'Vendor refund',
+      'Tax refund',
+      'Insurance refund',
+      'Chargeback returned',
+    ],
+  },
+  GIFT: {
+    label: 'Gift / Transfer Received',
+    subs: [
+      'Gift from family',
+      'Gift from friend',
+      'Inheritance',
+      'Transfer between own accounts',
+    ],
+  },
+  OTHER_IN: {
+    label: 'Other Personal Income',
+    subs: [
+      'Miscellaneous',
+      'Cash deposit',
+    ],
+  },
+};

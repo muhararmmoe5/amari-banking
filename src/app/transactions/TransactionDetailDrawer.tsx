@@ -8,7 +8,10 @@ import {
 } from 'lucide-react';
 import type { Transaction, EntityType, AuditStatus } from '@/types';
 import { ACCOUNTS, ENTITY_LABELS, ENTITY_COLORS, BUSINESS_ENTITIES, getAccount } from '@/constants/accounts';
-import { PERSONAL_CATEGORIES, BUSINESS_CATEGORIES } from '@/constants/categories';
+import {
+  PERSONAL_CATEGORIES, BUSINESS_CATEGORIES,
+  PERSONAL_INCOME_CATEGORIES, BUSINESS_INCOME_CATEGORIES,
+} from '@/constants/categories';
 import { fmtMoney, fmtDate } from '@/lib/format';
 import { saveTransaction, recurringAllocationPreviewAction } from './actions';
 import { listSplitsAction } from './splitActions';
@@ -417,6 +420,7 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
               setState={setState}
               open={openMap.booked}
               setOpen={() => toggle('booked')}
+              isIncome={tx.amount > 0}
             />
           ) : null}
 
@@ -443,6 +447,7 @@ export default function TransactionDetailDrawer({ tx, onClose }: { tx: Transacti
                 setState={setState}
                 open={openMap.flow}
                 setOpen={() => toggle('flow')}
+                isIncome={tx.amount > 0}
               />
               <PassedOnwardSection
                 tx={tx}
@@ -692,8 +697,8 @@ function DatesSection({ tx, state, setState }: { tx: Transaction; state: any; se
 
 // ──────────────────── ③ Booked Attribution ────────────────────
 function BookedAttributionSection({
-  state, setState, open, setOpen,
-}: { state: any; setState: any; open: boolean; setOpen: () => void }) {
+  state, setState, open, setOpen, isIncome = false,
+}: { state: any; setState: any; open: boolean; setOpen: () => void; isIncome?: boolean }) {
   const isB = state.personalOrBusiness === 'BUSINESS';
   const isP = state.personalOrBusiness === 'PERSONAL';
 
@@ -734,8 +739,8 @@ function BookedAttributionSection({
         />
       </div>
 
-      {isB && <BusinessPath state={state} setState={setState} />}
-      {isP && <PersonalPath state={state} setState={setState} />}
+      {isB && <BusinessPath state={state} setState={setState} isIncome={isIncome} />}
+      {isP && <PersonalPath state={state} setState={setState} isIncome={isIncome} />}
       {!state.personalOrBusiness && (
         <div className="text-[12px] text-ink-mute text-center py-6">
           Pick a path to start tagging.
@@ -828,8 +833,9 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
   );
 }
 
-function BusinessPath({ state, setState }: { state: any; setState: any }) {
-  const cat = state.businessCat1Key ? BUSINESS_CATEGORIES[state.businessCat1Key] : null;
+function BusinessPath({ state, setState, isIncome = false }: { state: any; setState: any; isIncome?: boolean }) {
+  const CAT_MAP = isIncome ? BUSINESS_INCOME_CATEGORIES : BUSINESS_CATEGORIES;
+  const cat = state.businessCat1Key ? CAT_MAP[state.businessCat1Key] : null;
 
   return (
     <div className="flex flex-col" style={{ gap: 14 }}>
@@ -863,7 +869,7 @@ function BusinessPath({ state, setState }: { state: any; setState: any }) {
             )}
           >
             <option value="">— select —</option>
-            {Object.entries(BUSINESS_CATEGORIES).map(([k, c]) => (
+            {Object.entries(CAT_MAP).map(([k, c]) => (
               <option key={k} value={k}>{c.label}</option>
             ))}
           </select>
@@ -913,8 +919,9 @@ function BusinessPath({ state, setState }: { state: any; setState: any }) {
   );
 }
 
-function PersonalPath({ state, setState }: { state: any; setState: any }) {
-  const cat = state.personalCat1Key ? PERSONAL_CATEGORIES[state.personalCat1Key] : null;
+function PersonalPath({ state, setState, isIncome = false }: { state: any; setState: any; isIncome?: boolean }) {
+  const CAT_MAP = isIncome ? PERSONAL_INCOME_CATEGORIES : PERSONAL_CATEGORIES;
+  const cat = state.personalCat1Key ? CAT_MAP[state.personalCat1Key] : null;
   return (
     <div className="flex flex-col" style={{ gap: 14 }}>
       <Field label="Whose personal expense / paid to" hint="Pick from your team or add a new person">
@@ -935,7 +942,7 @@ function PersonalPath({ state, setState }: { state: any; setState: any }) {
             )}
           >
             <option value="">— select —</option>
-            {Object.entries(PERSONAL_CATEGORIES).map(([k, c]) => (
+            {Object.entries(CAT_MAP).map(([k, c]) => (
               <option key={k} value={k}>{c.label}</option>
             ))}
           </select>
@@ -1212,8 +1219,8 @@ function RecurrenceSection({
 
 // ──────────────────── ⑤ Money flow ────────────────────
 function MoneyFlowSection({
-  tx, state, setState, open, setOpen,
-}: { tx: Transaction; state: any; setState: any; open: boolean; setOpen: () => void }) {
+  tx, state, setState, open, setOpen, isIncome = false,
+}: { tx: Transaction; state: any; setState: any; open: boolean; setOpen: () => void; isIncome?: boolean }) {
   const hideSource = false;
   // Source-of-money entity selection: drives the bank account picker on the right
   const sourceEntity: string = state.sourceEntityForPay || (() => {
@@ -1253,62 +1260,69 @@ function MoneyFlowSection({
           : state.moneySource ? `Source: ${state.moneySource}` : 'Not set'
       }
     >
-      {hideSource ? (
-        <div
-          className="mb-3"
-          style={{
-            padding: '8px 12px',
-            background: 'rgba(167,139,250,0.06)',
-            border: '0.5px solid rgba(167,139,250,0.20)',
-            borderRadius: 7,
-            fontSize: 11,
-            color: 'var(--ink-2)',
-            lineHeight: 1.5,
-          }}
-        >
-          Each split part already carries its own funding entity. Use this section
-          for reimbursement and the downstream money chain only.
-        </div>
-      ) : (
-        <>
-          <div className="field-label mb-2">Source of money to pay</div>
-          <div className="grid grid-cols-2" style={{ gap: 14 }}>
-            <Field label="① Entity" hint="Which entity's pool is paying">
-              <select
-                value={sourceEntity}
-                onChange={(e) => pickEntity(e.target.value)}
-              >
-                <option value="">— pick entity —</option>
-                {BUSINESS_ENTITIES.map((e) => (
-                  <option key={e} value={e}>{ENTITY_LABELS[e]}</option>
-                ))}
-                <option value="PERSONAL">Personal</option>
-                <option value="EXTERNAL">External / other</option>
-              </select>
-            </Field>
-            <Field
-              label="② Bank account"
-              hint={sourceEntity && sourceEntity !== 'EXTERNAL' && accountsForEntity.length === 0 ? 'no accounts on this entity yet' : `${accountsForEntity.length} account${accountsForEntity.length === 1 ? '' : 's'}`}
-            >
-              <select
-                value={state.sourceAccountForPay || ''}
-                onChange={(e) => {
-                  const accountId = e.target.value;
-                  setState({ sourceAccountForPay: accountId }, { sourceAccountId: accountId || null });
-                }}
-                disabled={!sourceEntity || sourceEntity === 'EXTERNAL'}
-              >
-                <option value="">— pick account —</option>
-                {accountsForEntity.map((a) => (
-                  <option key={a.id} value={a.id}>···{a.last4} — {a.label}</option>
-                ))}
-                <option value="EXTERNAL">External / N/A</option>
-              </select>
-            </Field>
-          </div>
-        </>
-      )}
+      {/* Explainer — what this section actually models */}
+      <div
+        className="mb-3"
+        style={{
+          padding: '10px 12px',
+          background: 'rgba(96,165,250,0.05)',
+          border: '0.5px solid rgba(96,165,250,0.20)',
+          borderRadius: 7,
+          fontSize: 11,
+          color: 'var(--ink-2)',
+          lineHeight: 1.5,
+        }}
+      >
+        {isIncome ? (
+          <>
+            Tracks the path your <b>incoming</b> cash takes. The wire landed in one entity&apos;s account, but the economic owner may be a different entity, and the money may then flow onward to a person or another entity (e.g. <i>Spacetel → Amari Holdings → Bytes AI → Mohammed&apos;s salary</i>). Pick where it lives now and where it&apos;s headed.
+          </>
+        ) : (
+          <>
+            Tracks the path the cash takes for this expense. <b>Source</b> = which entity&apos;s pool is paying. <b>Money chain</b> = where the money flows next (e.g. <i>Amari Holdings → Bytes AI → Mohammed</i> as salary). For inter-entity moves this creates the implicit loan record.
+          </>
+        )}
+      </div>
 
+      <div className="field-label mb-2">
+        {isIncome ? 'Where this income landed' : 'Source of money to pay'}
+      </div>
+      <div className="grid grid-cols-2" style={{ gap: 14 }}>
+        <Field label="① Entity" hint={isIncome ? 'Which entity received this cash' : "Which entity's pool is paying"}>
+          <select
+            value={sourceEntity}
+            onChange={(e) => pickEntity(e.target.value)}
+          >
+            <option value="">— pick entity —</option>
+            {BUSINESS_ENTITIES.map((e) => (
+              <option key={e} value={e}>{ENTITY_LABELS[e]}</option>
+            ))}
+            <option value="PERSONAL">Personal</option>
+            <option value="EXTERNAL">External / other</option>
+          </select>
+        </Field>
+        <Field
+          label="② Bank account"
+          hint={sourceEntity && sourceEntity !== 'EXTERNAL' && accountsForEntity.length === 0 ? 'no accounts on this entity yet' : `${accountsForEntity.length} account${accountsForEntity.length === 1 ? '' : 's'}`}
+        >
+          <select
+            value={state.sourceAccountForPay || ''}
+            onChange={(e) => {
+              const accountId = e.target.value;
+              setState({ sourceAccountForPay: accountId }, { sourceAccountId: accountId || null });
+            }}
+            disabled={!sourceEntity || sourceEntity === 'EXTERNAL'}
+          >
+            <option value="">— pick account —</option>
+            {accountsForEntity.map((a) => (
+              <option key={a.id} value={a.id}>···{a.last4} — {a.label}</option>
+            ))}
+            <option value="EXTERNAL">External / N/A</option>
+          </select>
+        </Field>
+      </div>
+
+      {!isIncome ? (
       <div className="mt-4">
         <Field label="Need to get from" hint="Who reimburses this account">
           <select
@@ -1323,6 +1337,7 @@ function MoneyFlowSection({
           </select>
         </Field>
       </div>
+      ) : null}
 
       {/* Money chain inset */}
       <div

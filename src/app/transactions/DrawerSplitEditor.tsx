@@ -22,7 +22,10 @@ import {
 import type { TransactionSplit } from '@/lib/db/splits';
 import type { EntityType } from '@/types';
 import { ENTITY_LABELS, ENTITY_COLORS, BUSINESS_ENTITIES, ACCOUNTS } from '@/constants/accounts';
-import { BUSINESS_CATEGORIES, PERSONAL_CATEGORIES } from '@/constants/categories';
+import {
+  BUSINESS_CATEGORIES, PERSONAL_CATEGORIES,
+  BUSINESS_INCOME_CATEGORIES, PERSONAL_INCOME_CATEGORIES,
+} from '@/constants/categories';
 import PersonPicker from '@/components/PersonPicker';
 
 interface Props {
@@ -83,6 +86,7 @@ export default function DrawerSplitEditor({ transactionId, transactionAmount }: 
 
   const totalCents = Math.round(Math.abs(transactionAmount) * 100);
   const sign = transactionAmount < 0 ? -1 : 1;
+  const isIncome = transactionAmount > 0;
   const allocated = (splits || []).reduce((s, x) => s + Math.abs(x.amountCents), 0);
   const remaining = totalCents - allocated;
   const isMatched = Math.abs(remaining) < 1;
@@ -311,6 +315,7 @@ export default function DrawerSplitEditor({ transactionId, transactionAmount }: 
           index={i}
           split={s}
           sign={sign}
+          isIncome={isIncome}
           salaries={salaries}
           budgets={budgets}
           onPatch={(p) => patchRow(s.id, p)}
@@ -339,11 +344,12 @@ export default function DrawerSplitEditor({ transactionId, transactionAmount }: 
 }
 
 function SplitRow({
-  index, split, sign, salaries, budgets, onPatch, onRemove,
+  index, split, sign, isIncome, salaries, budgets, onPatch, onRemove,
 }: {
   index: number;
   split: TransactionSplit;
   sign: number;
+  isIncome: boolean;
   salaries: SalaryLite[];
   budgets: BudgetLite[];
   onPatch: (p: Partial<TransactionSplit>) => void;
@@ -440,8 +446,8 @@ function SplitRow({
       </div>
 
       {/* Path-specific UI */}
-      {isB ? <BusinessRowBody split={split} onPatch={onPatch} /> : null}
-      {isP ? <PersonalRowBody split={split} onPatch={onPatch} /> : null}
+      {isB ? <BusinessRowBody split={split} onPatch={onPatch} isIncome={isIncome} /> : null}
+      {isP ? <PersonalRowBody split={split} onPatch={onPatch} isIncome={isIncome} /> : null}
 
       {!path ? (
         <div className="text-[11px] text-ink-mute text-center py-1">
@@ -1345,12 +1351,14 @@ function MiniPathButton({
 }
 
 function BusinessRowBody({
-  split, onPatch,
+  split, onPatch, isIncome = false,
 }: {
   split: TransactionSplit;
   onPatch: (p: Partial<TransactionSplit>) => void;
+  isIncome?: boolean;
 }) {
-  const cat = split.subCategory1 ? BUSINESS_CATEGORIES[split.subCategory1] : null;
+  const CAT_MAP = isIncome ? BUSINESS_INCOME_CATEGORIES : BUSINESS_CATEGORIES;
+  const cat = split.subCategory1 ? CAT_MAP[split.subCategory1] : null;
   return (
     <div className="flex flex-col gap-2">
       {/* Entity chip grid */}
@@ -1388,7 +1396,7 @@ function BusinessRowBody({
           style={{ height: 30, fontSize: 12 }}
         >
           <option value="">Category…</option>
-          {Object.entries(BUSINESS_CATEGORIES).map(([k, c]) => (
+          {Object.entries(CAT_MAP).map(([k, c]) => (
             <option key={k} value={k}>{c.label}</option>
           ))}
         </select>
@@ -1414,12 +1422,14 @@ function BusinessRowBody({
 }
 
 function PersonalRowBody({
-  split, onPatch,
+  split, onPatch, isIncome = false,
 }: {
   split: TransactionSplit;
   onPatch: (p: Partial<TransactionSplit>) => void;
+  isIncome?: boolean;
 }) {
-  const cat = split.subCategory1 ? PERSONAL_CATEGORIES[split.subCategory1] : null;
+  const CAT_MAP = isIncome ? PERSONAL_INCOME_CATEGORIES : PERSONAL_CATEGORIES;
+  const cat = split.subCategory1 ? CAT_MAP[split.subCategory1] : null;
   return (
     <div className="flex flex-col gap-2">
       <PersonPicker
@@ -1435,7 +1445,7 @@ function PersonalRowBody({
           style={{ height: 30, fontSize: 12 }}
         >
           <option value="">Category…</option>
-          {Object.entries(PERSONAL_CATEGORIES).map(([k, c]) => (
+          {Object.entries(CAT_MAP).map(([k, c]) => (
             <option key={k} value={k}>{c.label}</option>
           ))}
         </select>
