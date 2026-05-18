@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export default function PLPage() {
   const data = entityPLs();
-  const order = ['BYTES_AI', 'ROCKET_WIRELESS', 'DELICIOUS_BYTES', 'AMARI_VENTURES', 'BYTES_REST_TECH', 'PERSONAL', 'BUSINESS_SHARED', 'MULTI_ENTITY', 'UNKNOWN'];
+  const order = ['BYTES_AI', 'ROCKET_WIRELESS', 'DELICIOUS_BYTES', 'AMARI_VENTURES', 'BYTES_REST_TECH', 'AMARI_HOLDINGS', 'PERSONAL', 'BUSINESS_SHARED', 'MULTI_ENTITY', 'UNKNOWN'];
   const sorted = [...data].sort((a, b) => order.indexOf(a.entity) - order.indexOf(b.entity));
 
   return (

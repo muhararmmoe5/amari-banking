@@ -32,7 +32,7 @@ const FILTER_PROPS = {
   account_id: { type: 'string', description: '4-digit account number, e.g. "0320"' },
   entity: {
     type: 'string',
-    enum: ['BYTES_AI','ROCKET_WIRELESS','DELICIOUS_BYTES','AMARI_VENTURES','BYTES_REST_TECH','PERSONAL','MULTI_ENTITY','BUSINESS_SHARED','UNKNOWN'],
+    enum: ['BYTES_AI','ROCKET_WIRELESS','DELICIOUS_BYTES','AMARI_VENTURES','BYTES_REST_TECH','AMARI_HOLDINGS','PERSONAL','MULTI_ENTITY','BUSINESS_SHARED','UNKNOWN'],
     description: 'Filter by confirmed_entity (falls back to auto-detected entity_tag)',
   },
   category: { type: 'string', description: 'Filter by category, e.g. EXPENSE_ZELLE, INCOME_STRIPE' },

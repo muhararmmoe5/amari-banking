@@ -6,6 +6,7 @@ export const ENTITY_LABELS: Record<EntityType, string> = {
   DELICIOUS_BYTES: 'Delicious Bytes LLC',
   AMARI_VENTURES: 'Amari Ventures',
   BYTES_REST_TECH: 'Bytes Restaurant Tech',
+  AMARI_HOLDINGS: 'Amari Muharram Holdings',
   PERSONAL: 'Personal',
   MULTI_ENTITY: 'Multi-entity',
   BUSINESS_SHARED: 'Business (shared)',
@@ -18,6 +19,7 @@ export const ENTITY_COLORS: Record<EntityType, string> = {
   DELICIOUS_BYTES: '#c98a7a',   // terracotta
   AMARI_VENTURES: '#b18ac9',    // orchid
   BYTES_REST_TECH: '#7a8c6b',   // sage
+  AMARI_HOLDINGS: '#a78bfa',    // deep violet — personal holding co.
   PERSONAL: '#c9b8a8',          // warm cream
   MULTI_ENTITY: '#c9a87a',
   BUSINESS_SHARED: '#9f9a8c',
@@ -48,6 +50,7 @@ export const BUSINESS_ENTITIES: EntityType[] = [
   'DELICIOUS_BYTES',
   'AMARI_VENTURES',
   'BYTES_REST_TECH',
+  'AMARI_HOLDINGS',
 ];
 
 export function getAccount(id: string): AccountConfig | undefined {

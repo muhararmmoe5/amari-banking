@@ -4,6 +4,7 @@ export type EntityType =
   | 'DELICIOUS_BYTES'
   | 'AMARI_VENTURES'
   | 'BYTES_REST_TECH'
+  | 'AMARI_HOLDINGS'
   | 'PERSONAL'
   | 'MULTI_ENTITY'
   | 'BUSINESS_SHARED'

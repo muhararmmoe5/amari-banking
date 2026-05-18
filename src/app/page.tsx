@@ -34,7 +34,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 const ENTITY_ORDER: EntityType[] = [
-  'BYTES_AI', 'ROCKET_WIRELESS', 'DELICIOUS_BYTES', 'AMARI_VENTURES', 'BYTES_REST_TECH',
+  'BYTES_AI', 'ROCKET_WIRELESS', 'DELICIOUS_BYTES', 'AMARI_VENTURES', 'BYTES_REST_TECH', 'AMARI_HOLDINGS',
 ];
 
 function fmtMoneyCompact(n: number): string {
