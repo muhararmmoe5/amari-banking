@@ -36,19 +36,37 @@ export default function PersonPicker({
   const [error, setError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
+  // Close on outside click — also reset the new-person form so nothing sticks
   useEffect(() => {
     if (!open) return;
     function onDoc(e: MouseEvent) {
       if (!wrapRef.current?.contains(e.target as Node)) {
-        setOpen(false);
-        setAdding(false);
-        setError(null);
+        closeAll();
+      }
+    }
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        closeAll();
+        e.stopPropagation();
       }
     }
     document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onEsc);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  function closeAll() {
+    setOpen(false);
+    setAdding(false);
+    setError(null);
+    setNewName('');
+    setNewEmail('');
+    setQuery('');
+  }
 
   async function load() {
     setLoading(true);
@@ -140,12 +158,37 @@ export default function PersonPicker({
             border: '0.5px solid var(--border-default, rgba(255,255,255,0.16))',
             borderRadius: 8,
             boxShadow: '0 10px 30px -10px rgba(0,0,0,0.6)',
-            maxHeight: 320,
+            // Cap the list view, but let the new-person form expand freely
+            // so Cancel/Save are always reachable.
+            maxHeight: adding ? 'none' : 320,
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
           }}
         >
+          {/* Header with always-visible close X */}
+          <div
+            className="flex items-center gap-2"
+            style={{
+              padding: '6px 8px 6px 12px',
+              borderBottom: '0.5px solid var(--border-subtle, rgba(255,255,255,0.07))',
+              background: 'var(--bg-3)',
+            }}
+          >
+            <span className="text-[10.5px] text-ink-mute uppercase tracking-wider">
+              {adding ? 'Add new person' : 'Pick or add a person'}
+            </span>
+            <span className="flex-1" />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); closeAll(); }}
+              className="text-ink-mute hover:text-ink"
+              style={{ padding: 4, lineHeight: 0 }}
+              title="Close"
+            >
+              <X size={13} />
+            </button>
+          </div>
           {!adding ? (
             <>
               <div style={{ padding: 8, borderBottom: '0.5px solid var(--border-subtle)' }}>
@@ -230,7 +273,7 @@ export default function PersonPicker({
               <div className="flex gap-2 justify-end">
                 <button
                   type="button"
-                  onClick={() => { setAdding(false); setError(null); }}
+                  onClick={() => { setAdding(false); setError(null); setNewName(''); setNewEmail(''); }}
                   className="btn btn-sm btn-ghost"
                 >
                   Cancel

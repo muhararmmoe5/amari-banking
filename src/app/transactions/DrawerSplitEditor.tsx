@@ -461,7 +461,7 @@ function SplitRow({
 
       {/* Per-split money flow — reimbursement + downstream chain */}
       {path ? (
-        <SplitMoneyFlow split={split} onPatch={onPatch} />
+        <SplitMoneyFlow split={split} salaries={salaries} onPatch={onPatch} />
       ) : null}
 
       {/* Per-split passed onward — economic hit landed on a different entity */}
@@ -604,13 +604,15 @@ function SplitAllocation({
 }
 
 function SplitMoneyFlow({
-  split, onPatch,
+  split, salaries, onPatch,
 }: {
   split: TransactionSplit;
+  salaries: SalaryLite[];
   onPatch: (p: Partial<TransactionSplit>) => void;
 }) {
   const hasAny = !!(split.needToGetFrom || split.hop2Person || split.hop3Entity);
   const [open, setOpen] = useState(hasAny);
+  const salary = salaries.find((s) => s.id === split.salaryId) || null;
 
   return (
     <div
@@ -698,6 +700,173 @@ function SplitMoneyFlow({
               </div>
             </div>
           </div>
+
+          <SplitFlowChain split={split} salary={salary} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function FlowNodeAndArrow({
+  node, showArrow,
+}: {
+  node: { kind: 'entity' | 'person'; label: string; sub: string; color: string };
+  showArrow: boolean;
+}) {
+  return (
+    <>
+      <div
+        className="flex-1"
+        style={{
+          padding: '10px 8px',
+          background: `color-mix(in oklab, ${node.color} 12%, var(--bg-3))`,
+          border: '0.5px solid ' + node.color,
+          borderRadius: 7,
+          textAlign: 'center',
+          minWidth: 0,
+        }}
+      >
+        <div
+          className="grid place-items-center mx-auto mb-1.5"
+          style={{
+            width: 22, height: 22, borderRadius: 6,
+            background: node.color, color: 'var(--bg-0)',
+          }}
+        >
+          {node.kind === 'entity' ? <Building2 size={11} /> : <User size={11} />}
+        </div>
+        <div className="text-[11px] font-semibold truncate" style={{ color: 'var(--ink)' }}>
+          {node.label}
+        </div>
+        <div className="text-[9.5px] text-ink-mute mt-px truncate">{node.sub}</div>
+      </div>
+      {showArrow ? (
+        <div className="flex items-center text-ink-mute" style={{ padding: '0 2px' }}>
+          <ArrowRight size={13} />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function SplitFlowChain({
+  split, salary,
+}: {
+  split: TransactionSplit;
+  salary: SalaryLite | null;
+}) {
+  const source = split.sourceEntity || null;
+  const owner = split.entity;
+  const amount = Math.abs(split.amountCents) / 100;
+
+  // Build node list dynamically; only render if we have at least one meaningful hop.
+  type Node = { kind: 'entity' | 'person'; key: string; label: string; sub: string; color: string };
+  const nodes: Node[] = [];
+
+  if (source && source !== owner) {
+    nodes.push({
+      kind: 'entity',
+      key: `src-${source}`,
+      label: (ENTITY_LABELS as any)[source] || source,
+      sub: 'cash source',
+      color: (ENTITY_COLORS as any)[source] || '#6f6e68',
+    });
+  }
+  if (owner && owner !== 'UNKNOWN') {
+    nodes.push({
+      kind: 'entity',
+      key: `own-${owner}`,
+      label: (ENTITY_LABELS as any)[owner] || owner,
+      sub: source && source !== owner ? 'economic owner' : 'paid from here',
+      color: (ENTITY_COLORS as any)[owner] || '#6f6e68',
+    });
+  }
+  // Recipient: prefer salary's person, then hop2 person, then hop3 entity
+  if (salary && salary.personName) {
+    nodes.push({
+      kind: 'person',
+      key: `sal-${salary.id}`,
+      label: salary.personName,
+      sub: `${salary.kind === 'SALARY' ? 'salary' : salary.kind.toLowerCase()} · $${(salary.monthlyAmountCents / 100).toLocaleString()}/mo`,
+      color: 'var(--purple)',
+    });
+  } else if (split.hop2Person) {
+    nodes.push({
+      kind: 'person',
+      key: `hop2-${split.hop2Person}`,
+      label: split.hop2Person,
+      sub: 'salary / wages',
+      color: 'var(--purple)',
+    });
+  } else if (split.hop3Entity) {
+    nodes.push({
+      kind: 'entity',
+      key: `hop3-${split.hop3Entity}`,
+      label: (ENTITY_LABELS as any)[split.hop3Entity] || split.hop3Entity,
+      sub: 'economic hit',
+      color: (ENTITY_COLORS as any)[split.hop3Entity] || '#6f6e68',
+    });
+  }
+
+  if (nodes.length < 2) return null;
+
+  const isLoan = source && owner && source !== owner && source !== 'UNKNOWN' && owner !== 'UNKNOWN';
+  const useCase = salary
+    ? `${salary.kind === 'SALARY' ? 'Salary' : salary.kind} payment`
+    : split.subCategory2 || split.subCategory1 || 'Use case';
+
+  return (
+    <div
+      className="mt-3"
+      style={{
+        padding: 12,
+        background: 'var(--bg-2)',
+        border: '0.5px solid var(--border-subtle, rgba(255,255,255,0.07))',
+        borderRadius: 8,
+      }}
+    >
+      <div className="flex items-center gap-1.5 mb-3">
+        <Activity size={11} className="text-ink-mute" />
+        <span className="field-label" style={{ marginBottom: 0 }}>Flow visualization</span>
+        <span className="flex-1" />
+        <span className="text-[10px] text-ink-mute">{useCase}</span>
+      </div>
+
+      <div className="flex items-stretch" style={{ gap: 8 }}>
+        {nodes.map((n, i) => (
+          <FlowNodeAndArrow
+            key={n.key}
+            node={n}
+            showArrow={i < nodes.length - 1}
+          />
+        ))}
+      </div>
+
+      {isLoan ? (
+        <div
+          className="mt-3 flex items-center gap-1.5 text-[11px]"
+          style={{
+            padding: '6px 10px',
+            background: 'rgba(251,191,36,0.06)',
+            border: '0.5px solid rgba(251,191,36,0.25)',
+            borderRadius: 6,
+            color: 'var(--warn)',
+          }}
+        >
+          <span style={{ width: 6, height: 6, borderRadius: 50, background: 'var(--warn)' }} />
+          <span>
+            <span className="font-medium">Inter-entity loan:</span>{' '}
+            <span className="font-medium">{(ENTITY_LABELS as any)[owner] || owner}</span>
+            {' owes '}
+            <span className="font-medium">{(ENTITY_LABELS as any)[source!] || source}</span>
+            {' '}
+            <span className="num">{fmtMoney(amount)}</span>
+          </span>
+          <span className="flex-1" />
+          <span className="text-[10px] text-ink-mute">
+            {useCase.toLowerCase()}
+          </span>
         </div>
       ) : null}
     </div>
