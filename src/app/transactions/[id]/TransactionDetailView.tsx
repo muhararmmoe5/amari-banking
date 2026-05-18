@@ -70,6 +70,10 @@ export default function TransactionDetailView({
   const [individual, setIndividual] = useState<string>(tx.individual || '');
   const [docRef, setDocRef] = useState<string>(tx.receiptRef || '');
   const [notes, setNotes] = useState<string>(tx.notes || '');
+  const [bookingDateMode, setBookingDateMode] = useState<'DAY' | 'MONTH'>(
+    (tx.bookingDateMode as 'DAY' | 'MONTH') || 'MONTH',
+  );
+  const [taggedDate, setTaggedDate] = useState<string>(tx.taggedDate || '');
   // Default to split=true when this transaction already has split rows saved.
   // Earlier categorization persists in transaction_splits — surface it instead
   // of hiding it.
@@ -282,6 +286,28 @@ export default function TransactionDetailView({
               </div>
             </div>
           </div>
+
+          {/* Three-date row — Charge / Posted / Booked */}
+          <DatesSection
+            tx={tx}
+            bookingDateMode={bookingDateMode}
+            taggedDate={taggedDate}
+            onModeChange={(mode) => {
+              setBookingDateMode(mode);
+              // If switching to MONTH and we have a day value, normalize to the 1st
+              if (mode === 'MONTH' && taggedDate && taggedDate.length === 10 && !taggedDate.endsWith('-01')) {
+                const m = taggedDate.slice(0, 7) + '-01';
+                setTaggedDate(m);
+                persist({ bookingDateMode: mode, taggedDate: m });
+              } else {
+                persist({ bookingDateMode: mode });
+              }
+            }}
+            onTaggedDateChange={(v) => {
+              setTaggedDate(v);
+              persist({ taggedDate: v || null });
+            }}
+          />
 
           {/* AI Source trace card — only for expenses */}
           {isExpense ? (
@@ -1079,6 +1105,177 @@ function TimelineItem({
       </div>
     </div>
   );
+}
+
+function DatesSection({
+  tx, bookingDateMode, taggedDate, onModeChange, onTaggedDateChange,
+}: {
+  tx: Transaction;
+  bookingDateMode: 'DAY' | 'MONTH';
+  taggedDate: string;
+  onModeChange: (mode: 'DAY' | 'MONTH') => void;
+  onTaggedDateChange: (v: string) => void;
+}) {
+  const charge = tx.transactionDate;
+  const posted = tx.postingDate;
+  const isMonth = bookingDateMode === 'MONTH';
+  const monthValue = taggedDate ? taggedDate.slice(0, 7) : '';
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <div
+        className="grid"
+        style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}
+      >
+        {/* Charge date — from transaction description / source */}
+        <div>
+          <DateFieldLabel>Charge date</DateFieldLabel>
+          <div style={readOnlyDateStyle}>{charge ? formatDate(charge) : '—'}</div>
+          <div style={hintStyle}>From transaction description</div>
+        </div>
+
+        {/* Posted date — from Chase CSV */}
+        <div>
+          <DateFieldLabel>Posted date</DateFieldLabel>
+          <div style={readOnlyDateStyle}>{formatDate(posted)}</div>
+          <div style={hintStyle}>From bank · read-only</div>
+        </div>
+
+        {/* Booked date — gold accent, editable, Day/Month mode toggle */}
+        <div>
+          <DateFieldLabel gold>
+            Booked date{' '}
+            <span style={{ color: 'var(--gold)' }}>✏</span>
+          </DateFieldLabel>
+          {isMonth ? (
+            <input
+              type="month"
+              value={monthValue}
+              onChange={(e) => {
+                const v = e.target.value ? `${e.target.value}-01` : '';
+                onTaggedDateChange(v);
+              }}
+              className="num"
+              style={{
+                width: '100%',
+                height: 36,
+                padding: '0 12px',
+                borderRadius: 7,
+                background: 'var(--bg-2, #16161a)',
+                border: '0.5px solid rgba(201,168,122,0.5)',
+                boxShadow: '0 0 0 2px rgba(201,168,122,0.12)',
+                color: 'var(--ink)',
+                fontSize: 13,
+                fontWeight: 500,
+              }}
+            />
+          ) : (
+            <input
+              type="date"
+              value={taggedDate || ''}
+              onChange={(e) => onTaggedDateChange(e.target.value)}
+              className="num"
+              style={{
+                width: '100%',
+                height: 36,
+                padding: '0 12px',
+                borderRadius: 7,
+                background: 'var(--bg-2, #16161a)',
+                border: '0.5px solid rgba(201,168,122,0.5)',
+                boxShadow: '0 0 0 2px rgba(201,168,122,0.12)',
+                color: 'var(--ink)',
+                fontSize: 13,
+                fontWeight: 500,
+              }}
+            />
+          )}
+          <div className="flex" style={{ marginTop: 6, gap: 4 }}>
+            <button
+              type="button"
+              onClick={() => onModeChange('DAY')}
+              className="btn btn-sm"
+              style={{
+                flex: 1,
+                justifyContent: 'center',
+                background: !isMonth ? 'rgba(201,168,122,0.16)' : 'var(--bg-2, #16161a)',
+                borderColor: !isMonth ? 'rgba(201,168,122,0.4)' : 'rgba(255,255,255,0.055)',
+                color: !isMonth ? 'var(--gold)' : 'var(--ink-3)',
+              }}
+            >
+              Specific day
+              {!isMonth ? <Check size={10} style={{ marginLeft: 4 }} /> : null}
+            </button>
+            <button
+              type="button"
+              onClick={() => onModeChange('MONTH')}
+              className="btn btn-sm"
+              style={{
+                flex: 1,
+                justifyContent: 'center',
+                background: isMonth ? 'rgba(201,168,122,0.16)' : 'var(--bg-2, #16161a)',
+                borderColor: isMonth ? 'rgba(201,168,122,0.4)' : 'rgba(255,255,255,0.055)',
+                color: isMonth ? 'var(--gold)' : 'var(--ink-3)',
+              }}
+            >
+              Month only
+              {isMonth ? <Check size={10} style={{ marginLeft: 4 }} /> : null}
+            </button>
+          </div>
+          <div style={hintStyle}>
+            {isMonth
+              ? 'Books to the 1st · useful for subscriptions'
+              : 'Books to the specific day'}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DateFieldLabel({ children, gold }: { children: React.ReactNode; gold?: boolean }) {
+  return (
+    <div
+      style={{
+        fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.14em',
+        color: gold ? 'var(--gold)' : 'var(--ink-3)',
+        fontWeight: 600, marginBottom: 6,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+const readOnlyDateStyle: React.CSSProperties = {
+  padding: '8px 12px',
+  borderRadius: 7,
+  background: 'var(--bg-2, #16161a)',
+  border: '0.5px solid rgba(255,255,255,0.055)',
+  color: 'var(--ink-2)',
+  fontSize: 13,
+  fontFamily: 'var(--font-mono, "Geist Mono", monospace)',
+  height: 36,
+  display: 'flex',
+  alignItems: 'center',
+};
+
+const hintStyle: React.CSSProperties = {
+  fontSize: 10.5,
+  color: 'var(--ink-3)',
+  marginTop: 5,
+};
+
+function formatDate(s: string | null | undefined): string {
+  if (!s) return '—';
+  try {
+    // If month-only YYYY-MM, show as 'May 2026'
+    if (s.length === 7) {
+      return new Date(s + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    }
+    return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return s;
+  }
 }
 
 function KbdHint({ k, label }: { k: string; label: string }) {
