@@ -137,7 +137,7 @@ const ManualSourceLink = forwardRef<ManualSourceLinkHandle, {
   }
 
   async function remove(splitId: string) {
-    if (!confirm('Remove this split?')) return;
+    if (!confirm('Remove this source?')) return;
     const id = saveStart();
     try {
       await fetch(`/api/flow/splits?id=${encodeURIComponent(splitId)}`, {
@@ -221,11 +221,13 @@ const ManualSourceLink = forwardRef<ManualSourceLinkHandle, {
         </div>
       ) : null}
 
-      {/* Allocation summary */}
+      {/* Allocation summary — uses "split" only when there are 2+ sources */}
       {splits.length > 0 || adding ? (
         <div className="flex items-center justify-between text-2xs px-1">
           <div className="text-ink-mute">
-            Allocated <span className="num text-income">{fmtMoney(totalAllocatedCents / 100)}</span> of <span className="num">{fmtMoney(expenseCents / 100)}</span>
+            {splits.length > 1 ? 'Split · ' : ''}
+            <span className="num text-income">{fmtMoney(totalAllocatedCents / 100)}</span> of <span className="num">{fmtMoney(expenseCents / 100)}</span>
+            {splits.length === 1 ? ' tagged' : ''}
           </div>
           <div className={unallocatedCents > 1 ? 'text-warn' : unallocatedCents < -1 ? 'text-expense' : 'text-income'}>
             {unallocatedCents > 1 && <>{fmtMoney(unallocatedCents / 100)} unallocated</>}
@@ -235,16 +237,16 @@ const ManualSourceLink = forwardRef<ManualSourceLinkHandle, {
         </div>
       ) : null}
 
-      {/* Add new split */}
+      {/* Add new source manually */}
       {!adding ? (
         <div className="flex items-center justify-between gap-3">
           {splits.length === 0 ? (
             <div className="text-2xs text-ink-mute">
-              Not tagged to any income yet. Click below to start splitting.
+              Not tagged to any income yet. Use AI above or add a source manually.
             </div>
           ) : <div />}
           <button type="button" onClick={() => setAdding(true)} className="btn btn-sm">
-            <Plus size={12} /> Add split
+            <Plus size={12} /> Add manually
           </button>
         </div>
       ) : (
@@ -369,7 +371,7 @@ const ManualSourceLink = forwardRef<ManualSourceLinkHandle, {
 
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={resetForm} className="btn btn-sm btn-ghost">Cancel</button>
-            <button type="button" onClick={save} className="btn btn-sm btn-primary">Save split</button>
+            <button type="button" onClick={save} className="btn btn-sm btn-primary">Save source</button>
           </div>
         </div>
       )}
