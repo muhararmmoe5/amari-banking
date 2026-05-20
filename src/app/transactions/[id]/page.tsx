@@ -3,12 +3,24 @@ import { requireUser } from '@/lib/auth';
 import { getTransaction } from '@/lib/db/queries';
 import { traceFundingSource } from '@/lib/db/flow-trace';
 import { listSplits } from '@/lib/db/splits';
-import { ACCOUNTS } from '@/constants/accounts';
+import { ACCOUNTS, ENTITY_LABELS } from '@/constants/accounts';
 import TransactionDetailView from './TransactionDetailView';
+import type { EntityType } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
 interface Props { params: { id: string } }
+
+function ownerLabelFor(sourceTxId: string): string | null {
+  const t = getTransaction(sourceTxId);
+  if (!t) return null;
+  const entity = (t.confirmedEntity || t.entityTag) as EntityType | null;
+  const entityName = entity && ENTITY_LABELS[entity] ? ENTITY_LABELS[entity] : null;
+  if (t.individual && entityName) return `${t.individual} · ${entityName}`;
+  if (t.individual) return t.individual;
+  if (entityName) return entityName;
+  return null;
+}
 
 export default function TransactionDetailPage({ params }: Props) {
   const user = requireUser();
@@ -23,7 +35,7 @@ export default function TransactionDetailPage({ params }: Props) {
   // expense to a funding inflow, surface that. Otherwise run the FIFO trace.
   let fifoSource: {
     merchant: string; amount: number; accountId: string; date: string;
-    isInternal: boolean; attributedAmount: number;
+    isInternal: boolean; attributedAmount: number; ownerLabel: string | null;
   } | null = null;
   let sourceIsOverride = false;
 
@@ -37,6 +49,7 @@ export default function TransactionDetailPage({ params }: Props) {
         date: linked.postingDate,
         isInternal: !!linked.isInternal,
         attributedAmount: Math.min(linked.amount, Math.abs(tx.amount)),
+        ownerLabel: ownerLabelFor(linked.id),
       };
       sourceIsOverride = true;
     }
@@ -52,6 +65,7 @@ export default function TransactionDetailPage({ params }: Props) {
         date: topSource.date,
         isInternal: topSource.isInternal,
         attributedAmount: topSource.amount,
+        ownerLabel: ownerLabelFor(topSource.txId),
       };
     }
   }

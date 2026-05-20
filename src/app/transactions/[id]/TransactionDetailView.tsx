@@ -20,7 +20,7 @@ import DrawerSplitEditor from '../DrawerSplitEditor';
 import { fmtMoney } from '@/lib/format';
 
 interface AccountLite { id: string; label: string; entity: EntityType; last4: string }
-interface FifoSource { merchant: string; amount: number; accountId: string; date: string; isInternal: boolean; attributedAmount: number }
+interface FifoSource { merchant: string; amount: number; accountId: string; date: string; isInternal: boolean; attributedAmount: number; ownerLabel: string | null }
 interface SplitSummary {
   id: string;
   amountCents: number;
@@ -1150,6 +1150,7 @@ function AiSourceTraceCard({ tx, fifoSource, sourceIsOverride }: {
           eyebrow={has ? `INFLOW · ${fifoSource!.date}` : 'INFLOW · —'}
           title={has ? fifoSource!.merchant.toUpperCase() : 'No prior inflow'}
           meta={has ? `Wire +$${Math.abs(fifoSource!.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })} · ····${fifoSource!.accountId}` : 'Run AI trace from Source of Money in the drawer'}
+          owner={has ? fifoSource!.ownerLabel : null}
         />
         <div style={{ padding: '0 10px', color: 'var(--ink-3)' }}>
           <ArrowRight size={20} strokeWidth={1.4} />
@@ -1171,12 +1172,13 @@ function AiSourceTraceCard({ tx, fifoSource, sourceIsOverride }: {
 }
 
 function FlowNode({
-  type, eyebrow, title, meta,
+  type, eyebrow, title, meta, owner,
 }: {
   type: 'inflow' | 'outflow';
   eyebrow: string;
   title: string;
   meta: string;
+  owner?: string | null;
 }) {
   const isIn = type === 'inflow';
   return (
@@ -1204,6 +1206,14 @@ function FlowNode({
       <div className="num" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>
         {meta}
       </div>
+      {owner ? (
+        <div
+          className="truncate"
+          style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 6, paddingTop: 6, borderTop: '0.5px dashed rgba(255,255,255,0.08)' }}
+        >
+          <span style={{ color: 'var(--ink-4, #44443f)' }}>Owner · </span>{owner}
+        </div>
+      ) : null}
     </div>
   );
 }
