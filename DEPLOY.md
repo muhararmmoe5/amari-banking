@@ -1,8 +1,53 @@
 # Deploying Amari Banking
 
-Target: **Railway** — Next.js + persistent SQLite volume, ~$5/month. End-to-end setup ~20 minutes.
+Two supported hosts. Both give you Next.js + a persistent disk for SQLite.
 
-> **Why Railway and not Vercel?** Vercel's serverless platform has no persistent filesystem, so SQLite can't survive between deploys. Railway gives us a real disk we can mount and the SQLite database keeps working without rewriting every query for Postgres.
+- **Render** — `render.yaml` blueprint in the repo, one-click deploy. $7/mo Starter. See [Render section](#deploy-on-render-recommended) below.
+- **Railway** — manual click-path via dashboard. $5/mo Hobby. See [Railway section](#deploy-on-railway) below.
+
+> **Why not Vercel?** Vercel's serverless platform has no persistent filesystem, so SQLite can't survive between deploys. Both Render and Railway give us a real disk we can mount and the SQLite database keeps working without rewriting every query for Postgres.
+
+---
+
+## Deploy on Render (recommended)
+
+The repo ships a `render.yaml` blueprint that pre-configures the web service, persistent disk, and env vars.
+
+### 1. Sign up
+
+<https://render.com> → **Sign up with GitHub** → grant access to `muhararmmoe5/amari-banking` (you can pick "Only select repositories" for safety).
+
+### 2. Apply the blueprint
+
+Dashboard → **New +** → **Blueprint** → pick the `amari-banking` repo. Render reads `render.yaml` and shows the planned **web service + 1 GB disk** all pre-filled. Click **Apply**.
+
+You'll be prompted to confirm the $7/mo Starter plan (required because the free tier doesn't support persistent disks). The first build takes ~3-4 minutes.
+
+### 3. Public URL
+
+Once deployed, the service shows a URL like `amari-banking.onrender.com` at the top of the service page. Open it → it redirects to `/setup` → create your owner account.
+
+### 4. (Optional) AI assistant
+
+Service → **Environment** tab → set `ANTHROPIC_API_KEY` to your `sk-ant-...` key → service auto-redeploys. The floating "Ask AI" button starts working.
+
+### 5. (Optional) Custom domain
+
+Service → **Settings** → **Custom Domains** → add `amari.yourdomain.com` (CNAME to the value Render shows).
+
+### Render: what's automatic
+
+| Thing | How it's handled |
+|---|---|
+| Persistent disk | Defined in `render.yaml` — 1 GB at `/var/data`, survives deploys |
+| Env vars | `NODE_ENV=production`, `DB_PATH=/var/data/amari.db` pre-set |
+| Auto-deploy | Every push to the watched branch triggers a build |
+| TLS | Auto-managed, HTTPS forced |
+| Health checks | `/login` is probed every 30s |
+
+---
+
+## Deploy on Railway
 
 ---
 

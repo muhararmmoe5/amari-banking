@@ -1,0 +1,38 @@
+# Render Blueprint — Amari Banking
+# Docs: https://render.com/docs/blueprint-spec
+#
+# How to use:
+#   1. Sign in at https://render.com with GitHub.
+#   2. Dashboard -> New + -> Blueprint
+#   3. Connect the muhararmmoe5/amari-banking repo.
+#   4. Render reads this file and shows the planned web service + 1 GB disk
+#      pre-configured. Click Apply.
+#   5. After the first build (~3-4 min) the service URL appears at the top of
+#      the page. That's your live app.
+#   6. If you want the in-app AI assistant, open the service -> Environment
+#      -> set ANTHROPIC_API_KEY to your sk-ant-... key and redeploy.
+
+services:
+  - type: web
+    name: amari-banking
+    runtime: node
+    plan: starter            # $7/mo, persistent disk supported, no sleep
+    region: oregon           # change to virginia/frankfurt/singapore if you prefer
+    branch: claude/deploy-amari-platform-8iRC2
+    autoDeploy: true
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /login  # public route, returns 200 without auth
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_PATH
+        value: /var/data/amari.db
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: ANTHROPIC_API_KEY
+        sync: false          # set manually in Render dashboard if you want AI
+    disk:
+      name: amari-data
+      mountPath: /var/data
+      sizeGB: 1
