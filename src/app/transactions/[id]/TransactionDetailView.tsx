@@ -41,11 +41,12 @@ function flagFor(score: number | null | undefined): FlagInfo {
 }
 
 export default function TransactionDetailView({
-  tx, account, fifoSource, initialSplitCount, initialSplitSummary,
+  tx, account, fifoSource, sourceIsOverride, initialSplitCount, initialSplitSummary,
 }: {
   tx: Transaction;
   account: AccountLite | null;
   fifoSource: FifoSource | null;
+  sourceIsOverride?: boolean;
   initialSplitCount: number;
   initialSplitSummary: SplitSummary[];
 }) {
@@ -311,7 +312,7 @@ export default function TransactionDetailView({
 
           {/* AI Source trace card — only for expenses */}
           {isExpense ? (
-            <AiSourceTraceCard tx={tx} fifoSource={fifoSource} />
+            <AiSourceTraceCard tx={tx} fifoSource={fifoSource} sourceIsOverride={!!sourceIsOverride} />
           ) : null}
 
           {/* Split decision + summary */}
@@ -831,8 +832,82 @@ export default function TransactionDetailView({
 
 // ─────────────── Sub-components ───────────────
 
-function AiSourceTraceCard({ tx, fifoSource }: { tx: Transaction; fifoSource: FifoSource | null }) {
+interface InflowSearchResult {
+  id: string;
+  postingDate: string;
+  description: string;
+  merchant: string | null;
+  amount: number;
+  accountId: string;
+}
+
+function AiSourceTraceCard({ tx, fifoSource, sourceIsOverride }: {
+  tx: Transaction;
+  fifoSource: FifoSource | null;
+  sourceIsOverride: boolean;
+}) {
+  const router = useRouter();
+  const { saveStart, saveEnd, saveError } = useToast();
   const has = !!fifoSource;
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<InflowSearchResult[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function runSearch() {
+    setSearching(true);
+    try {
+      const r = await fetch(
+        `/api/transactions/search?inflowOnly=1&limit=20&q=${encodeURIComponent(query)}`,
+        { credentials: 'same-origin' }
+      );
+      const d = await r.json();
+      setResults(d.transactions || []);
+    } catch {
+      setResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function pickSource(sourceTxId: string) {
+    if (busy) return;
+    setBusy(true);
+    const toastId = saveStart();
+    try {
+      await saveTransaction(tx.id, { fundedByTransactionId: sourceTxId });
+      saveEnd(toastId);
+      setPickerOpen(false);
+      setQuery('');
+      setResults(null);
+      router.refresh();
+    } catch (e: any) {
+      saveError(toastId, e?.message || 'Failed to set source');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function retrace() {
+    if (busy) return;
+    setBusy(true);
+    const toastId = saveStart();
+    try {
+      // Clear any manual override so the FIFO trace runs fresh on next render.
+      if (sourceIsOverride) {
+        await saveTransaction(tx.id, { fundedByTransactionId: null });
+      }
+      saveEnd(toastId);
+      router.refresh();
+    } catch (e: any) {
+      saveError(toastId, e?.message || 'Retrace failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div
       style={{
@@ -870,18 +945,79 @@ function AiSourceTraceCard({ tx, fifoSource }: { tx: Transaction; fifoSource: Fi
           <div style={{ fontSize: 13, fontWeight: 500, letterSpacing: '-.005em' }}>
             Source of money ·{' '}
             <em style={{ fontFamily: 'var(--font-serif, "Instrument Serif", serif)', fontStyle: 'italic', color: 'var(--gold)' }}>
-              AI-traced
+              {sourceIsOverride ? 'manual override' : 'AI-traced'}
             </em>
           </div>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
-            {has ? 'Funded 100% from a prior inflow · you can override' : 'No prior inflow detected on this account yet'}
+            {sourceIsOverride
+              ? 'You set this source manually · Retrace to switch back to the FIFO trace'
+              : has
+                ? 'Funded 100% from a prior inflow · you can override'
+                : 'No prior inflow detected on this account yet'}
           </div>
         </div>
-        <button type="button" className="btn btn-ghost btn-sm">
+        <button type="button" className="btn btn-ghost btn-sm" onClick={retrace} disabled={busy}>
           <RotateCcw size={11} /> Retrace
         </button>
-        <button type="button" className="btn btn-ghost btn-sm">Override</button>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => setPickerOpen((v) => !v)}
+          disabled={busy}
+        >
+          {pickerOpen ? 'Close' : 'Override'}
+        </button>
       </div>
+
+      {pickerOpen ? (
+        <div
+          className="card p-3 space-y-2"
+          style={{ marginBottom: 14, background: 'var(--bg-2, #16161a)' }}
+        >
+          <div className="text-2xs text-ink-mute">
+            Search a prior inflow to link as the funding source for this expense.
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              autoFocus
+              placeholder="search income (Spacetel, Stripe, investor name…)"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runSearch(); } }}
+              className="flex-1 !text-sm"
+            />
+            <button type="button" className="btn btn-sm" onClick={runSearch} disabled={searching}>
+              {searching ? '…' : 'Find'}
+            </button>
+          </div>
+          {results !== null ? (
+            results.length === 0 ? (
+              <div className="text-2xs text-ink-mute italic">No matching inflows.</div>
+            ) : (
+              <div className="border border-line rounded-md max-h-56 overflow-y-auto divide-y divide-line/40">
+                {results.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => pickSource(r.id)}
+                    disabled={busy}
+                    className="block w-full text-left px-3 py-2 hover:bg-bg-3 transition disabled:opacity-50"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm truncate">{r.merchant || r.description.slice(0, 50)}</span>
+                      <span className="num text-income text-sm">{fmtMoney(r.amount)}</span>
+                    </div>
+                    <div className="text-2xs text-ink-mute mt-0.5">
+                      {r.postingDate} · ····{r.accountId}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="flex items-center">
         <FlowNode
