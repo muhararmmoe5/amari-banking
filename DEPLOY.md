@@ -1,81 +1,147 @@
 # Deploying Amari Banking
 
-This deploys to **Railway** — Next.js + persistent SQLite volume on a hobby plan (~$5/month). Total setup time: ~15 minutes.
+Target: **Railway** — Next.js + persistent SQLite volume, ~$5/month. End-to-end setup ~20 minutes.
 
-> **Why Railway and not Vercel?** Vercel's serverless platform doesn't have a persistent filesystem, so SQLite can't survive between deploys. Railway gives us a real disk we can mount and the SQLite database keeps working without rewriting every query for Postgres.
+> **Why Railway and not Vercel?** Vercel's serverless platform has no persistent filesystem, so SQLite can't survive between deploys. Railway gives us a real disk we can mount and the SQLite database keeps working without rewriting every query for Postgres.
+
+---
 
 ## What you need
 
-- The GitHub repo for this project (already exists at `muhararmmoe5/amari-banking`)
+- The GitHub repo (already at `muhararmmoe5/amari-banking`)
 - A Railway account
-- (Optional) An Anthropic API key for the AI assistant
+- (Optional, later) An S3-compatible bucket + GPG recipient for off-site encrypted backups
+- (Optional) An Anthropic API key for the in-app AI assistant
 
-## Steps
+---
 
-### 1. Sign up at Railway
+## 1. Sign up at Railway
 
-Go to <https://railway.app> → **Login with GitHub** → grant access to your account.
+<https://railway.app> → **Login with GitHub** → grant access. The hobby plan is $5/mo + small usage; first $5 free.
 
-You get a $5 free trial. After that the hobby plan is $5/month + small usage.
+## 2. Create the project
 
-### 2. Create the project from the repo
+Dashboard → **+ New Project** → **Deploy from GitHub repo** → pick **`amari-banking`** → **Deploy Now**. Railway auto-detects Next.js. First build ~3 min.
 
-Railway dashboard → **+ New Project** → **Deploy from GitHub repo** → pick **`amari-banking`** → **Deploy Now**.
+> Make sure Railway is tracking the branch you want to deploy from (default: `claude/deploy-amari-platform-8iRC2`). Settings → Source → **Branch**.
 
-Railway will auto-detect Next.js and start a build. The first build takes ~3 minutes.
+## 3. Add a persistent volume
 
-### 3. Add a persistent volume
+Without this, every redeploy wipes the database.
 
-The build will deploy, but SQLite will write to a temp directory that gets wiped on every redeploy. Fix this before opening the app for the first time.
-
-Inside the project → click on the **service tile** → **Settings** tab → scroll to **Volumes** → **+ Add Volume**.
+Service tile → **Settings** → **Volumes** → **+ Add Volume**
 
 - **Mount path:** `/data`
-- **Size:** 1 GB (plenty for the foreseeable future)
+- **Size:** 1 GB
 
-Save. Railway will redeploy automatically.
+Save. Railway redeploys automatically.
 
-### 4. Set environment variables
+## 4. Environment variables
 
-Project → service tile → **Variables** tab → add these one at a time:
+Service tile → **Variables** → add:
 
-| Name | Value |
-|---|---|
-| `NODE_ENV` | `production` |
-| `DB_PATH` | `/data/amari.db` |
-| `ANTHROPIC_API_KEY` | (optional — paste your `sk-ant-...` key if you want the AI chat) |
+| Name | Value | Required |
+|---|---|---|
+| `NODE_ENV` | `production` | yes |
+| `DB_PATH` | `/data/amari.db` | yes |
+| `ANTHROPIC_API_KEY` | `sk-ant-...` | optional |
+| `ANTHROPIC_MODEL` | `claude-haiku-4-5` | optional, for cheaper AI |
 
-Railway will redeploy after each variable is added. Wait for the green "deployed" indicator.
+Each variable triggers a redeploy. Wait for green "deployed".
 
-### 5. Get your public URL
+## 5. Generate the public URL
 
-Project → service → **Settings** tab → **Networking** → **Generate Domain**.
+Service → **Settings** → **Networking** → **Generate Domain**. You'll get `amari-banking-production-XXXX.up.railway.app`. That's your live app.
 
-You'll get a URL like `amari-banking-production-XXXX.up.railway.app`. That's your live app.
+## 6. First-time owner setup
 
-### 6. First-time setup
+Open the URL. Empty DB → redirects to **`/setup`** → fill name + email + password (12+ chars, 3 of: lower/upper/digit/symbol). You're the owner.
 
-Open the URL. Because the database is brand-new, the app redirects you to **`/setup`** — fill in your name, email, and password (12+ characters, 3 of: lowercase / uppercase / digit / symbol). You're now the owner.
+## 7. Invite partners
 
-### 7. Send invites
+**Team & Investors** → add person → send icon → fill email → copy invite URL → share it (email/text/Slack). They set their own password and only see their portfolio.
 
-Go to **Team & Investors** → add a partner → click the send icon → fill in their email → copy the invite URL. Send the URL to them however you like (email, text, Slack). They click it, set their own password, and they're in. They'll only see their own portfolio.
+---
 
-## After deploy
+## Security posture (what's already in place)
 
-- **Custom domain:** Settings → Networking → **Custom Domain** → add `amari.yourdomain.com` (point a CNAME at the value Railway shows).
-- **Backups:** SQLite is one file at `/data/amari.db`. Railway lets you SSH in or use their CLI to download it (`railway run cat /data/amari.db > backup.db`). Schedule this monthly.
-- **Logs:** Service → **Deployments** tab → click any deploy → **Logs**.
-- **Re-deploys:** every `git push` to `claude/build-new-feature-lc4pe` triggers an auto-deploy. To stop that, change the watched branch in Settings → Source.
+This deploy ships with the Phase-1 hardening turned on automatically:
+
+- **HTTPS everywhere** — Railway terminates TLS; session cookies are `Secure; HttpOnly; SameSite=Strict`.
+- **Account lockout** — 5 failed logins per account → 15-min lock.
+- **Per-IP login throttle** — 30 login attempts per IP per 15 min, returns 429-style message.
+- **Strong password policy** — 12+ chars, 3 of 4 character classes.
+- **Scrypt password hashing** with per-user salt.
+- **Security headers** — HSTS (2 yr, preload), CSP, X-Frame-Options DENY, X-Content-Type-Options nosniff, strict Referrer-Policy, Permissions-Policy blocking camera/mic/geo/usb.
+- **Volume encryption at rest** — Railway volumes sit on AWS EBS which is encrypted at rest by the provider.
+
+## Manual encrypted backup (do this weekly until automated)
+
+Two ways to run it.
+
+**A. From your laptop with the Railway CLI**
+```bash
+npm i -g @railway/cli
+railway login
+railway link              # pick the amari-banking project
+railway shell             # opens a shell inside the running container
+# inside the shell:
+apt-get update && apt-get install -y sqlite3 gnupg
+BACKUP_GPG_RECIPIENT=you@example.com /app/scripts/backup.sh
+exit
+# back on your laptop, pull the file off:
+railway run 'cat /app/backups/amari-YYYYMMDD-HHMMSS.db.gpg' > ./amari-latest.db.gpg
+```
+
+**B. Locally against the production DB**
+```bash
+railway run 'cat /data/amari.db' > /tmp/amari.db
+DB_PATH=/tmp/amari.db BACKUP_GPG_RECIPIENT=you@example.com ./scripts/backup.sh
+rm /tmp/amari.db   # don't leave a plaintext copy around
+```
+
+**To restore:**
+```bash
+gpg --decrypt amari-YYYYMMDD-HHMMSS.db.gpg > restored.db
+# then drop restored.db into /data/amari.db inside the Railway shell
+```
+
+Store the encrypted backups somewhere off Railway (iCloud Drive / Drive / S3 bucket). The whole point is that if Railway loses the volume, you still have the data.
+
+---
+
+## After deploy — operational notes
+
+- **Custom domain:** Settings → Networking → Custom Domain → `amari.yourdomain.com` (CNAME to the value Railway shows).
+- **Logs:** Service → Deployments → click any deploy → Logs.
+- **Re-deploys:** every push to the watched branch auto-deploys. Change the branch in Settings → Source.
+- **Database location:** one file at `/data/amari.db` (+ `-wal` and `-shm` siblings). Don't delete those.
+
+---
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---|---|
-| 500 on every page | Check the deploy logs. Most likely a missing env var. |
-| "Cannot find module 'better-sqlite3'" | Try **Redeploy** once. Railway sometimes caches a half-built native module. If it persists, post the build log. |
-| Database resets on every deploy | The volume isn't mounted. Verify Volume mount path is `/data` and `DB_PATH=/data/amari.db`. |
+| 500 on every page | Check deploy logs. Most likely a missing env var. |
+| "Cannot find module 'better-sqlite3'" | Hit **Redeploy** once — Railway sometimes caches a half-built native module. |
+| Database resets on every deploy | Volume isn't mounted. Verify mount path is `/data` and `DB_PATH=/data/amari.db`. |
+| "Too many attempts" on login | Per-IP throttle hit. Wait 15 min or restart the service. |
+| CSP error in browser console | A library tried to load an external URL. Add it to `connect-src`/`script-src` in `next.config.mjs`. |
 
-## Next: Plaid
+---
 
-Once the app is online, we can wire up Plaid (auto-sync transactions instead of CSV imports) — it needs the public URL to receive webhooks. See `PLAID.md` (added when we build that step).
+## Roadmap — remaining "production-grade" hardening
+
+Tracked here so we don't forget. Each item is its own PR.
+
+| Phase | Item | Why it's deferred |
+|---|---|---|
+| 2 | **TOTP 2FA** on every account | Needs a new table, QR enrollment screen, backup codes, login-step UI. Half-day. |
+| 3 | **Audit log** — append-only record of every login + every mutation, surfaced in `/admin/audit` | Needs an `audit_log` table and a helper called from every server action (~40 sites). Half-day. |
+| 4 | **Automated nightly off-site encrypted backups** | Needs YOU to provision an S3 bucket + GPG keypair, then a Railway cron + script (~2 hr once those exist). |
+| 5 | **App-level DB encryption (SQLCipher)** | Requires swapping `better-sqlite3` for `better-sqlite3-multiple-ciphers` and a key-management story. Provider already encrypts at rest, so this is defense-in-depth. |
+
+## Next product step: Plaid
+
+Once stable, wire up Plaid (auto-sync transactions, replace CSV imports). Needs the public URL for webhooks. See `PLAID.md` when we build it.

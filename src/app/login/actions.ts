@@ -7,11 +7,19 @@ import {
 } from '@/lib/auth/sessions';
 import { verifyPassword } from '@/lib/auth/password';
 import { SESSION_COOKIE } from '@/lib/auth';
+import { checkLoginRate } from '@/lib/auth/ratelimit';
 
 export async function loginAction(formData: FormData): Promise<{ error?: string }> {
   if (userCount() === 0) {
     redirect('/setup');
   }
+  const h = headers();
+  const ip = (h.get('x-forwarded-for') || '').split(',')[0].trim() || null;
+  const rate = checkLoginRate(ip);
+  if (!rate.allowed) {
+    return { error: `Too many attempts from this network. Try again in ${Math.ceil((rate.retryAfterSec || 60) / 60)} min.` };
+  }
+
   const email = String(formData.get('email') || '').trim();
   const password = String(formData.get('password') || '');
   const next = String(formData.get('next') || '/');
@@ -31,9 +39,7 @@ export async function loginAction(formData: FormData): Promise<{ error?: string 
   }
   recordLoginSuccess(user.id);
 
-  const h = headers();
   const ua = (h.get('user-agent') || '').slice(0, 512);
-  const ip = (h.get('x-forwarded-for') || '').split(',')[0].trim() || null;
   const token = createSession(user.id, ip || undefined, ua || undefined);
 
   cookies().set(SESSION_COOKIE, token, {
