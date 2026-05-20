@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, ArrowRight, Check, CreditCard, Sparkles, RotateCcw,
-  Split as SplitIcon, User, Building2, AlertTriangle,
+  Split as SplitIcon, User, Building2, AlertTriangle, Repeat,
 } from 'lucide-react';
 import type { Transaction, EntityType } from '@/types';
 import { ENTITY_LABELS, ENTITY_COLORS, BUSINESS_ENTITIES } from '@/constants/accounts';
@@ -81,6 +81,14 @@ export default function TransactionDetailView({
   const [isSplit, setIsSplit] = useState(initialSplitCount > 0);
   const [editingSplits, setEditingSplits] = useState(false);
   const splitTotal = initialSplitSummary.reduce((s, x) => s + Math.abs(x.amountCents), 0) / 100;
+
+  const [isRecurring, setIsRecurring] = useState<boolean>(!!tx.isRecurring);
+  const [recurringFrequency, setRecurringFrequency] = useState<string>(tx.recurringFrequency || 'MONTHLY');
+  const [recurringNextDate, setRecurringNextDate] = useState<string>(tx.recurringNextDate || '');
+  const [recurringLabel, setRecurringLabel] = useState<string>(tx.recurringLabel || '');
+  const [recurringExpectedStr, setRecurringExpectedStr] = useState<string>(
+    tx.recurringExpectedCents != null ? (tx.recurringExpectedCents / 100).toFixed(2) : ''
+  );
 
   function persist(patch: any) {
     const id = saveStart();
@@ -314,6 +322,123 @@ export default function TransactionDetailView({
           {isExpense ? (
             <AiSourceTraceCard tx={tx} fifoSource={fifoSource} sourceIsOverride={!!sourceIsOverride} />
           ) : null}
+
+          {/* Recurrence: one-time vs recurring + frequency */}
+          <SectionEm
+            title="Recurrence & forecast"
+            emFirst="Recurrence"
+            sub={isRecurring
+              ? `Recurring · ${recurringFrequency.toLowerCase()}${recurringNextDate ? ` · next ${recurringNextDate}` : ''}`
+              : 'One-time charge'}
+          >
+            <div className="grid grid-cols-2" style={{ gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRecurring(false);
+                  persist({ isRecurring: false });
+                }}
+                style={pathBtnStyle(!isRecurring, 'var(--ink-3)')}
+              >
+                <Check size={13} style={{ opacity: !isRecurring ? 1 : 0.4 }} />
+                One-time charge
+                {!isRecurring ? <span style={{ marginLeft: 'auto', fontSize: 11 }}>●</span> : null}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRecurring(true);
+                  persist({ isRecurring: true, recurringFrequency: recurringFrequency || 'MONTHLY' });
+                }}
+                style={pathBtnStyle(isRecurring, 'var(--warn, #d4b16f)')}
+              >
+                <Repeat size={13} style={{ opacity: isRecurring ? 1 : 0.4 }} />
+                Recurring charge
+                {isRecurring ? <span style={{ marginLeft: 'auto', fontSize: 11 }}>●</span> : null}
+              </button>
+            </div>
+
+            {isRecurring ? (
+              <div style={{ marginTop: 18 }}>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>
+                  Frequency
+                </div>
+                <div
+                  className="flex gap-1 p-0.5"
+                  style={{
+                    background: 'var(--bg-3)',
+                    border: '0.5px solid rgba(255,255,255,0.06)',
+                    borderRadius: 7,
+                    marginBottom: 18,
+                  }}
+                >
+                  {['MONTHLY', 'WEEKLY', 'BIWEEKLY', 'QUARTERLY', 'ANNUAL'].map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => { setRecurringFrequency(f); persist({ recurringFrequency: f }); }}
+                      style={{
+                        flex: 1,
+                        padding: '6px 0',
+                        borderRadius: 5,
+                        background: recurringFrequency === f ? 'var(--bg-0)' : 'transparent',
+                        color: recurringFrequency === f ? 'var(--ink)' : 'var(--ink-3)',
+                        fontSize: 11,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {f.charAt(0) + f.slice(1).toLowerCase()}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-3" style={{ gap: 16 }}>
+                  <label>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>
+                      Expected amount
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={recurringExpectedStr}
+                      onChange={(e) => setRecurringExpectedStr(e.target.value)}
+                      onBlur={() => {
+                        const n = Number(recurringExpectedStr.replace(/[^0-9.\-]/g, ''));
+                        const cents = Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
+                        persist({ recurringExpectedCents: cents });
+                      }}
+                      placeholder={Math.abs(tx.amount).toFixed(2)}
+                    />
+                  </label>
+                  <label>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>
+                      Next due date
+                    </div>
+                    <input
+                      type="date"
+                      value={recurringNextDate}
+                      onChange={(e) => {
+                        setRecurringNextDate(e.target.value);
+                        persist({ recurringNextDate: e.target.value || null });
+                      }}
+                    />
+                  </label>
+                  <label>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>
+                      Label
+                    </div>
+                    <input
+                      type="text"
+                      value={recurringLabel}
+                      onChange={(e) => setRecurringLabel(e.target.value)}
+                      onBlur={() => persist({ recurringLabel: recurringLabel || null })}
+                      placeholder="e.g. Family home rent"
+                    />
+                  </label>
+                </div>
+              </div>
+            ) : null}
+          </SectionEm>
 
           {/* Split decision + summary */}
           <SectionEm
