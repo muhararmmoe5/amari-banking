@@ -20,7 +20,9 @@ import DrawerSplitEditor from '../DrawerSplitEditor';
 import { fmtMoney } from '@/lib/format';
 
 interface AccountLite { id: string; label: string; entity: EntityType; last4: string }
-interface FifoSource { merchant: string; amount: number; accountId: string; date: string; isInternal: boolean; attributedAmount: number; ownerLabel: string | null }
+interface FifoSource { txId: string; merchant: string; amount: number; accountId: string; date: string; isInternal: boolean; attributedAmount: number; ownerLabel: string | null }
+interface DownstreamConsumer { txId: string; date: string; merchant: string | null; description: string; amountFromThisInflow: number; expenseAmount: number }
+interface DownstreamTrace { totalSpent: number; remaining: number; pctSpent: number; consumers: DownstreamConsumer[] }
 interface SplitSummary {
   id: string;
   amountCents: number;
@@ -41,12 +43,15 @@ function flagFor(score: number | null | undefined): FlagInfo {
 }
 
 export default function TransactionDetailView({
-  tx, account, fifoSource, sourceIsOverride, initialSplitCount, initialSplitSummary,
+  tx, account, fifoSource, sourceIsOverride, txOwnerLabel, downstream,
+  initialSplitCount, initialSplitSummary,
 }: {
   tx: Transaction;
   account: AccountLite | null;
   fifoSource: FifoSource | null;
   sourceIsOverride?: boolean;
+  txOwnerLabel?: string | null;
+  downstream?: DownstreamTrace | null;
   initialSplitCount: number;
   initialSplitSummary: SplitSummary[];
 }) {
@@ -276,6 +281,23 @@ export default function TransactionDetailView({
                     </span>
                   </>
                 ) : null}
+                {txOwnerLabel ? (
+                  <span
+                    className="pill"
+                    style={{
+                      fontSize: 11,
+                      padding: '2.5px 8px',
+                      marginLeft: 4,
+                      color: 'var(--gold)',
+                      background: 'color-mix(in oklab, var(--gold) 9%, transparent)',
+                      border: '1px solid color-mix(in oklab, var(--gold) 30%, rgba(255,255,255,0.06))',
+                      borderRadius: 999,
+                    }}
+                  >
+                    <span style={{ color: 'var(--ink-4, #44443f)', marginRight: 5 }}>Owner</span>
+                    {txOwnerLabel}
+                  </span>
+                ) : null}
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -321,6 +343,11 @@ export default function TransactionDetailView({
           {/* AI Source trace card — only for expenses */}
           {isExpense ? (
             <AiSourceTraceCard tx={tx} fifoSource={fifoSource} sourceIsOverride={!!sourceIsOverride} />
+          ) : null}
+
+          {/* Income usage bar + downstream trace — only for income transactions */}
+          {isIncome && downstream ? (
+            <DownstreamUsageCard tx={tx} downstream={downstream} />
           ) : null}
 
           {/* Split decision + summary */}
@@ -1151,6 +1178,7 @@ function AiSourceTraceCard({ tx, fifoSource, sourceIsOverride }: {
           title={has ? fifoSource!.merchant.toUpperCase() : 'No prior inflow'}
           meta={has ? `Wire +$${Math.abs(fifoSource!.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })} · ····${fifoSource!.accountId}` : 'Run AI trace from Source of Money in the drawer'}
           owner={has ? fifoSource!.ownerLabel : null}
+          href={has ? `/transactions/${fifoSource!.txId}` : undefined}
         />
         <div style={{ padding: '0 10px', color: 'var(--ink-3)' }}>
           <ArrowRight size={20} strokeWidth={1.4} />
@@ -1171,27 +1199,124 @@ function AiSourceTraceCard({ tx, fifoSource, sourceIsOverride }: {
   );
 }
 
+function DownstreamUsageCard({ tx, downstream }: { tx: Transaction; downstream: DownstreamTrace }) {
+  const total = Math.abs(tx.amount);
+  const spent = downstream.totalSpent;
+  const remaining = Math.max(0, downstream.remaining);
+  const pct = Math.min(100, Math.max(0, downstream.pctSpent));
+  return (
+    <div
+      style={{
+        marginTop: 0,
+        padding: '18px 22px',
+        borderRadius: 12,
+        background: 'linear-gradient(135deg, color-mix(in oklab, var(--income) 8%, var(--bg-1, #111114)) 0%, color-mix(in oklab, var(--income) 3%, var(--bg-1, #111114)) 100%)',
+        border: '1px solid color-mix(in oklab, var(--income) 24%, rgba(255,255,255,0.055))',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      <div className="flex items-center" style={{ gap: 11, marginBottom: 12 }}>
+        <div
+          className="grid place-items-center"
+          style={{
+            width: 30, height: 30, borderRadius: 7,
+            background: 'color-mix(in oklab, var(--income) 22%, var(--bg-2, #16161a))',
+            border: '0.5px solid color-mix(in oklab, var(--income) 40%, rgba(255,255,255,0.055))',
+            color: 'var(--income)',
+          }}
+        >
+          <Sparkles size={14} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 500, letterSpacing: '-.005em' }}>
+            Where the money went ·{' '}
+            <em style={{ fontFamily: 'var(--font-serif, "Instrument Serif", serif)', fontStyle: 'italic', color: 'var(--income)' }}>
+              FIFO traced
+            </em>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+            {pct >= 99.5
+              ? 'Fully allocated to downstream expenses'
+              : `${pct.toFixed(0)}% spent · ${fmtMoney(remaining)} still available on this account from this inflow`}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div className="num" style={{ fontSize: 17, fontWeight: 600, color: 'var(--income)' }}>{fmtMoney(spent)}</div>
+          <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>used of <span className="num">{fmtMoney(total)}</span></div>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div
+        style={{
+          height: 8, borderRadius: 999, overflow: 'hidden',
+          background: 'rgba(255,255,255,0.05)', marginBottom: 14,
+        }}
+      >
+        <div
+          style={{
+            width: `${pct}%`, height: '100%',
+            background: 'linear-gradient(90deg, color-mix(in oklab, var(--income) 75%, transparent), var(--income))',
+            transition: 'width 200ms ease',
+          }}
+        />
+      </div>
+
+      {/* Downstream consumers — clickable boxes */}
+      {downstream.consumers.length > 0 ? (
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+          <FlowNode
+            type="inflow"
+            eyebrow={`THIS INFLOW · ${tx.postingDate}`}
+            title={(tx.merchantName || tx.description.slice(0, 50)).toUpperCase()}
+            meta={`+${fmtMoney(total)} · ····${tx.accountId}`}
+          />
+          <div style={{ padding: '0 6px', alignSelf: 'center', color: 'var(--ink-3)' }}>
+            <ArrowRight size={18} strokeWidth={1.4} />
+          </div>
+          {downstream.consumers.slice(0, 6).map((c) => (
+            <FlowNode
+              key={c.txId}
+              type="outflow"
+              eyebrow={`OUTFLOW · ${c.date}`}
+              title={(c.merchant || c.description.slice(0, 40)).toUpperCase()}
+              meta={`${fmtMoney(-c.amountFromThisInflow)} of ${fmtMoney(-c.expenseAmount)}`}
+              href={`/transactions/${c.txId}`}
+            />
+          ))}
+          {downstream.consumers.length > 6 ? (
+            <div
+              style={{
+                alignSelf: 'center', padding: '0 10px', fontSize: 11, color: 'var(--ink-3)',
+              }}
+            >
+              + {downstream.consumers.length - 6} more
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+          No downstream expenses yet — this inflow is still fully available.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FlowNode({
-  type, eyebrow, title, meta, owner,
+  type, eyebrow, title, meta, owner, href,
 }: {
   type: 'inflow' | 'outflow';
   eyebrow: string;
   title: string;
   meta: string;
   owner?: string | null;
+  href?: string;
 }) {
   const isIn = type === 'inflow';
-  return (
-    <div
-      style={{
-        flex: 1,
-        padding: '14px 16px',
-        background: 'var(--bg-1, #111114)',
-        border: `1px solid color-mix(in oklab, ${isIn ? 'var(--income)' : 'var(--gold)'} 30%, rgba(255,255,255,0.055))`,
-        borderRadius: 10,
-        minWidth: 0,
-      }}
-    >
+  const inner = (
+    <>
       <div
         style={{
           fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.14em',
@@ -1214,8 +1339,29 @@ function FlowNode({
           <span style={{ color: 'var(--ink-4, #44443f)' }}>Owner · </span>{owner}
         </div>
       ) : null}
-    </div>
+    </>
   );
+  const boxStyle: React.CSSProperties = {
+    flex: 1,
+    padding: '14px 16px',
+    background: 'var(--bg-1, #111114)',
+    border: `1px solid color-mix(in oklab, ${isIn ? 'var(--income)' : 'var(--gold)'} 30%, rgba(255,255,255,0.055))`,
+    borderRadius: 10,
+    minWidth: 0,
+    display: 'block',
+    textDecoration: 'none',
+    color: 'inherit',
+    cursor: href ? 'pointer' : 'default',
+    transition: 'background 80ms ease',
+  };
+  if (href) {
+    return (
+      <Link href={href} style={boxStyle} className="hover:bg-bg-3">
+        {inner}
+      </Link>
+    );
+  }
+  return <div style={boxStyle}>{inner}</div>;
 }
 
 function SectionEm({
