@@ -25,6 +25,7 @@
     "react-dom": "^18.3.1",
     "react-dropzone": "^14.2.9",
     "recharts": "^2.13.0",
+    "twilio": "^5.13.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
