@@ -487,5 +487,20 @@ export function getDb(): Database.Database {
     const { seedDefaultOptions } = require('./seed-options');
     seedDefaultOptions();
   } catch { /* swallow — seeding is optional */ }
+
+  // Demo data seed for fresh production deploys. Gated on SEED_DEMO_DATA=true
+  // env var; no-op if the transactions table already has rows.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { seedDemoIfEmpty } = require('./seed-demo');
+    const result = seedDemoIfEmpty(db);
+    if (result.inserted > 0) {
+      // eslint-disable-next-line no-console
+      console.log(`[seed-demo] inserted ${result.inserted} demo transactions`);
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('[seed-demo] failed', e);
+  }
   return db;
 }

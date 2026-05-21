@@ -30,6 +30,8 @@ services:
         value: /var/data/amari.db
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
+      - key: SEED_DEMO_DATA
+        value: "true"        # auto-load demo transactions on first boot (no-op if table is non-empty)
       - key: ANTHROPIC_API_KEY
         sync: false          # set manually in Render dashboard if you want AI
     disk:
