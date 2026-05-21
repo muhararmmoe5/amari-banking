@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
@@ -21,6 +22,8 @@ import {
   Settings,
   ChevronDown,
   LogOut,
+  Menu,
+  X,
 } from 'lucide-react';
 
 type NavItem = { href: string; label: string; icon: any; tag?: string; flagBadge?: boolean; ownerOnly?: boolean };
@@ -77,6 +80,10 @@ export default function Sidebar({
   const path = usePathname();
   const isOwner = role === 'OWNER';
   const initials = (userName || userEmail || '?').slice(0, 2).toUpperCase();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Auto-close the mobile drawer whenever the user navigates.
+  useEffect(() => { setMobileOpen(false); }, [path]);
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
@@ -84,7 +91,50 @@ export default function Sidebar({
   }
 
   return (
-    <aside className="w-[232px] shrink-0 border-r border-line bg-bg-1 min-h-screen flex flex-col overflow-hidden sticky top-0 z-30">
+    <>
+      {/* Mobile top bar — only visible on small screens */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-[52px] bg-bg-1 border-b border-line flex items-center px-3 gap-3">
+        <button
+          type="button"
+          onClick={() => setMobileOpen((v) => !v)}
+          className="p-2 -ml-2 text-ink-dim hover:text-ink"
+          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+        >
+          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+        <div
+          className="w-7 h-7 grid place-items-center rounded-lg text-bg-0 font-normal italic"
+          style={{
+            background: 'radial-gradient(circle at 30% 30%, color-mix(in oklab, #c9a87a 92%, white), color-mix(in oklab, #c9a87a 60%, black)), #c9a87a',
+            fontFamily: 'var(--font-serif)',
+            fontSize: 18,
+            lineHeight: 1,
+          }}
+        >
+          A
+        </div>
+        <div className="font-semibold text-[14px] tracking-tight">Amari Banking</div>
+      </div>
+
+      {/* Backdrop — only when drawer is open on mobile */}
+      {mobileOpen ? (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden
+        />
+      ) : null}
+
+      <aside
+        className={clsx(
+          'w-[232px] shrink-0 border-r border-line bg-bg-1 flex flex-col overflow-hidden z-40',
+          // Desktop: sticky sidebar
+          'md:sticky md:top-0 md:min-h-screen md:translate-x-0',
+          // Mobile: fixed drawer that slides in/out
+          'fixed top-0 left-0 bottom-0 transition-transform duration-200 ease-out',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+        )}
+      >
       {/* Brand */}
       <div className="px-[18px] py-[18px] pb-[14px] flex items-center gap-2.5">
         <div
@@ -171,5 +221,6 @@ export default function Sidebar({
         <div className="mono text-[10px] text-ink-ghost px-2 pt-2">v.intent-owner · main</div>
       </div>
     </aside>
+    </>
   );
 }

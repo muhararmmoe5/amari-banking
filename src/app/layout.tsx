@@ -1,5 +1,5 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import Sidebar from '@/components/Sidebar';
 import { ToastProvider } from '@/components/Toast';
 import AIChat from '@/components/AIChat';
@@ -9,6 +9,13 @@ import { getCurrentUser } from '@/lib/auth';
 export const metadata: Metadata = {
   title: 'Amari Banking — Reconciliation',
   description: 'Multi-entity financial reconciliation and audit trail',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: '#0a0a0c',
 };
 
 export const dynamic = 'force-dynamic';
@@ -38,9 +45,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <ToastProvider>
-          <div className="flex min-h-screen">
+          <div className="flex min-h-screen flex-col md:flex-row">
             <Sidebar openFlags={openFlags} role={user.role} userName={user.name} userEmail={user.email} />
-            <main className="flex-1 min-w-0">{children}</main>
+            <main className="flex-1 min-w-0 pt-[52px] md:pt-0">{children}</main>
           </div>
           {user.role === 'OWNER' ? <AIChat /> : null}
         </ToastProvider>

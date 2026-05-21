@@ -344,3 +344,27 @@ input[type="checkbox"], input[type="radio"] { @apply w-4 h-4; accent-color: var(
   display: flex; align-items: center; gap: 8px;
   background: var(--bg-1);
 }
+
+/* ===== Mobile responsiveness shims ===== */
+/* Prevent horizontal page scroll caused by individual wide elements */
+@media (max-width: 767px) {
+  /* Tables overflow off the right edge on phones — let them scroll inside their own container */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+  /* Page padding tightening — desktop padding makes phones cramped */
+  main > * {
+    max-width: 100%;
+  }
+  /* Default form inputs hit larger tap targets */
+  input, select, textarea, button {
+    font-size: 16px; /* prevent iOS zoom-on-focus */
+  }
+  /* Drawer-style detail panes (`.dr` class) should fill the screen on mobile */
+  .dr {
+    width: 100vw;
+  }
+}
