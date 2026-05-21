@@ -1281,61 +1281,76 @@ function DownstreamUsageCard({ tx, downstream }: { tx: Transaction; downstream: 
             Funded {downstream.consumers.length} {downstream.consumers.length === 1 ? 'expense' : 'expenses'}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {downstream.consumers.slice(0, 8).map((c) => {
-              const pctOfInflow = total > 0 ? (c.amountFromThisInflow / total) * 100 : 0;
-              return (
-                <Link
-                  key={c.txId}
-                  href={`/transactions/${c.txId}`}
-                  className="group"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '9px 4px',
-                    borderBottom: '0.5px solid rgba(255,255,255,0.045)',
-                    textDecoration: 'none',
-                    color: 'inherit',
-                    transition: 'background 80ms ease, padding 120ms ease',
-                  }}
-                >
-                  <div
+            {(() => {
+              let running = total;
+              return downstream.consumers.slice(0, 8).map((c) => {
+                const pctOfInflow = total > 0 ? (c.amountFromThisInflow / total) * 100 : 0;
+                running = Math.max(0, running - c.amountFromThisInflow);
+                const [yy, mm, dd] = c.date.split('-');
+                const monthShort = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][parseInt(mm, 10)] || mm;
+                return (
+                  <Link
+                    key={c.txId}
+                    href={`/transactions/${c.txId}`}
+                    className="group"
                     style={{
-                      width: 6, height: 6, borderRadius: 999,
-                      background: 'var(--income)',
-                      opacity: 0.4 + Math.min(0.6, pctOfInflow / 100),
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="truncate" style={{ fontSize: 12.5, color: 'var(--ink)' }}>
-                      {c.merchant || c.description.slice(0, 50)}
-                    </div>
-                    <div className="num" style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 1 }}>
-                      {c.date} · {pctOfInflow.toFixed(1)}% of this inflow
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      width: 60, height: 3, borderRadius: 999,
-                      background: 'rgba(255,255,255,0.05)',
-                      overflow: 'hidden', flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 14,
+                      padding: '11px 4px',
+                      borderBottom: '0.5px solid rgba(255,255,255,0.045)',
+                      textDecoration: 'none',
+                      color: 'inherit',
                     }}
                   >
+                    {/* Date chip on the left so two same-merchant rows are visually distinct. */}
                     <div
                       style={{
-                        width: `${Math.min(100, pctOfInflow)}%`, height: '100%',
-                        background: 'var(--income)',
+                        width: 46, textAlign: 'center', flexShrink: 0,
+                        padding: '4px 0', borderRadius: 7,
+                        background: 'color-mix(in oklab, var(--income) 8%, var(--bg-2, #16161a))',
+                        border: '0.5px solid color-mix(in oklab, var(--income) 22%, rgba(255,255,255,0.05))',
                       }}
-                    />
-                  </div>
-                  <div className="num" style={{ fontSize: 12, color: 'var(--ink-2)', minWidth: 80, textAlign: 'right' }}>
-                    {fmtMoney(-c.amountFromThisInflow)}
-                  </div>
-                  <ArrowRight size={13} strokeWidth={1.4} style={{ color: 'var(--ink-4, #44443f)', flexShrink: 0 }} />
-                </Link>
-              );
-            })}
+                    >
+                      <div style={{ fontSize: 8.5, textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--income)', fontWeight: 600, lineHeight: 1.1 }}>
+                        {monthShort}
+                      </div>
+                      <div className="num" style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.1, marginTop: 1 }}>
+                        {dd}
+                      </div>
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="truncate" style={{ fontSize: 13, color: 'var(--ink)' }}>
+                        {c.merchant || c.description.slice(0, 50)}
+                      </div>
+                      <div className="num" style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 2 }}>
+                        Took {pctOfInflow.toFixed(1)}% · {fmtMoney(running)} left after
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        width: 54, height: 3, borderRadius: 999,
+                        background: 'rgba(255,255,255,0.05)',
+                        overflow: 'hidden', flexShrink: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${Math.min(100, pctOfInflow)}%`, height: '100%',
+                          background: 'var(--income)',
+                        }}
+                      />
+                    </div>
+                    <div className="num" style={{ fontSize: 12.5, color: 'var(--ink-2)', minWidth: 90, textAlign: 'right' }}>
+                      {fmtMoney(-c.amountFromThisInflow)}
+                    </div>
+                    <ArrowRight size={13} strokeWidth={1.4} style={{ color: 'var(--ink-4, #44443f)', flexShrink: 0 }} />
+                  </Link>
+                );
+              });
+            })()}
           </div>
           {downstream.consumers.length > 8 ? (
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, paddingLeft: 18 }}>
