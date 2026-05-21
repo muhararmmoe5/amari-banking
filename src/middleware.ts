@@ -3,7 +3,6 @@ import { NextResponse, type NextRequest } from 'next/server';
 const PUBLIC_PATHS = [
   '/login',
   '/setup',
-  '/threeway',
   '/_next',
   '/favicon',
 ];
@@ -11,7 +10,6 @@ const PUBLIC_PATHS = [
 const PUBLIC_PREFIXES = [
   '/invite/',
   '/api/auth/',
-  '/api/voice/',
 ];
 
 export function middleware(req: NextRequest) {
