@@ -256,7 +256,7 @@ export default function TransactionDetailView({
               >
                 {tx.description}
               </div>
-              <div className="flex flex-wrap items-center" style={{ marginTop: 18, gap: 8 }}>
+              <div className="flex flex-wrap items-center" style={{ marginTop: 18, columnGap: 8, rowGap: 12 }}>
                 <BankChip bank="CHASE" monogram="J" mask={account?.last4 || tx.accountId} />
                 {account ? (
                   <span style={{ color: 'var(--ink-2)', fontSize: 11.5 }}>{account.label}</span>
@@ -1263,35 +1263,83 @@ function DownstreamUsageCard({ tx, downstream }: { tx: Transaction; downstream: 
         />
       </div>
 
-      {/* Downstream consumers — clickable boxes */}
+      {/* Downstream consumers — compact list */}
       {downstream.consumers.length > 0 ? (
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-          <FlowNode
-            type="inflow"
-            eyebrow={`THIS INFLOW · ${tx.postingDate}`}
-            title={(tx.merchantName || tx.description.slice(0, 50)).toUpperCase()}
-            meta={`+${fmtMoney(total)} · ····${tx.accountId}`}
-          />
-          <div style={{ padding: '0 6px', alignSelf: 'center', color: 'var(--ink-3)' }}>
-            <ArrowRight size={18} strokeWidth={1.4} />
+        <div
+          style={{
+            borderTop: '0.5px solid rgba(255,255,255,0.06)',
+            paddingTop: 10,
+            marginTop: 2,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.14em',
+              color: 'var(--ink-4, #44443f)', marginBottom: 8,
+            }}
+          >
+            Funded {downstream.consumers.length} {downstream.consumers.length === 1 ? 'expense' : 'expenses'}
           </div>
-          {downstream.consumers.slice(0, 6).map((c) => (
-            <FlowNode
-              key={c.txId}
-              type="outflow"
-              eyebrow={`OUTFLOW · ${c.date}`}
-              title={(c.merchant || c.description.slice(0, 40)).toUpperCase()}
-              meta={`${fmtMoney(-c.amountFromThisInflow)} of ${fmtMoney(-c.expenseAmount)}`}
-              href={`/transactions/${c.txId}`}
-            />
-          ))}
-          {downstream.consumers.length > 6 ? (
-            <div
-              style={{
-                alignSelf: 'center', padding: '0 10px', fontSize: 11, color: 'var(--ink-3)',
-              }}
-            >
-              + {downstream.consumers.length - 6} more
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {downstream.consumers.slice(0, 8).map((c) => {
+              const pctOfInflow = total > 0 ? (c.amountFromThisInflow / total) * 100 : 0;
+              return (
+                <Link
+                  key={c.txId}
+                  href={`/transactions/${c.txId}`}
+                  className="group"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '9px 4px',
+                    borderBottom: '0.5px solid rgba(255,255,255,0.045)',
+                    textDecoration: 'none',
+                    color: 'inherit',
+                    transition: 'background 80ms ease, padding 120ms ease',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 6, height: 6, borderRadius: 999,
+                      background: 'var(--income)',
+                      opacity: 0.4 + Math.min(0.6, pctOfInflow / 100),
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="truncate" style={{ fontSize: 12.5, color: 'var(--ink)' }}>
+                      {c.merchant || c.description.slice(0, 50)}
+                    </div>
+                    <div className="num" style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 1 }}>
+                      {c.date} · {pctOfInflow.toFixed(1)}% of this inflow
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      width: 60, height: 3, borderRadius: 999,
+                      background: 'rgba(255,255,255,0.05)',
+                      overflow: 'hidden', flexShrink: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${Math.min(100, pctOfInflow)}%`, height: '100%',
+                        background: 'var(--income)',
+                      }}
+                    />
+                  </div>
+                  <div className="num" style={{ fontSize: 12, color: 'var(--ink-2)', minWidth: 80, textAlign: 'right' }}>
+                    {fmtMoney(-c.amountFromThisInflow)}
+                  </div>
+                  <ArrowRight size={13} strokeWidth={1.4} style={{ color: 'var(--ink-4, #44443f)', flexShrink: 0 }} />
+                </Link>
+              );
+            })}
+          </div>
+          {downstream.consumers.length > 8 ? (
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, paddingLeft: 18 }}>
+              + {downstream.consumers.length - 8} more
             </div>
           ) : null}
         </div>
