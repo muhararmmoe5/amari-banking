@@ -13,7 +13,8 @@ import {
   PERSONAL_CATEGORIES, BUSINESS_CATEGORIES,
   PERSONAL_INCOME_CATEGORIES, BUSINESS_INCOME_CATEGORIES,
 } from '@/constants/categories';
-import { saveTransaction } from '../actions';
+import { saveTransaction, deleteTransactionAction } from '../actions';
+import { Trash2 } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import BankChip from '@/components/BankChip';
 import DrawerSplitEditor from '../DrawerSplitEditor';
@@ -840,6 +841,8 @@ export default function TransactionDetailView({
             inter-entity owings, salary &amp; budget tagging, escalation, CPA sign-off all live in the
             quick-edit drawer. Open the row again from the list to use the full editor.
           </div>
+
+          <DangerZone txId={tx.id} />
         </div>
 
         {/* ── RIGHT ASIDE ──────────────────────────────────────── */}
@@ -1799,5 +1802,83 @@ function auditFlagCopy(tx: Transaction): React.ReactNode {
     <>
       Review pending — confirm entity, category, and source of money before CPA sign-off.
     </>
+  );
+}
+
+function DangerZone({ txId }: { txId: string }) {
+  const [confirming, setConfirming] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+
+  function doDelete() {
+    setErr(null);
+    startTransition(async () => {
+      try {
+        await deleteTransactionAction(txId);
+        // redirect happens server-side
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : 'Failed to delete');
+      }
+    });
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: 32,
+        padding: '14px 16px',
+        borderRadius: 10,
+        border: '0.5px dashed color-mix(in oklab, var(--danger, #ff7676) 35%, rgba(255,255,255,0.08))',
+        background: 'color-mix(in oklab, var(--danger, #ff7676) 3%, transparent)',
+      }}
+    >
+      <div className="flex items-center" style={{ gap: 10 }}>
+        <Trash2 size={14} style={{ color: 'var(--danger, #ff7676)' }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, color: 'var(--ink-2)', fontWeight: 500 }}>Delete this transaction</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+            Removes the row, its splits, and unlinks any expense that referenced it as a funding source. Cannot be undone.
+          </div>
+        </div>
+        {!confirming ? (
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            className="btn"
+            style={{ fontSize: 12, padding: '6px 12px', color: 'var(--danger, #ff7676)', borderColor: 'color-mix(in oklab, var(--danger, #ff7676) 25%, rgba(255,255,255,0.08))' }}
+          >
+            Delete
+          </button>
+        ) : (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              className="btn"
+              style={{ fontSize: 12, padding: '6px 10px' }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={doDelete}
+              disabled={isPending}
+              className="btn"
+              style={{
+                fontSize: 12, padding: '6px 12px',
+                background: 'var(--danger, #ff7676)',
+                color: '#fff', borderColor: 'transparent',
+                opacity: isPending ? 0.5 : 1,
+              }}
+            >
+              {isPending ? 'Deleting…' : 'Confirm delete'}
+            </button>
+          </div>
+        )}
+      </div>
+      {err ? (
+        <div style={{ fontSize: 11, color: 'var(--danger, #ff7676)', marginTop: 8 }}>{err}</div>
+      ) : null}
+    </div>
   );
 }

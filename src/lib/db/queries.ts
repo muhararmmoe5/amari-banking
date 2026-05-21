@@ -528,6 +528,129 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   db.prepare(`UPDATE transactions SET ${fields.join(', ')} WHERE id = @id`).run(params);
 }
 
+export interface CreateTxInput {
+  accountId: string;
+  postingDate: string;
+  description: string;
+  amount: number;
+  type?: string | null;
+  merchantName?: string | null;
+  category?: string;
+  entityTag?: string;
+  confirmedEntity?: string | null;
+  individual?: string | null;
+  fundedByTransactionId?: string | null;
+  notes?: string | null;
+}
+
+/** Create a manual transaction. Returns the new id. */
+export function createTransaction(input: CreateTxInput): string {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  const batchId = ensureManualBatch(input.accountId);
+  db.prepare(`
+    INSERT INTO transactions (
+      id, account_id, posting_date, description, amount, type, balance,
+      merchant_name, category, entity_tag,
+      is_internal,
+      confirmed_entity, individual,
+      funded_by_transaction_id,
+      notes,
+      audit_status, audit_flags, audit_score,
+      imported_at, updated_at, import_batch_id, hash
+    ) VALUES (
+      @id, @accountId, @date, @description, @amount, @type, NULL,
+      @merchant, @category, @entityTag,
+      0,
+      @confirmedEntity, @individual,
+      @fundedBy,
+      @notes,
+      'UNREVIEWED', '[]', 0,
+      @now, @now, @batchId, @hash
+    )
+  `).run({
+    id,
+    accountId: input.accountId,
+    date: input.postingDate,
+    description: input.description,
+    amount: input.amount,
+    type: input.type || null,
+    merchant: input.merchantName || null,
+    category: input.category || 'UNCATEGORIZED',
+    entityTag: input.entityTag || 'UNKNOWN',
+    confirmedEntity: input.confirmedEntity || null,
+    individual: input.individual || null,
+    fundedBy: input.fundedByTransactionId || null,
+    notes: input.notes || null,
+    now,
+    batchId,
+    hash: `manual:${id}`,
+  });
+  return id;
+}
+
+let _manualBatchCache: Map<string, string> | null = null;
+function ensureManualBatch(accountId: string): string {
+  const db = getDb();
+  if (!_manualBatchCache) _manualBatchCache = new Map();
+  if (_manualBatchCache.has(accountId)) return _manualBatchCache.get(accountId)!;
+  const existing = db.prepare(
+    `SELECT id FROM import_batches WHERE file_name = 'manual-entry' AND account_id = ? LIMIT 1`
+  ).get(accountId) as { id: string } | undefined;
+  if (existing) {
+    _manualBatchCache.set(accountId, existing.id);
+    return existing.id;
+  }
+  const id = crypto.randomUUID();
+  db.prepare(`
+    INSERT INTO import_batches (id, file_name, account_id, imported_at, row_count, date_range_from, date_range_to)
+    VALUES (?, 'manual-entry', ?, ?, 0, NULL, NULL)
+  `).run(id, accountId, Date.now());
+  _manualBatchCache.set(accountId, id);
+  return id;
+}
+
+/** Permanently delete a transaction and its splits. */
+export function deleteTransaction(id: string): void {
+  const db = getDb();
+  const row = db.prepare('SELECT internal_linked_id FROM transactions WHERE id = ?').get(id) as
+    | { internal_linked_id: string | null }
+    | undefined;
+  if (!row) return;
+  const txn = db.transaction(() => {
+    db.prepare('DELETE FROM transaction_splits WHERE transaction_id = ?').run(id);
+    // Sever inbound funded-by references rather than failing on FK.
+    db.prepare('UPDATE transactions SET funded_by_transaction_id = NULL WHERE funded_by_transaction_id = ?').run(id);
+    // Sever inbound internal_linked_id references.
+    db.prepare('UPDATE transactions SET internal_linked_id = NULL WHERE internal_linked_id = ?').run(id);
+    db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
+  });
+  txn();
+}
+
+/** List inflows on a given account that are candidates for the
+ *  "source of money" picker when creating/editing an expense. */
+export function listInflowsOnAccount(accountId: string, limit = 50): Array<{
+  id: string; postingDate: string; description: string; merchant: string | null; amount: number;
+}> {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT id, posting_date, description, merchant_name, amount
+    FROM transactions
+    WHERE account_id = ? AND amount > 0
+    ORDER BY posting_date DESC, id DESC
+    LIMIT ?
+  `).all(accountId, limit) as any[];
+  return rows.map((r) => ({
+    id: r.id,
+    postingDate: r.posting_date,
+    description: r.description,
+    merchant: r.merchant_name,
+    amount: r.amount,
+  }));
+}
+
 /** Find the inflow transaction that an expense was manually linked to via
  *  funded_by_transaction_id. Returns null if the expense isn't linked. */
 export function fundedByInflow(txId: string): {

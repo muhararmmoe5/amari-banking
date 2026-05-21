@@ -226,6 +226,12 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
             Deep audit
           </Link>
           <RescanDatesButton />
+          <Link
+            href={`/transactions/new${searchParams.account ? `?account=${searchParams.account}` : ''}`}
+            className="btn"
+          >
+            + Add
+          </Link>
           <Link href="/import" className="btn btn-primary">
             Import more
           </Link>
