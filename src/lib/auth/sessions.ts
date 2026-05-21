@@ -181,3 +181,43 @@ export function consumeInvite(token: string, userId: string): void {
     token,
   );
 }
+
+// ===== Password reset tokens =====
+
+export interface PasswordResetToken {
+  token: string;
+  userId: string;
+  expiresAt: number;
+  usedAt: number | null;
+}
+
+const RESET_TTL_MS = 1000 * 60 * 60; // 1 hour
+
+export function createPasswordResetToken(userId: string, ip?: string | null): PasswordResetToken {
+  const db = getDb();
+  const token = crypto.randomBytes(32).toString('hex');
+  const now = Date.now();
+  const expiresAt = now + RESET_TTL_MS;
+  db.prepare(
+    `INSERT INTO password_reset_tokens (token, user_id, expires_at, created_at, ip)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(token, userId, expiresAt, now, ip || null);
+  return { token, userId, expiresAt, usedAt: null };
+}
+
+export function getPasswordResetToken(token: string): PasswordResetToken | null {
+  const db = getDb();
+  const r = db.prepare('SELECT * FROM password_reset_tokens WHERE token = ?').get(token) as any;
+  if (!r) return null;
+  return { token: r.token, userId: r.user_id, expiresAt: r.expires_at, usedAt: r.used_at };
+}
+
+export function consumePasswordResetToken(token: string): void {
+  const db = getDb();
+  db.prepare('UPDATE password_reset_tokens SET used_at = ? WHERE token = ?').run(Date.now(), token);
+}
+
+export function markPasswordResetEmailSent(token: string): void {
+  const db = getDb();
+  db.prepare('UPDATE password_reset_tokens SET email_sent_at = ? WHERE token = ?').run(Date.now(), token);
+}

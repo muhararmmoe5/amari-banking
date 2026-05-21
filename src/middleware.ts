@@ -3,12 +3,14 @@ import { NextResponse, type NextRequest } from 'next/server';
 const PUBLIC_PATHS = [
   '/login',
   '/setup',
+  '/forgot-password',
   '/_next',
   '/favicon',
 ];
 
 const PUBLIC_PREFIXES = [
   '/invite/',
+  '/reset-password/',
   '/api/auth/',
 ];
 

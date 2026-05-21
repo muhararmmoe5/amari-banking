@@ -214,6 +214,17 @@ export function getDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_invite_person ON invite_tokens(person_id);
 
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      token TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      used_at INTEGER,
+      ip TEXT,
+      email_sent_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_pwreset_user ON password_reset_tokens(user_id);
+
     CREATE TABLE IF NOT EXISTS transaction_splits (
       id TEXT PRIMARY KEY,
       transaction_id TEXT NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
