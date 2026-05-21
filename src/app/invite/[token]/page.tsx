@@ -1,4 +1,4 @@
-import { getInvite } from '@/lib/auth/sessions';
+import { getInvite, getUserByEmail } from '@/lib/auth/sessions';
 import { getPerson } from '@/lib/db/cap';
 import InviteForm from './InviteForm';
 
@@ -38,6 +38,8 @@ export default function InvitePage({ params }: { params: { token: string } }) {
   }
 
   const person = getPerson(invite.personId);
+  const existingUser = getUserByEmail(invite.email);
+  const isReset = !!existingUser;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
@@ -50,14 +52,20 @@ export default function InvitePage({ params }: { params: { token: string } }) {
             AV
           </span>
           <div>
-            <div className="font-semibold">Welcome to Amari</div>
-            <div className="text-xs text-ink-mute">You&apos;ve been invited as {invite.role.replace('_', ' ').toLowerCase()}</div>
+            <div className="font-semibold">{isReset ? 'Reset your password' : 'Welcome to Amari'}</div>
+            <div className="text-xs text-ink-mute">
+              {isReset
+                ? `Signed in as ${invite.email}`
+                : `You've been invited as ${invite.role.replace('_', ' ').toLowerCase()}`}
+            </div>
           </div>
         </div>
         <p className="text-xs text-ink-mute mb-4">
-          Set up your account to see {person?.name ? `${person.name}'s` : 'your'} equity, contributions, and portfolio value.
+          {isReset
+            ? 'Pick a new password below. Your old password stops working as soon as you save.'
+            : `Set up your account to see ${person?.name ? `${person.name}'s` : 'your'} equity, contributions, and portfolio value.`}
         </p>
-        <InviteForm token={params.token} defaultName={person?.name || ''} email={invite.email} />
+        <InviteForm token={params.token} defaultName={existingUser?.name || person?.name || ''} email={invite.email} />
       </div>
     </div>
   );

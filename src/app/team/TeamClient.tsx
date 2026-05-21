@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Plus, Trash2, Pencil, Send, Copy, Check } from 'lucide-react';
+import { Plus, Trash2, Pencil, Send, Copy, Check, Key } from 'lucide-react';
 import type { Person, PersonRole } from '@/types/cap';
 import { actCreatePerson, actUpdatePerson, actDeletePerson, actCreateInvite } from '../cap/actions';
 import { useToast } from '@/components/Toast';
@@ -19,7 +19,7 @@ const ROLES: { value: PersonRole; label: string; color: string }[] = [
 
 const roleConfig = (r: PersonRole) => ROLES.find((x) => x.value === r) || ROLES[5];
 
-interface InviteResult { personId: string; url: string; expiresAt: number; copied: boolean }
+interface InviteResult { personId: string; url: string; expiresAt: number; copied: boolean; kind: 'invite' | 'reset' }
 
 export default function TeamClient({ initialPeople, portfolioMap }: { initialPeople: Person[]; portfolioMap: Record<string, number> }) {
   const [people, setPeople] = useState(initialPeople);
@@ -41,8 +41,27 @@ export default function TeamClient({ initialPeople, portfolioMap }: { initialPeo
       try {
         const res = await actCreateInvite(person.id, email, safeRole);
         if ('error' in res) { saveError(tId, res.error); return; }
-        setInviteResult({ personId: person.id, url: res.url, expiresAt: res.expiresAt, copied: false });
+        setInviteResult({ personId: person.id, url: res.url, expiresAt: res.expiresAt, copied: false, kind: 'invite' });
         setInviting(null);
+        saveEnd(tId);
+      } catch (e: any) { saveError(tId, e?.message); }
+    });
+  }
+
+  async function generatePasswordReset(person: Person) {
+    if (!person.email) {
+      toast({ kind: 'err', title: 'Add an email to this person first' });
+      return;
+    }
+    if (!confirm(`Generate a password reset link for ${person.name}? Their current password will keep working until they open the link and set a new one.`)) {
+      return;
+    }
+    const tId = saveStart();
+    startTx(async () => {
+      try {
+        const res = await actCreateInvite(person.id, person.email!, 'PARTNER');
+        if ('error' in res) { saveError(tId, res.error); return; }
+        setInviteResult({ personId: person.id, url: res.url, expiresAt: res.expiresAt, copied: false, kind: 'reset' });
         saveEnd(tId);
       } catch (e: any) { saveError(tId, e?.message); }
     });
@@ -183,8 +202,14 @@ export default function TeamClient({ initialPeople, portfolioMap }: { initialPeo
 
       {inviteResult ? (
         <div className="card p-4 space-y-2 border-entity-bytes/40">
-          <h3 className="text-sm font-medium">Invite link ready</h3>
-          <p className="text-xs text-ink-dim">Copy this link and send it to them however you like (email, text, Slack). Anyone with the link can claim it once, so don&apos;t post publicly.</p>
+          <h3 className="text-sm font-medium">
+            {inviteResult.kind === 'reset' ? 'Password reset link ready' : 'Invite link ready'}
+          </h3>
+          <p className="text-xs text-ink-dim">
+            {inviteResult.kind === 'reset'
+              ? 'Send this link to them. When they open it they\'ll set a new password and the old one stops working. Single-use, so don\'t post publicly.'
+              : 'Copy this link and send it to them however you like (email, text, Slack). Anyone with the link can claim it once, so don\'t post publicly.'}
+          </p>
           <div className="flex items-center gap-2">
             <input readOnly value={inviteResult.url} className="flex-1 mono text-xs" onFocus={(e) => e.currentTarget.select()} />
             <button onClick={copyInvite} className="btn btn-primary">
@@ -259,6 +284,7 @@ export default function TeamClient({ initialPeople, portfolioMap }: { initialPeo
                   <td className="px-3 py-2 text-xs text-ink-dim truncate max-w-[260px]">{p.notes || '—'}</td>
                   <td className="px-3 py-2 text-right">
                     <button onClick={() => setInviting(p)} className="btn btn-ghost !p-1.5 text-entity-bytes" title="Generate invite link"><Send size={13} /></button>
+                    <button onClick={() => generatePasswordReset(p)} className="btn btn-ghost !p-1.5" title={p.email ? 'Reset password' : 'Add an email first, then reset password'}><Key size={13} /></button>
                     <button onClick={() => setEditing(p)} className="btn btn-ghost !p-1.5" title="Edit"><Pencil size={13} /></button>
                     <button onClick={() => remove(p)} className="btn btn-ghost !p-1.5 text-expense" title="Delete"><Trash2 size={13} /></button>
                   </td>
