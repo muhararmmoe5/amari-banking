@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:reset": "node scripts/reset-db.js"
   },
   "engines": {
     "node": ">=18.18"
