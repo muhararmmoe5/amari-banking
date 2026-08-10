@@ -629,6 +629,45 @@ export function deleteTransaction(id: string): void {
   txn();
 }
 
+/**
+ * Nuke every imported transaction and the batches that produced them, plus
+ * anything that hangs off a transaction (splits, funding splits, recon
+ * matches, ingestion log). Preserves everything unrelated to imported bank
+ * data: users, sessions, invites, people, cap table, budgets, salaries,
+ * account definitions, field option lists.
+ *
+ * Intended for owners who want to wipe their statement history and re-import
+ * from scratch — not for individual-row cleanup.
+ */
+export function clearAllTransactions(): {
+  deletedTransactions: number;
+  deletedSplits: number;
+  deletedBatches: number;
+} {
+  const db = getDb();
+  const before = {
+    tx: (db.prepare('SELECT COUNT(*) c FROM transactions').get() as { c: number }).c,
+    splits: (db.prepare('SELECT COUNT(*) c FROM transaction_splits').get() as { c: number }).c,
+    batches: (db.prepare('SELECT COUNT(*) c FROM import_batches').get() as { c: number }).c,
+  };
+  const txn = db.transaction(() => {
+    // Most children cascade via FK ON DELETE CASCADE, but explicit deletes
+    // survive future schema drift where a cascade might get dropped.
+    try { db.prepare('DELETE FROM expense_funding_splits').run(); } catch {}
+    try { db.prepare('DELETE FROM reconciliation_matches').run(); } catch {}
+    db.prepare('DELETE FROM transaction_splits').run();
+    db.prepare('DELETE FROM transactions').run();
+    db.prepare('DELETE FROM import_batches').run();
+    try { db.prepare('DELETE FROM ingestion_log').run(); } catch {}
+  });
+  txn();
+  return {
+    deletedTransactions: before.tx,
+    deletedSplits: before.splits,
+    deletedBatches: before.batches,
+  };
+}
+
 /** List inflows on a given account that are candidates for the
  *  "source of money" picker when creating/editing an expense. */
 export function listInflowsOnAccount(accountId: string, limit = 50): Array<{

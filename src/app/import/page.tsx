@@ -222,6 +222,141 @@ export default function ImportPage() {
           </div>
         </div>
       ) : null}
+
+      <ClearAllZone />
+    </div>
+  );
+}
+
+// ── Danger zone ────────────────────────────────────────────────────────────
+function ClearAllZone() {
+  const [expanded, setExpanded] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const phrase = 'delete everything';
+  const canRun = confirmText.trim().toLowerCase() === phrase && !busy;
+
+  async function run() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch('/api/admin/clear-transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: phrase }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMsg(`Failed: ${data.error || res.statusText}`);
+      } else {
+        setMsg(`Cleared ${data.deletedTransactions} transactions, ${data.deletedSplits} splits, ${data.deletedBatches} import batches.`);
+        setConfirmText('');
+        setExpanded(false);
+        // Force a refresh so the header counts etc. reset.
+        setTimeout(() => window.location.reload(), 900);
+      }
+    } catch (e) {
+      setMsg(`Failed: ${e instanceof Error ? e.message : 'network error'}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: 40,
+        padding: '16px 18px',
+        borderRadius: 10,
+        border: '0.5px dashed color-mix(in oklab, var(--danger, #ff7676) 35%, rgba(255,255,255,0.08))',
+        background: 'color-mix(in oklab, var(--danger, #ff7676) 3%, transparent)',
+      }}
+    >
+      <div className="flex items-center" style={{ gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>
+            Clear all imported statements
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 3, lineHeight: 1.45 }}>
+            Wipes every imported transaction, its splits, funding-source links, reconciliations, and the import batch history. Users, cap table, people, budgets, salaries, and account definitions stay. Irreversible.
+          </div>
+        </div>
+        {!expanded ? (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="btn"
+            style={{
+              fontSize: 12, padding: '6px 12px',
+              color: 'var(--danger, #ff7676)',
+              borderColor: 'color-mix(in oklab, var(--danger, #ff7676) 25%, rgba(255,255,255,0.08))',
+            }}
+          >
+            Clear all…
+          </button>
+        ) : null}
+      </div>
+
+      {expanded ? (
+        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+            Type <code style={{ color: 'var(--danger, #ff7676)' }}>{phrase}</code> below to confirm.
+          </div>
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder={phrase}
+            style={{
+              padding: '9px 12px',
+              background: 'var(--bg-1, #111114)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 8,
+              fontSize: 13,
+              color: 'var(--ink)',
+              outline: 'none',
+            }}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => { setExpanded(false); setConfirmText(''); setMsg(null); }}
+              className="btn"
+              style={{ fontSize: 12, padding: '7px 12px' }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={run}
+              disabled={!canRun}
+              className="btn"
+              style={{
+                fontSize: 12, padding: '7px 14px',
+                background: canRun ? 'var(--danger, #ff7676)' : 'rgba(255,255,255,0.05)',
+                color: canRun ? '#fff' : 'var(--ink-3)',
+                borderColor: 'transparent',
+                opacity: canRun ? 1 : 0.6,
+              }}
+            >
+              {busy ? 'Clearing…' : 'Clear everything'}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {msg ? (
+        <div
+          style={{
+            marginTop: 12, fontSize: 11.5,
+            color: msg.startsWith('Failed') ? 'var(--danger, #ff7676)' : 'var(--income)',
+          }}
+        >
+          {msg}
+        </div>
+      ) : null}
     </div>
   );
 }
