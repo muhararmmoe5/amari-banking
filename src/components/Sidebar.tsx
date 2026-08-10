@@ -73,12 +73,13 @@ export default function Sidebar({
   openFlags, role, userName, userEmail,
 }: {
   openFlags?: number;
-  role?: 'OWNER' | 'PARTNER' | 'TEAM_MEMBER';
+  role?: 'OWNER' | 'EDITOR' | 'PARTNER' | 'TEAM_MEMBER';
   userName?: string;
   userEmail?: string;
 }) {
   const path = usePathname();
-  const isOwner = role === 'OWNER';
+  // OWNER and EDITOR both see the full sidebar and can hit every write path.
+  const isOwner = role === 'OWNER' || role === 'EDITOR';
   const initials = (userName || userEmail || '?').slice(0, 2).toUpperCase();
   const [mobileOpen, setMobileOpen] = useState(false);
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { traceFundingSource } from '@/lib/db/flow-trace';
 import { addFundingSplit, listFundingSplits } from '@/lib/db/queries';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
  *  funding splits. Returns the resulting split list. */
 export async function POST(req: NextRequest) {
   const u = getCurrentUser();
-  if (!u || u.role !== 'OWNER') {
+  if (!u || !hasEditAccess(u)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const body = await req.json().catch(() => ({}));

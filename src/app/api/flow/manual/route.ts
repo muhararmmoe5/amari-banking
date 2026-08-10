@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fundedByInflow, expensesFundedByInflowViaSplits } from '@/lib/db/queries';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(req: NextRequest) {
   const user = getCurrentUser();
-  if (!user || user.role !== 'OWNER') {
+  if (!user || !hasEditAccess(user)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const sp = req.nextUrl.searchParams;

@@ -4,7 +4,7 @@ import Sidebar from '@/components/Sidebar';
 import { ToastProvider } from '@/components/Toast';
 import AIChat from '@/components/AIChat';
 import { portfolioSummary } from '@/lib/db/queries';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
 
 export const metadata: Metadata = {
   title: 'Amari Banking — Reconciliation',
@@ -25,7 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   let user: ReturnType<typeof getCurrentUser> = null;
   try {
     user = getCurrentUser();
-    if (user?.role === 'OWNER') openFlags = portfolioSummary().openFlagCount;
+    if (hasEditAccess(user)) openFlags = portfolioSummary().openFlagCount;
   } catch {
     /* ignore */
   }
@@ -49,7 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Sidebar openFlags={openFlags} role={user.role} userName={user.name} userEmail={user.email} />
             <main className="flex-1 min-w-0 pt-[52px] md:pt-0">{children}</main>
           </div>
-          {user.role === 'OWNER' ? <AIChat /> : null}
+          {hasEditAccess(user) ? <AIChat /> : null}
         </ToastProvider>
       </body>
     </html>

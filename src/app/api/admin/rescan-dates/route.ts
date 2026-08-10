@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
 import { extractTransactionDate } from '@/lib/parsers/extract-tx-date';
 import { revalidatePath } from 'next/cache';
 
@@ -9,7 +9,7 @@ export const maxDuration = 120;
 
 export async function POST() {
   const user = getCurrentUser();
-  if (!user || user.role !== 'OWNER') {
+  if (!user || !hasEditAccess(user)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const db = getDb();

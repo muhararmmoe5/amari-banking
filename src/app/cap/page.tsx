@@ -7,13 +7,13 @@ import { ENTITY_LABELS, ENTITY_COLORS } from '@/constants/accounts';
 import { fmtCents, fmtPct } from '@/lib/cap';
 import { ArrowRight, TrendingUp } from 'lucide-react';
 import type { EntityType } from '@/types';
-import { requireUser } from '@/lib/auth';
+import { requireUser, hasEditAccess } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export default function CapOverviewPage() {
   const user = requireUser();
-  const isOwner = user.role === 'OWNER';
+  const isOwner = hasEditAccess(user);
 
   // Non-owners with a single holding go straight to that entity / their portfolio
   if (!isOwner) {

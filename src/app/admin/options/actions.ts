@@ -2,11 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { createOption, deleteOption, renameOption, type OptionField } from '@/lib/db/options';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
 
 function checkOwner() {
   const u = getCurrentUser();
-  if (!u || u.role !== 'OWNER') throw new Error('Only the owner can manage options');
+  if (!u || !hasEditAccess(u)) throw new Error('Only the owner can manage options');
 }
 
 function revalidateAll() {

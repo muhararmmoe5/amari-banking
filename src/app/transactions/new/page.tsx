@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { requireUser } from '@/lib/auth';
+import { requireUser, hasEditAccess } from '@/lib/auth';
 import { ACCOUNTS, ENTITY_LABELS, BUSINESS_ENTITIES } from '@/constants/accounts';
 import NewTransactionForm from './NewTransactionForm';
 import { listInflowsOnAccount } from '@/lib/db/queries';
@@ -13,7 +13,7 @@ export default function NewTransactionPage({
   searchParams: { account?: string };
 }) {
   const user = requireUser();
-  if (user.role !== 'OWNER') redirect('/cap');
+  if (!hasEditAccess(user)) redirect('/cap');
 
   // Preload inflows for the initially-selected account so the form has an
   // option list to render even before the user changes the account.

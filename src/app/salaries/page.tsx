@@ -1,4 +1,4 @@
-import { requireUser } from '@/lib/auth';
+import { requireUser, hasEditAccess } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { listSalaries, spendBySalary } from '@/lib/db/salaries';
 import { listPeople } from '@/lib/db/cap';
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 export default function SalariesPage() {
   const user = requireUser();
-  if (user.role !== 'OWNER') redirect('/cap');
+  if (!hasEditAccess(user)) redirect('/cap');
 
   const salaries = listSalaries();
   const people = listPeople();

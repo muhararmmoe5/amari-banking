@@ -2,7 +2,10 @@ import 'server-only';
 import crypto from 'crypto';
 import { getDb } from '@/lib/db';
 
-export type UserRole = 'OWNER' | 'PARTNER' | 'TEAM_MEMBER';
+// EDITOR = full read/write access, equivalent to OWNER for every capability
+// check. Kept as a distinct role so the UI can still label them differently
+// and audit trails can attribute changes to the right user.
+export type UserRole = 'OWNER' | 'EDITOR' | 'PARTNER' | 'TEAM_MEMBER';
 
 export interface AuthUser {
   id: string;

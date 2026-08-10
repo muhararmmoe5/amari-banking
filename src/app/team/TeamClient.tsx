@@ -34,7 +34,8 @@ export default function TeamClient({ initialPeople, portfolioMap }: { initialPeo
     const fd = new FormData(form);
     const email = String(fd.get('email') || '').trim();
     if (!email) { toast({ kind: 'err', title: 'Email required' }); return; }
-    const role = (String(fd.get('role') || 'PARTNER') as 'PARTNER' | 'TEAM_MEMBER' | 'OBSERVER');
+    const role = (String(fd.get('role') || 'PARTNER') as 'EDITOR' | 'PARTNER' | 'TEAM_MEMBER' | 'OBSERVER');
+    // OBSERVER isn't a real auth role — collapse to TEAM_MEMBER (read-only view).
     const safeRole = role === 'OBSERVER' ? 'TEAM_MEMBER' : role;
     const tId = saveStart();
     startTx(async () => {
@@ -188,6 +189,7 @@ export default function TeamClient({ initialPeople, portfolioMap }: { initialPeo
             <label className="block">
               <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Role</div>
               <select name="role" defaultValue="PARTNER">
+                <option value="EDITOR">Editor (full edit access, same as you)</option>
                 <option value="PARTNER">Partner (sees their own equity)</option>
                 <option value="TEAM_MEMBER">Team member (read-only)</option>
               </select>

@@ -10,7 +10,7 @@ import {
   type CreateTxInput,
 } from '@/lib/db/queries';
 import { previewRecurringAllocation } from '@/lib/db/forecasts';
-import { requireUser } from '@/lib/auth';
+import { requireUser, hasEditAccess } from '@/lib/auth';
 
 export async function saveTransaction(id: string, patch: UpdateTxPatch) {
   updateTransaction(id, patch);
@@ -30,7 +30,7 @@ export async function recurringAllocationPreviewAction(
 
 export async function bulkApplyTagsAction(txIds: string[], patch: UpdateTxPatch): Promise<{ updated: number }> {
   const user = requireUser();
-  if (user.role !== 'OWNER') throw new Error('Only the owner can bulk-tag');
+  if (!hasEditAccess(user)) throw new Error('Only the owner can bulk-tag');
   for (const id of txIds) {
     if (typeof id !== 'string' || id.length > 64) continue;
     updateTransaction(id, patch);
@@ -43,7 +43,7 @@ export async function bulkApplyTagsAction(txIds: string[], patch: UpdateTxPatch)
 
 export async function createTransactionAction(input: CreateTxInput): Promise<{ id: string }> {
   const user = requireUser();
-  if (user.role !== 'OWNER') throw new Error('Only the owner can add transactions');
+  if (!hasEditAccess(user)) throw new Error('Only the owner can add transactions');
   if (!input.accountId || !input.postingDate || !input.description || typeof input.amount !== 'number') {
     throw new Error('Missing required fields');
   }
@@ -58,7 +58,7 @@ export async function createTransactionAction(input: CreateTxInput): Promise<{ i
 
 export async function deleteTransactionAction(id: string): Promise<void> {
   const user = requireUser();
-  if (user.role !== 'OWNER') throw new Error('Only the owner can delete transactions');
+  if (!hasEditAccess(user)) throw new Error('Only the owner can delete transactions');
   if (!id || typeof id !== 'string') throw new Error('Invalid id');
   deleteTransaction(id);
   revalidatePath('/transactions');

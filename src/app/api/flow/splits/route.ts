@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listFundingSplits, addFundingSplit, deleteFundingSplit } from '@/lib/db/queries';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const u = getCurrentUser();
-  if (!u || u.role !== 'OWNER') return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  if (!u || !hasEditAccess(u)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const expenseTxId = req.nextUrl.searchParams.get('expenseTxId');
   if (!expenseTxId) return NextResponse.json({ error: 'expenseTxId required' }, { status: 400 });
   return NextResponse.json({ splits: listFundingSplits(expenseTxId) });
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const u = getCurrentUser();
-  if (!u || u.role !== 'OWNER') return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  if (!u || !hasEditAccess(u)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const body = await req.json().catch(() => ({}));
   const expenseTxId = String(body.expenseTxId || '');
   const sourceTxId = body.sourceTxId ? String(body.sourceTxId) : null;
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const u = getCurrentUser();
-  if (!u || u.role !== 'OWNER') return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  if (!u || !hasEditAccess(u)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const id = req.nextUrl.searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
   deleteFundingSplit(id);

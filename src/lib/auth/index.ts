@@ -22,4 +22,22 @@ export function requireOwner(): AuthUser {
   return user;
 }
 
+/**
+ * Returns true for users who can write anywhere in the app. OWNER and EDITOR
+ * are treated identically for every capability gate — this is the single
+ * source of truth so we don't scatter `role === 'OWNER' || role === 'EDITOR'`
+ * across the codebase.
+ */
+export function hasEditAccess(user: AuthUser | null | undefined): boolean {
+  if (!user) return false;
+  return user.role === 'OWNER' || user.role === 'EDITOR';
+}
+
+/** Convenience for pages that need to redirect viewers away. */
+export function requireEditAccess(): AuthUser {
+  const user = requireUser();
+  if (!hasEditAccess(user)) redirect('/');
+  return user;
+}
+
 export { type AuthUser, type UserRole } from './sessions';

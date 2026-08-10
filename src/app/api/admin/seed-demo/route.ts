@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST() {
   const user = getCurrentUser();
-  if (!user || user.role !== 'OWNER') {
+  if (!user || !hasEditAccess(user)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 

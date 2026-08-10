@@ -7,7 +7,7 @@ import type { EntityType } from '@/types';
 import { ArrowLeft } from 'lucide-react';
 import CapEntityClient from './CapEntityClient';
 import CommitmentsPanel from './CommitmentsPanel';
-import { requireUser } from '@/lib/auth';
+import { requireUser, hasEditAccess } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +18,7 @@ export default function CapEntityPage({ params }: { params: { entity: string } }
 
   const user = requireUser();
   // Non-owners may only view entities where they have a holding
-  if (user.role !== 'OWNER') {
+  if (!hasEditAccess(user)) {
     const my = user.personId ? listHoldingsForPerson(user.personId) : [];
     const ok = my.some((h) => h.entity === entity);
     if (!ok) {

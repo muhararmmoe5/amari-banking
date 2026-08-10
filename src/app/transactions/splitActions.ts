@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireUser } from '@/lib/auth';
+import { requireUser, hasEditAccess } from '@/lib/auth';
 import {
   listSplits, createSplit, updateSplit, deleteSplit,
   type SplitInput, type UpdateSplitPatch, type TransactionSplit,
@@ -9,7 +9,7 @@ import {
 
 function ensureOwner() {
   const user = requireUser();
-  if (user.role !== 'OWNER') throw new Error('Only the owner can edit splits');
+  if (!hasEditAccess(user)) throw new Error('Only the owner can edit splits');
   return user;
 }
 

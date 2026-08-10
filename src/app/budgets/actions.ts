@@ -2,11 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { createBudget, updateBudget, deleteBudget, type BudgetInput, type BudgetStatus } from '@/lib/db/budgets';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
 
 function checkOwner() {
   const u = getCurrentUser();
-  if (!u || u.role !== 'OWNER') throw new Error('Only the owner can manage budgets');
+  if (!u || !hasEditAccess(u)) throw new Error('Only the owner can manage budgets');
 }
 
 function revalidateAll() {

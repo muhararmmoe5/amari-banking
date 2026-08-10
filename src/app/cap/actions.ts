@@ -15,7 +15,7 @@ import {
 } from '@/lib/db/cap';
 import { getDb } from '@/lib/db';
 import { createInvite, type UserRole } from '@/lib/auth/sessions';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
 import { headers } from 'next/headers';
 
 function revalidateAll() {
@@ -113,7 +113,7 @@ export async function actSyncContributionsToCommitments(entity: any) {
 
 function checkOwner() {
   const u = getCurrentUser();
-  if (!u || u.role !== 'OWNER') throw new Error('Owner only');
+  if (!u || !hasEditAccess(u)) throw new Error('Owner only');
 }
 
 export async function actDeleteContribution(id: string) {
@@ -179,7 +179,7 @@ export async function actLinkTransactionToCommitment(txId: string, commitmentId:
  */
 export async function actSeedOmarBytesDeal(): Promise<{ commitmentId: string; personId: string; holdingId: string; autoLinked: number }> {
   const user = getCurrentUser();
-  if (!user || user.role !== 'OWNER') throw new Error('Only the owner can seed the cap table');
+  if (!user || !hasEditAccess(user)) throw new Error('Only the owner can seed the cap table');
 
   // 1. Find or create Omar
   const people = listPeople();
@@ -237,7 +237,7 @@ export async function actSeedOmarBytesDeal(): Promise<{ commitmentId: string; pe
 
 export async function actCreateInvite(personId: string, email: string, role: UserRole = 'PARTNER'): Promise<{ url: string; expiresAt: number } | { error: string }> {
   const user = getCurrentUser();
-  if (!user || user.role !== 'OWNER') return { error: 'Only the owner can create invites' };
+  if (!user || !hasEditAccess(user)) return { error: 'Only the owner can create invites' };
   const person = getPerson(personId);
   if (!person) return { error: 'Person not found' };
   if (!email.trim()) return { error: 'Email is required' };

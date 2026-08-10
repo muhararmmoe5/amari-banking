@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listPeople, createPerson } from '@/lib/db/cap';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const user = getCurrentUser();
-  if (!user || user.role !== 'OWNER') {
+  if (!user || !hasEditAccess(user)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const people = listPeople();
@@ -17,7 +17,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const user = getCurrentUser();
-  if (!user || user.role !== 'OWNER') {
+  if (!user || !hasEditAccess(user)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const body = await req.json().catch(() => ({}));

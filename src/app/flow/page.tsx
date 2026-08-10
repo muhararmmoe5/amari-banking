@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireUser } from '@/lib/auth';
+import { requireUser, hasEditAccess } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import {
   getCurrentBalances,
@@ -16,7 +16,7 @@ interface SP { min?: string; account?: string; source?: string; from?: string; t
 
 export default function FlowPage({ searchParams }: { searchParams: SP }) {
   const user = requireUser();
-  if (user.role !== 'OWNER') redirect('/cap');
+  if (!hasEditAccess(user)) redirect('/cap');
 
   const minAmount = parseInt(searchParams.min || '1000', 10);
   const inflows: InflowEvent[] = listLargeInflows({

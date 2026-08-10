@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation';
-import { requireUser } from '@/lib/auth';
+import { requireUser, hasEditAccess } from '@/lib/auth';
 import { getTransaction } from '@/lib/db/queries';
 import { traceFundingSource, traceDownstreamFromInflow } from '@/lib/db/flow-trace';
 import { listSplits } from '@/lib/db/splits';
@@ -24,7 +24,7 @@ function ownerLabelFor(sourceTxId: string): string | null {
 
 export default function TransactionDetailPage({ params }: Props) {
   const user = requireUser();
-  if (user.role !== 'OWNER') redirect('/cap');
+  if (!hasEditAccess(user)) redirect('/cap');
 
   const tx = getTransaction(params.id);
   if (!tx) notFound();

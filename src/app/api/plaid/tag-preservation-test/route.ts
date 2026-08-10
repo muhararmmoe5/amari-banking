@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { getDb } from '@/lib/db';
 import { applyPlaidTransaction } from '@/lib/db/plaid-sync';
 import { computeFingerprint } from '@/lib/db/fingerprint';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
  *  when any fail. Run before shipping any Plaid sync changes. */
 export async function POST() {
   const u = getCurrentUser();
-  if (!u || u.role !== 'OWNER') {
+  if (!u || !hasEditAccess(u)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 

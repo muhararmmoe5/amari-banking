@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
  *  cash contribution to a wire). Returns top N matching recent rows.  */
 export async function GET(req: NextRequest) {
   const u = getCurrentUser();
-  if (!u || u.role !== 'OWNER') return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  if (!u || !hasEditAccess(u)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const sp = req.nextUrl.searchParams;
   const q = (sp.get('q') || '').trim();
   const inflowOnly = sp.get('inflowOnly') === '1';

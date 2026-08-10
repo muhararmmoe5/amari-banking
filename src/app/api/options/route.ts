@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listOptionsGrouped, createOption, OPTION_FIELDS, type OptionField } from '@/lib/db/options';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +13,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const u = getCurrentUser();
-  if (!u || u.role !== 'OWNER') return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  if (!u || !hasEditAccess(u)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const body = await req.json().catch(() => ({}));
   const field = body?.field as OptionField;
   const value = String(body?.value || '');
