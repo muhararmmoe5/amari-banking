@@ -235,7 +235,7 @@ function ClearAllZone() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  const phrase = 'delete everything';
+  const phrase = 'clear my transactions';
   const canRun = confirmText.trim().toLowerCase() === phrase && !busy;
 
   async function run() {
@@ -277,10 +277,10 @@ function ClearAllZone() {
       <div className="flex items-center" style={{ gap: 12 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>
-            Clear all imported statements
+            Clear my uploaded statements &amp; transactions
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 3, lineHeight: 1.45 }}>
-            Wipes every imported transaction, its splits, funding-source links, reconciliations, and the import batch history. Users, cap table, people, budgets, salaries, and account definitions stay. Irreversible.
+            Wipes only what came from your CSV imports: every transaction, its splits, funding-source links, reconciliations, and the batch history. Your login, cap table, people, budgets, salaries, and account setup all stay. Irreversible.
           </div>
         </div>
         {!expanded ? (
@@ -341,7 +341,7 @@ function ClearAllZone() {
                 opacity: canRun ? 1 : 0.6,
               }}
             >
-              {busy ? 'Clearing…' : 'Clear everything'}
+              {busy ? 'Clearing…' : 'Clear my transactions'}
             </button>
           </div>
         </div>

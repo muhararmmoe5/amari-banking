@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
  * phrase in the body — this is destructive and irreversible, so a plain
  * OWNER-check isn't enough friction on its own.
  *
- * Body: { confirm: string }   // must equal 'delete everything'
+ * Body: { confirm: string }   // must equal 'clear my transactions'
  */
 export async function POST(req: NextRequest) {
   const user = getCurrentUser();
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   let body: { confirm?: string } = {};
   try { body = await req.json(); } catch { /* fall through */ }
 
-  if (body.confirm !== 'delete everything') {
+  if (body.confirm !== 'clear my transactions') {
     return NextResponse.json(
       { error: 'confirmation phrase required', hint: 'send { confirm: "delete everything" }' },
       { status: 400 },
