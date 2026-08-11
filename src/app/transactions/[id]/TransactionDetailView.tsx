@@ -224,13 +224,32 @@ export default function TransactionDetailView({
         >
           Needs receipt
         </button>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => persist({ auditStatus: 'CONFIRMED', reviewState: 'REVIEWED_APPROVED', reviewedAt: new Date().toISOString() })}
-        >
-          <Check size={12} /> Confirm tag
-        </button>
+        {tx.reviewState === 'REVIEWED_APPROVED' ? (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            style={{
+              color: 'var(--warn, #d4b16f)',
+              borderColor: 'color-mix(in oklab, var(--warn, #d4b16f) 30%, rgba(255,255,255,0.08))',
+            }}
+            onClick={() => persist({
+              auditStatus: 'UNREVIEWED',
+              reviewState: 'PENDING_REVIEW',
+              reviewedAt: null,
+            })}
+            title="Return this transaction to the pending-review queue"
+          >
+            <RotateCcw size={12} /> Unapprove
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => persist({ auditStatus: 'CONFIRMED', reviewState: 'REVIEWED_APPROVED', reviewedAt: new Date().toISOString() })}
+          >
+            <Check size={12} /> Confirm tag
+          </button>
+        )}
       </div>
 
       {/* Two-column body — stacks vertically on mobile */}
