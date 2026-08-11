@@ -78,6 +78,10 @@ const CLAIMANT_ALLOWED_KEYS: readonly (keyof UpdateTxPatch)[] = [
   'confirmedCategory', 'businessPurpose', 'notes',
   'subCategory1', 'subCategory2', 'individual',
   'receiptRef',
+  // Category selection: business/personal top-level and the custom
+  // name+description. All labeling — no source-of-money exposure.
+  'businessCat1Key', 'personalCat1Key',
+  'customCategory', 'customCategoryDescription',
 ];
 function narrowPatchForClaimant(patch: UpdateTxPatch, ownName: string): UpdateTxPatch {
   const out: UpdateTxPatch = {};

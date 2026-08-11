@@ -144,6 +144,10 @@ export interface Transaction {
   needsIdentification: boolean;
   /** Free-text note left by the flagger — e.g. 'was this on the LA trip?'. */
   identificationNote: string | null;
+  /** User-defined category label + optional description, chosen via the
+   *  '+ Custom' tile on the Category quick-pick when no preset fits. */
+  customCategory: string | null;
+  customCategoryDescription: string | null;
   bookingDateMode: 'DAY' | 'MONTH' | null;
   isRecurring: boolean;
   recurringFrequency: string | null;

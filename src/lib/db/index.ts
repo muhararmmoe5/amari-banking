@@ -464,6 +464,11 @@ export function getDb(): Database.Database {
     // Optional free-text: the person who flagged left a note ('was this yours
     // on the LA trip?'). Rendered next to the row on /identify.
     `ALTER TABLE transactions ADD COLUMN identification_note TEXT`,
+    // User-defined category (short name) + optional description.
+    // Used when none of the preset PERSONAL/BUSINESS category chips fit.
+    // Shows on the detail page as a '+ Custom' tile in the quick-pick.
+    `ALTER TABLE transactions ADD COLUMN custom_category TEXT`,
+    `ALTER TABLE transactions ADD COLUMN custom_category_description TEXT`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }

@@ -80,6 +80,8 @@ export default function TransactionDetailView({
   const [individual, setIndividual] = useState<string>(tx.individual || '');
   const [docRef, setDocRef] = useState<string>(tx.receiptRef || '');
   const [customSourceTag, setCustomSourceTag] = useState<string>(tx.customSourceTag || '');
+  const [customCategory, setCustomCategory] = useState<string>(tx.customCategory || '');
+  const [customCategoryDescription, setCustomCategoryDescription] = useState<string>(tx.customCategoryDescription || '');
   const [notes, setNotes] = useState<string>(tx.notes || '');
   // Older rows may not have a bookingDateMode column populated. Infer
   // it from the tagged_date shape: full YYYY-MM-DD means DAY mode; a
@@ -711,9 +713,26 @@ export default function TransactionDetailView({
                       {c.label}
                     </CategoryChip>
                   ))}
+                  <CategoryChip
+                    active={businessCat1Key === '__CUSTOM__'}
+                    onClick={() => pickBusinessCategory('__CUSTOM__')}
+                    color="var(--gold)"
+                  >
+                    + Custom
+                  </CategoryChip>
                 </div>
 
-                {businessCat1Key && businessCats[businessCat1Key] ? (
+                {businessCat1Key === '__CUSTOM__' ? (
+                  <CustomCategoryInputs
+                    name={customCategory}
+                    desc={customCategoryDescription}
+                    onNameChange={setCustomCategory}
+                    onDescChange={setCustomCategoryDescription}
+                    onNameBlur={() => persist({ customCategory: customCategory || null })}
+                    onDescBlur={() => persist({ customCategoryDescription: customCategoryDescription || null })}
+                    tone="var(--gold)"
+                  />
+                ) : businessCat1Key && businessCats[businessCat1Key] ? (
                   <div style={{ marginTop: 14 }}>
                     <FieldLabel>Sub-category</FieldLabel>
                     <select
@@ -772,9 +791,26 @@ export default function TransactionDetailView({
                       {c.label}
                     </CategoryChip>
                   ))}
+                  <CategoryChip
+                    active={personalCat1Key === '__CUSTOM__'}
+                    onClick={() => pickPersonalCategory('__CUSTOM__')}
+                    color="var(--purple)"
+                  >
+                    + Custom
+                  </CategoryChip>
                 </div>
 
-                {personalCat1Key && personalCats[personalCat1Key] ? (
+                {personalCat1Key === '__CUSTOM__' ? (
+                  <CustomCategoryInputs
+                    name={customCategory}
+                    desc={customCategoryDescription}
+                    onNameChange={setCustomCategory}
+                    onDescChange={setCustomCategoryDescription}
+                    onNameBlur={() => persist({ customCategory: customCategory || null })}
+                    onDescBlur={() => persist({ customCategoryDescription: customCategoryDescription || null })}
+                    tone="var(--purple)"
+                  />
+                ) : personalCat1Key && personalCats[personalCat1Key] ? (
                   <div style={{ marginTop: 14 }}>
                     <FieldLabel>Sub-category</FieldLabel>
                     <select
@@ -1584,6 +1620,58 @@ function pathBtnStyle(active: boolean, color: string): React.CSSProperties {
     fontSize: 13, fontWeight: 500,
     textAlign: 'left', cursor: 'pointer', transition: 'all 120ms ease',
   };
+}
+
+function CustomCategoryInputs({
+  name, desc, onNameChange, onDescChange, onNameBlur, onDescBlur, tone,
+}: {
+  name: string;
+  desc: string;
+  onNameChange: (v: string) => void;
+  onDescChange: (v: string) => void;
+  onNameBlur: () => void;
+  onDescBlur: () => void;
+  tone: string;
+}) {
+  return (
+    <div style={{
+      marginTop: 14, padding: 12, borderRadius: 8,
+      border: `0.5px dashed color-mix(in oklab, ${tone} 30%, rgba(255,255,255,0.08))`,
+      background: `color-mix(in oklab, ${tone} 4%, transparent)`,
+    }}>
+      <div style={{ fontSize: 11, color: 'var(--ink-2)', marginBottom: 8 }}>
+        <em style={{ fontStyle: 'italic', color: tone }}>Custom category</em>
+        {' — '}
+        <span style={{ color: 'var(--ink-3)' }}>
+          use this when none of the presets fit. Autocompletes on future rows once used a few times.
+        </span>
+      </div>
+      <div className="grid" style={{ gap: 8 }}>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => onNameChange(e.target.value)}
+          onBlur={onNameBlur}
+          placeholder="Category name (e.g. Legal — Delaware filings)"
+          maxLength={80}
+          style={{ ...fieldInStyle }}
+        />
+        <textarea
+          rows={2}
+          value={desc}
+          onChange={(e) => onDescChange(e.target.value)}
+          onBlur={onDescBlur}
+          placeholder="Description — what this category covers, when to use it"
+          maxLength={500}
+          style={{
+            ...fieldInStyle,
+            height: 'auto', padding: '10px 12px',
+            resize: 'vertical', minHeight: 54,
+          }}
+        />
+      </div>
+    </div>
+  );
 }
 
 function CategoryChip({

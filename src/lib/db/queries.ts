@@ -58,6 +58,8 @@ function rowToTransaction(r: any): Transaction {
     customSourceTag: r.custom_source_tag ?? null,
     needsIdentification: !!r.needs_identification,
     identificationNote: r.identification_note ?? null,
+    customCategory: r.custom_category ?? null,
+    customCategoryDescription: r.custom_category_description ?? null,
     bookingDateMode: r.booking_date_mode ?? null,
     isRecurring: !!r.is_recurring,
     recurringFrequency: r.recurring_frequency ?? null,
@@ -433,6 +435,8 @@ export interface UpdateTxPatch {
   customSourceTag?: string | null;
   needsIdentification?: boolean;
   identificationNote?: string | null;
+  customCategory?: string | null;
+  customCategoryDescription?: string | null;
   bookingDateMode?: 'DAY' | 'MONTH' | null;
   isRecurring?: boolean;
   recurringFrequency?: string | null;
@@ -509,6 +513,8 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   if (patch.customSourceTag !== undefined) { fields.push('custom_source_tag = @custom_source_tag'); params.custom_source_tag = patch.customSourceTag; }
   if (patch.needsIdentification !== undefined) { fields.push('needs_identification = @needs_identification'); params.needs_identification = patch.needsIdentification ? 1 : 0; }
   if (patch.identificationNote !== undefined) { fields.push('identification_note = @identification_note'); params.identification_note = patch.identificationNote; }
+  if (patch.customCategory !== undefined) { fields.push('custom_category = @custom_category'); params.custom_category = patch.customCategory; }
+  if (patch.customCategoryDescription !== undefined) { fields.push('custom_category_description = @custom_category_description'); params.custom_category_description = patch.customCategoryDescription; }
   if (patch.bookingDateMode !== undefined) { fields.push('booking_date_mode = @booking_date_mode'); params.booking_date_mode = patch.bookingDateMode; }
   if (patch.isRecurring !== undefined) { fields.push('is_recurring = @is_recurring'); params.is_recurring = patch.isRecurring ? 1 : 0; }
   if (patch.recurringFrequency !== undefined) { fields.push('recurring_frequency = @recurring_frequency'); params.recurring_frequency = patch.recurringFrequency; }
