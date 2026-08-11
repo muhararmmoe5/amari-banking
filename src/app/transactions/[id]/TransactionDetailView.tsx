@@ -1855,6 +1855,16 @@ function CustomCategoryInputs({
     return suggestions.filter((s) => s.name.toLowerCase().includes(q)).slice(0, 40);
   }, [suggestions, name]);
 
+  // 'idle' / 'saved' — saved shows for ~1.6s after any persist fires
+  // so the user gets visual confirmation their edit landed.
+  const [saveState, setSaveState] = useState<'idle' | 'saved'>('idle');
+  function flashSaved() {
+    setSaveState('saved');
+    // Clear after a beat — long enough to notice, short enough not to
+    // linger while the user picks their next action.
+    window.setTimeout(() => setSaveState('idle'), 1600);
+  }
+
   function pick(s: CustomCategorySuggestion) {
     onNameChange(s.name);
     if (s.description && !desc.trim()) onDescChange(s.description);
@@ -1865,11 +1875,48 @@ function CustomCategoryInputs({
       // Slight tick so onDescChange state settles before onDescBlur fires.
       setTimeout(onDescBlur, 0);
     }
+    flashSaved();
   }
 
   function handleNameChange(v: string) {
     onNameChange(v);
     if (!open) setOpen(true);
+  }
+
+  // Enter on the input persists the current name AND closes the dropdown
+  // so the user gets an explicit save-and-move-on gesture. Blur normally
+  // persists too, but on mobile keyboards 'Enter' is the natural
+  // 'done' key and typing a custom name that isn't in the preset list
+  // wasn't giving any feedback before.
+  function handleNameKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // If exactly one suggestion matches, prefer it (fills description
+      // too). Otherwise commit whatever the user typed.
+      const exact = filtered.find((s) => s.name.trim().toLowerCase() === name.trim().toLowerCase());
+      if (exact) {
+        pick(exact);
+      } else {
+        onNameBlur();
+        setOpen(false);
+        flashSaved();
+      }
+      (e.target as HTMLInputElement).blur();
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+    }
+  }
+
+  // The parent's blur handler doesn't tell us whether the DB actually
+  // saved — we assume any blur with a non-empty change persists, and
+  // flash the indicator. Keeps the visual feedback trustworthy.
+  function handleNameBlur() {
+    onNameBlur();
+    flashSaved();
+  }
+  function handleDescBlur() {
+    onDescBlur();
+    flashSaved();
   }
 
   return (
@@ -1878,12 +1925,26 @@ function CustomCategoryInputs({
       border: `0.5px dashed color-mix(in oklab, ${tone} 30%, rgba(255,255,255,0.08))`,
       background: `color-mix(in oklab, ${tone} 4%, transparent)`,
     }}>
-      <div style={{ fontSize: 11, color: 'var(--ink-2)', marginBottom: 8 }}>
+      <div style={{ fontSize: 11, color: 'var(--ink-2)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
         <em style={{ fontStyle: 'italic', color: tone }}>Custom category</em>
-        {' — '}
         <span style={{ color: 'var(--ink-3)' }}>
-          use this when none of the presets fit. Type to filter or pick from the list.
+          — use this when none of the presets fit. Type to filter or pick from the list.
         </span>
+        {saveState === 'saved' ? (
+          <span
+            style={{
+              marginLeft: 'auto',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              fontSize: 10, color: 'var(--income)', fontWeight: 500,
+              padding: '2px 8px', borderRadius: 999,
+              background: 'color-mix(in oklab, var(--income) 12%, transparent)',
+              border: '0.5px solid color-mix(in oklab, var(--income) 30%, transparent)',
+              transition: 'opacity 200ms ease',
+            }}
+          >
+            <Check size={10} strokeWidth={2.5} /> Saved
+          </span>
+        ) : null}
       </div>
       <div className="grid" style={{ gap: 8 }}>
         <div ref={wrapRef} style={{ position: 'relative' }}>
@@ -1892,7 +1953,8 @@ function CustomCategoryInputs({
             value={name}
             onChange={(e) => handleNameChange(e.target.value)}
             onFocus={() => setOpen(true)}
-            onBlur={onNameBlur}
+            onBlur={handleNameBlur}
+            onKeyDown={handleNameKeyDown}
             placeholder="Type or pick a category…"
             maxLength={80}
             autoComplete="off"
@@ -1949,7 +2011,7 @@ function CustomCategoryInputs({
           rows={2}
           value={desc}
           onChange={(e) => onDescChange(e.target.value)}
-          onBlur={onDescBlur}
+          onBlur={handleDescBlur}
           placeholder="Description — what this category covers, when to use it"
           maxLength={500}
           style={{

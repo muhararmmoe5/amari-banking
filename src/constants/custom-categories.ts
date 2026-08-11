@@ -72,6 +72,8 @@ const BUSINESS_PRESETS: CustomCategoryPreset[] = [
   { path: 'BUSINESS', name: 'Travel — Team offsite',         description: 'Retreat travel booked for multiple team members at once' },
   { path: 'BUSINESS', name: 'Meals — Client entertainment',  description: 'Meals with clients / prospects — 50% deductible' },
   { path: 'BUSINESS', name: 'Meals — Team',                  description: 'Team lunches, working dinners, meals with contractors' },
+  { path: 'BUSINESS', name: 'Meals — Hotel convenience store', description: 'Snacks / drinks / small food from hotel mini-marts on business travel — travel-meal deductible' },
+  { path: 'BUSINESS', name: 'Meals — Airport / travel',      description: 'Meals + snacks at airports, gas station stops during business travel' },
 
   // ── Investment / financial ────────────────────────────────────────
   { path: 'BUSINESS', name: 'Financial — Bank fees',         description: 'Wire fees, overdraft, monthly account fees, incoming ACH fees' },
@@ -106,6 +108,8 @@ const PERSONAL_PRESETS: CustomCategoryPreset[] = [
   { path: 'PERSONAL', name: 'Food — Coffee / cafes',         description: 'Coffee shops, tea, cafes, morning coffee runs' },
   { path: 'PERSONAL', name: 'Food — Fast food / takeout',    description: 'Quick service, drive-through, delivery apps for yourself' },
   { path: 'PERSONAL', name: 'Food — Alcohol / bars',         description: 'Bars, liquor stores, wine, cocktails' },
+  { path: 'PERSONAL', name: 'Food — Hotel convenience store', description: 'Snacks, drinks, small food purchases from hotel mini-marts or lobby stores while traveling' },
+  { path: 'PERSONAL', name: 'Food — Airport / travel',       description: 'Meals and snacks at airports, train stations, gas station convenience stores while traveling' },
 
   // ── Transportation (personal) ────────────────────────────────────
   { path: 'PERSONAL', name: 'Personal — Uber / Lyft',        description: 'Rideshares for personal use (not client travel)' },
