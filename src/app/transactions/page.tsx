@@ -3,6 +3,7 @@ import { listTransactions, countTransactions, reviewBucketCounts } from '@/lib/d
 import { ACCOUNTS } from '@/constants/accounts';
 import VirtualTable from './VirtualTable';
 import RescanDatesButton from './RescanDatesButton';
+import RememberTransactionFilters from './RememberTransactionFilters';
 import type { EntityType, AuditStatus } from '@/types';
 import { requireUser, hasEditAccess } from '@/lib/auth';
 import { redirect } from 'next/navigation';
@@ -158,6 +159,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
 
   return (
     <div className="max-w-[1600px] mx-auto pb-12">
+      <RememberTransactionFilters />
       {/* ── Page header ─────────────────────────────────────── */}
       <div
         className="flex flex-col md:flex-row md:items-end gap-4 md:gap-5 tx-page-header"

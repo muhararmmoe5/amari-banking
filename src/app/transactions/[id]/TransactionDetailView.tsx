@@ -15,6 +15,7 @@ import {
 } from '@/constants/categories';
 import { saveTransaction, deleteTransactionAction } from '../actions';
 import { Trash2 } from 'lucide-react';
+import BackToTransactionsLink from '../BackToTransactionsLink';
 import { useToast } from '@/components/Toast';
 import BankChip from '@/components/BankChip';
 import DrawerSplitEditor from '../DrawerSplitEditor';
@@ -168,9 +169,7 @@ export default function TransactionDetailView({
           borderBottom: '1px solid rgba(255,255,255,0.055)',
         }}
       >
-        <Link href="/transactions" className="btn btn-ghost btn-sm">
-          <ArrowLeft size={12} /> Back to transactions
-        </Link>
+        <BackToTransactionsLink className="btn btn-ghost btn-sm" />
         <span style={{ flex: 1 }} />
         {/* Prev / Next were rendered permanently disabled with no wiring —
             removed until they have a real cursor-through-list handler. */}
@@ -996,7 +995,7 @@ export default function TransactionDetailView({
           <KbdHint k="R" label="Receipt" />
           <KbdHint k="⌘S" label="Save" />
         </div>
-        <Link href="/transactions" className="btn btn-ghost btn-sm">Cancel</Link>
+        <BackToTransactionsLink className="btn btn-ghost btn-sm">Cancel</BackToTransactionsLink>
         <button
           type="button"
           className="btn btn-primary"
