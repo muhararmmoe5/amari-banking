@@ -1102,7 +1102,19 @@ export default function TransactionDetailView({
           className="btn btn-primary"
           onClick={() => {
             persist({ auditStatus: 'CONFIRMED', reviewState: 'REVIEWED_APPROVED', reviewedAt: new Date().toISOString() });
-            router.push('/transactions');
+            // Route back preserving whatever filter the user was in when
+            // they entered — sessionStorage['tx.filters'] is set by
+            // RememberTransactionFilters on /transactions. If missing,
+            // fall through to the default /transactions view which now
+            // shows ALL transactions (including the one just tagged).
+            let dest = '/transactions';
+            try {
+              const stored = sessionStorage.getItem('tx.filters');
+              if (stored && stored.length > 0 && stored.length < 2000) {
+                dest = '/transactions' + stored;
+              }
+            } catch { /* storage disabled — fall through */ }
+            router.push(dest);
           }}
         >
           <Check size={11} /> Save &amp; next

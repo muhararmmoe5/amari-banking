@@ -72,11 +72,11 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
   const dateTo = searchParams.to || presetRange.to;
   const orderDir: 'ASC' | 'DESC' = searchParams.order === 'oldest' ? 'ASC' : 'DESC';
   const reviewBucket: 'PENDING_REVIEW' | 'REVIEWED' | 'REVIEWED_APPROVED' | 'ESCALATIONS' | 'ALL' =
-    searchParams.review === 'reviewed' ? 'REVIEWED'
+    searchParams.review === 'pending' ? 'PENDING_REVIEW'
+      : searchParams.review === 'reviewed' ? 'REVIEWED'
       : searchParams.review === 'approved' ? 'REVIEWED_APPROVED'
       : searchParams.review === 'escalations' ? 'ESCALATIONS'
-      : searchParams.review === 'all' ? 'ALL'
-      : 'PENDING_REVIEW'; // default — every transaction starts as pending review
+      : 'ALL'; // default — show everything so a just-tagged row still appears
   const filters = {
     accountId: searchParams.account,
     entityTag: searchParams.entity as EntityType | undefined,
@@ -150,7 +150,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
       color: 'var(--expense)',
     },
   ];
-  const activeTab = searchParams.review || 'pending';
+  const activeTab = searchParams.review || 'all';
   const activeKey = activeTab === 'pending' ? 'pending'
     : activeTab === 'reviewed' ? 'reviewed'
     : activeTab === 'approved' ? 'approved'
