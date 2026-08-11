@@ -62,17 +62,22 @@ function canEditThisTransaction(user: AuthUser, txId: string): boolean {
 }
 
 /**
- * The subset of UpdateTxPatch keys a claimant (non-editor) is allowed to
- * change. Broadly: the row's own bookkeeping metadata. NOT: audit status,
- * review state, funding source (financial linkage), needs_identification
- * (would let them un-flag other people's charges), or the individual
- * field (would let them re-assign the row to someone else and vanish it).
+ * The subset of UpdateTxPatch keys a claimant (team member) is allowed to
+ * change. Broadly: category, purpose, personal notes, and their own claim
+ * on the row.
+ *
+ * Explicitly NOT allowed for team members (only admins can touch these):
+ *  - audit status / review state (bookkeeping oversight)
+ *  - funding source, custom source tag, sourceBusiness, sourceOfMoney,
+ *    needToGetFrom, taggedDate (all financial-linkage / source-of-money
+ *    fields — the owner explicitly wants team members locked out of these)
+ *  - needs_identification (would let them un-flag other people's charges)
+ *  - reassignment of `individual` to someone other than themselves
  */
 const CLAIMANT_ALLOWED_KEYS: readonly (keyof UpdateTxPatch)[] = [
   'confirmedCategory', 'businessPurpose', 'notes',
   'subCategory1', 'subCategory2', 'individual',
-  'customSourceTag', 'receiptRef', 'taggedDate',
-  'sourceBusiness', 'sourceOfMoney', 'needToGetFrom',
+  'receiptRef',
 ];
 function narrowPatchForClaimant(patch: UpdateTxPatch, ownName: string): UpdateTxPatch {
   const out: UpdateTxPatch = {};
@@ -244,9 +249,11 @@ export async function claimTransactionAction(
 export async function saveCustomSourceTagAction(id: string, tag: string | null): Promise<void> {
   const user = requireUser();
   if (typeof id !== 'string' || id.length > 64) throw new Error('bad id');
-  // Editors can tag any row; claimants only their own claimed rows.
-  if (!hasEditAccess(user) && !canEditThisTransaction(user, id)) {
-    throw new Error('you can only tag transactions claimed to you');
+  // Only admins (OWNER/EDITOR) may set the custom source tag — this is
+  // the 'source of money' field the owner explicitly wants team members
+  // locked out of.
+  if (!hasEditAccess(user)) {
+    throw new Error('only admins can set the source-of-money tag');
   }
   const clean = tag && tag.trim() ? tag.trim().slice(0, 200) : null;
   updateTransaction(id, { customSourceTag: clean });

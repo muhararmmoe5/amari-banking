@@ -350,13 +350,15 @@ export default function TransactionDetailView({
             }}
           />
 
-          {/* AI Source trace card — only for expenses */}
-          {isExpense ? (
+          {/* AI Source trace card — only for expenses, admins only.
+              Team members are explicitly locked out of source-of-money
+              editing — they only categorize/annotate their own row. */}
+          {isExpense && viewerIsEditor ? (
             <AiSourceTraceCard tx={tx} fifoSource={fifoSource} sourceIsOverride={!!sourceIsOverride} />
           ) : null}
 
-          {/* Income usage bar + downstream trace — only for income transactions */}
-          {isIncome && downstream ? (
+          {/* Income usage bar + downstream trace — only for income transactions, admins only */}
+          {isIncome && downstream && viewerIsEditor ? (
             <DownstreamUsageCard tx={tx} downstream={downstream} />
           ) : null}
 
@@ -741,20 +743,21 @@ export default function TransactionDetailView({
                       style={fieldInStyle}
                     />
                   </div>
-                  <div>
-                    <FieldLabel>Counterparty</FieldLabel>
-                    {/* Was previously an unbound <input> — typed values
-                        vanished on reload. Bound to customSourceTag which
-                        is the right home for 'who got paid' free text. */}
-                    <input
-                      type="text"
-                      value={customSourceTag}
-                      onChange={(e) => setCustomSourceTag(e.target.value)}
-                      onBlur={() => persist({ customSourceTag: customSourceTag || null })}
-                      placeholder="Who got paid"
-                      style={fieldInStyle}
-                    />
-                  </div>
+                  {viewerIsEditor ? (
+                    <div>
+                      <FieldLabel>Counterparty</FieldLabel>
+                      {/* Bound to customSourceTag — the 'source of money'
+                          field. Admins only per the two-role model. */}
+                      <input
+                        type="text"
+                        value={customSourceTag}
+                        onChange={(e) => setCustomSourceTag(e.target.value)}
+                        onBlur={() => persist({ customSourceTag: customSourceTag || null })}
+                        placeholder="Who got paid"
+                        style={fieldInStyle}
+                      />
+                    </div>
+                  ) : null}
                 </div>
 
                 <FieldLabel>Category · quick pick</FieldLabel>
@@ -830,24 +833,26 @@ export default function TransactionDetailView({
                   style={fieldInStyle}
                 />
               </div>
-              <div style={{ gridColumn: 'span 2' }}>
-                <FieldLabel>
-                  Custom source tag{' '}
-                  <span style={{ color: 'var(--ink-4, #44443f)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
-                    — the specific client / project / purpose behind this row
-                  </span>
-                </FieldLabel>
-                <input
-                  type="text"
-                  value={customSourceTag}
-                  onChange={(e) => setCustomSourceTag(e.target.value)}
-                  onBlur={() => persist({ customSourceTag: customSourceTag || null })}
-                  placeholder={tx.amount > 0
-                    ? 'e.g. Bytes AI — Client Acme SaaS, invoice #1234'
-                    : 'e.g. Anthropic API for Bytes AI production'}
-                  style={fieldInStyle}
-                />
-              </div>
+              {viewerIsEditor ? (
+                <div style={{ gridColumn: 'span 2' }}>
+                  <FieldLabel>
+                    Custom source tag{' '}
+                    <span style={{ color: 'var(--ink-4, #44443f)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                      — the specific client / project / purpose behind this row
+                    </span>
+                  </FieldLabel>
+                  <input
+                    type="text"
+                    value={customSourceTag}
+                    onChange={(e) => setCustomSourceTag(e.target.value)}
+                    onBlur={() => persist({ customSourceTag: customSourceTag || null })}
+                    placeholder={tx.amount > 0
+                      ? 'e.g. Bytes AI — Client Acme SaaS, invoice #1234'
+                      : 'e.g. Anthropic API for Bytes AI production'}
+                    style={fieldInStyle}
+                  />
+                </div>
+              ) : null}
               <div style={{ gridColumn: 'span 2' }}>
                 <FieldLabel>Notes</FieldLabel>
                 <textarea

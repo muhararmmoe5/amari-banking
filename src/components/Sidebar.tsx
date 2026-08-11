@@ -228,7 +228,9 @@ export default function Sidebar({
           </div>
           <div className="min-w-0 flex-1 text-left">
             <div className="text-[12px] font-medium truncate">{userName || userEmail || 'User'}</div>
-            <div className="text-[10.5px] text-ink-mute truncate">{role ? role.toLowerCase().replace('_', ' ') : 'signed in'}</div>
+            <div className="text-[10.5px] text-ink-mute truncate">
+              {role === 'OWNER' || role === 'EDITOR' ? 'admin' : role ? 'team member' : 'signed in'}
+            </div>
           </div>
           <LogOut size={12} className="text-ink-mute group-hover:text-expense transition" />
         </button>

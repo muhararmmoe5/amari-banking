@@ -188,10 +188,9 @@ export default function TeamClient({ initialPeople, portfolioMap }: { initialPeo
             </label>
             <label className="block">
               <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Role</div>
-              <select name="role" defaultValue="PARTNER">
-                <option value="EDITOR">Editor (full edit access, same as you)</option>
-                <option value="PARTNER">Partner (sees their own equity)</option>
-                <option value="TEAM_MEMBER">Team member (read-only)</option>
+              <select name="role" defaultValue="TEAM_MEMBER">
+                <option value="EDITOR">Admin — full access, same as you</option>
+                <option value="TEAM_MEMBER">Team member — Identify queue + edit own claimed charges</option>
               </select>
             </label>
           </div>
