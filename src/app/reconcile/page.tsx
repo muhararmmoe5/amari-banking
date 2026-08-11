@@ -1,10 +1,14 @@
 import { getDb } from '@/lib/db';
 import { Money } from '@/components/Money';
 import { fmtDate } from '@/lib/format';
+import { requireUser, hasEditAccess } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 export default function ReconcilePage() {
+  const user = requireUser();
+  if (!hasEditAccess(user)) redirect('/cap');
   const db = getDb();
   const matchCount = (db.prepare('SELECT COUNT(*) c FROM reconciliation_matches').get() as { c: number }).c;
   const unmatched = db.prepare(`

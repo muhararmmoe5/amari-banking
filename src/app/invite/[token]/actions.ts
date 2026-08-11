@@ -2,7 +2,7 @@
 
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { getInvite, consumeInvite, createSession, createUser, getUserByEmail, updateUserPassword } from '@/lib/auth/sessions';
+import { getInvite, consumeInvite, createSession, createUser, getUserByEmail, updateUserPassword, updateUserRole, type UserRole } from '@/lib/auth/sessions';
 import { hashPassword, validatePasswordPolicy } from '@/lib/auth/password';
 import { SESSION_COOKIE } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
@@ -21,12 +21,27 @@ export async function redeemInviteAction(token: string, formData: FormData): Pro
 
   const hash = await hashPassword(password);
 
-  // Reuse an existing user with this email if present, else create
+  // Reuse an existing user with this email if present, else create.
+  // For existing users, upgrade the role if the invite grants MORE
+  // privilege than they currently have — but never silently downgrade
+  // (e.g. a "password reset" invite that carried role=PARTNER used to
+  // demote an existing EDITOR).
   const existing = getUserByEmail(invite.email);
   let userId: string;
+  let finalRole: UserRole;
   if (existing) {
     updateUserPassword(existing.id, hash);
     userId = existing.id;
+    // Role privilege order (lowest → highest): TEAM_MEMBER, PARTNER,
+    // EDITOR, OWNER. Only apply the invite's role if it's a bump.
+    const rank: Record<UserRole, number> = { TEAM_MEMBER: 0, PARTNER: 1, EDITOR: 2, OWNER: 3 };
+    const existingRole = (existing.role as UserRole) || 'TEAM_MEMBER';
+    if ((rank[invite.role] ?? 0) > (rank[existingRole] ?? 0)) {
+      updateUserRole(existing.id, invite.role);
+      finalRole = invite.role;
+    } else {
+      finalRole = existingRole;
+    }
   } else {
     const user = createUser({
       email: invite.email,
@@ -36,6 +51,7 @@ export async function redeemInviteAction(token: string, formData: FormData): Pro
       personId: invite.personId,
     });
     userId = user.id;
+    finalRole = user.role;
   }
 
   consumeInvite(token, userId);
@@ -52,5 +68,10 @@ export async function redeemInviteAction(token: string, formData: FormData): Pro
     maxAge: 60 * 60 * 24 * 30,
   });
   revalidatePath('/');
-  redirect('/');
+  // Send editors/owners to the full dashboard; everyone else to their
+  // own team profile page (or /cap if no personId).
+  const canSeeDashboard = finalRole === 'OWNER' || finalRole === 'EDITOR';
+  if (canSeeDashboard) redirect('/');
+  if (invite.personId) redirect(`/team/${invite.personId}`);
+  redirect('/cap');
 }

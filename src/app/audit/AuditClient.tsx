@@ -15,7 +15,8 @@ import SplitEditor from './SplitEditor';
 
 const ENTITY_OPTIONS: EntityType[] = [
   'BYTES_AI', 'ROCKET_WIRELESS', 'DELICIOUS_BYTES', 'AMARI_VENTURES',
-  'BYTES_REST_TECH', 'PERSONAL', 'MULTI_ENTITY', 'BUSINESS_SHARED', 'UNKNOWN',
+  'BYTES_REST_TECH', 'AMARI_HOLDINGS', 'PERSONAL', 'MULTI_ENTITY',
+  'BUSINESS_SHARED', 'UNKNOWN',
 ];
 
 export default function AuditClient({ initialRows }: { initialRows: Transaction[] }) {

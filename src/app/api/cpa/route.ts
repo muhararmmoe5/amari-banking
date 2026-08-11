@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateCpaWorkbook } from '@/lib/exporters/cpa-excel';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  // Full financial package — restricted to editors/owners.
+  const user = getCurrentUser();
+  if (!user || !hasEditAccess(user)) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
   const url = new URL(req.url);
   const dateFrom = url.searchParams.get('from') || undefined;
   const dateTo = url.searchParams.get('to') || undefined;

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import {
   X, ChevronDown, Check, Lock, Plus, ArrowDown, ArrowRight,
-  User, Building2, Repeat, Calendar, Wallet, Receipt, Paperclip,
+  User, Building2, Repeat, Calendar, Wallet, Receipt,
   Split, Tag, Award, Link2, Sparkles, ShieldCheck, AlertTriangle, Flag,
 } from 'lucide-react';
 import type { Transaction, EntityType, AuditStatus } from '@/types';
@@ -1363,14 +1363,20 @@ function MoneyFlowSection({
       >
         <div className="field-label mb-3">Money chain · who got it next?</div>
         <div className="grid grid-cols-2 gap-3.5">
-          <Field label="Hop 2 · pays to person" hint="As salary / wages">
+          <Field label="Hop 2 · pays to person" hint="Use the Salary section to link a specific person">
+            {/* Previously offered a bogus 'pending' option that persisted the
+                literal string 'pending' to salary_person_id and flipped
+                is_salary=true. Since the drawer doesn't have the person
+                list threaded in yet, the honest option is a single 'stayed
+                in entity' choice; specific person selection happens in
+                the Salary section on the transaction detail page. */}
             <select
               value={state.hop2Person || ''}
-              onChange={(e) => setState({ hop2Person: e.target.value }, { salaryPersonId: e.target.value || null, isSalary: !!e.target.value })}
+              onChange={(e) => setState({ hop2Person: e.target.value }, { salaryPersonId: null, isSalary: false })}
+              disabled
+              title="Pick a specific person from the Salary section on the transaction detail page"
             >
               <option value="">— stayed in entity —</option>
-              {/* Person list could be threaded in; using counterparty list shortcut */}
-              <option value="pending">— pick on Salary section —</option>
             </select>
           </Field>
           <Field label="Hop 3 · then forwards to" hint="Where it ultimately lands">
@@ -1575,11 +1581,9 @@ function NotesSection({
                 placeholder="INV-123 / link to file"
               />
             </Field>
-            <Field label="Receipt">
-              <button type="button" className="btn w-full justify-center">
-                <Paperclip size={12} /> Upload receipt
-              </button>
-            </Field>
+            {/* Upload receipt was a bare <button> with no wiring, no file
+                input. Removed until a real S3/local upload flow exists —
+                users can still paste a link in Doc reference above. */}
           </div>
         </>
       ) : null}

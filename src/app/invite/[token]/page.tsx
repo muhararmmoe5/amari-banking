@@ -11,7 +11,8 @@ export default function InvitePage({ params }: { params: { token: string } }) {
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="card p-8 text-center max-w-md">
           <h1 className="text-lg font-semibold mb-2">Invite not found</h1>
-          <p className="text-sm text-ink-dim">This invite link is invalid or has expired.</p>
+          <p className="text-sm text-ink-dim mb-4">This invite link is invalid or has expired.</p>
+          <a href="/login" className="btn btn-primary">Go to sign in</a>
         </div>
       </div>
     );
@@ -21,7 +22,8 @@ export default function InvitePage({ params }: { params: { token: string } }) {
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="card p-8 text-center max-w-md">
           <h1 className="text-lg font-semibold mb-2">Invite already used</h1>
-          <p className="text-sm text-ink-dim">This link has already been claimed. <a href="/login" className="text-entity-bytes">Sign in</a> instead.</p>
+          <p className="text-sm text-ink-dim mb-4">This link has already been claimed.</p>
+          <a href="/login" className="btn btn-primary">Sign in</a>
         </div>
       </div>
     );
@@ -31,7 +33,8 @@ export default function InvitePage({ params }: { params: { token: string } }) {
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="card p-8 text-center max-w-md">
           <h1 className="text-lg font-semibold mb-2">Invite expired</h1>
-          <p className="text-sm text-ink-dim">Ask the owner for a new invite link.</p>
+          <p className="text-sm text-ink-dim mb-4">Ask the owner for a new invite link.</p>
+          <a href="/login" className="btn">Back to sign in</a>
         </div>
       </div>
     );

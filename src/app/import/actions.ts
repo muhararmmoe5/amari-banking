@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { parseChaseCsv } from '@/lib/parsers/csv';
 import { saveImportBatch } from '@/lib/db/queries';
 import { runReconciliation } from '@/lib/parsers/reconciler';
+import { requireUser, hasEditAccess } from '@/lib/auth';
 
 export interface ImportFilePayload {
   filename: string;
@@ -25,6 +26,8 @@ export async function importCsvFiles(files: ImportFilePayload[]): Promise<{
   reconciled: number;
   ambiguousMatches: number;
 }> {
+  const user = requireUser();
+  if (!hasEditAccess(user)) throw new Error('read-only role cannot import');
   const perFile: ImportRunResult[] = [];
   for (const f of files) {
     const parsed = parseChaseCsv(f.csvText, f.filename, f.accountId);

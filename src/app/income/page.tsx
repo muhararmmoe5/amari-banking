@@ -3,6 +3,8 @@ import { incomeBySources, listTransactions, incomeByMonthAndSource } from '@/lib
 import { Money } from '@/components/Money';
 import { fmtMoney, fmtDate } from '@/lib/format';
 import IncomeChart from './IncomeChart';
+import { requireUser, hasEditAccess } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +24,8 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 export default function IncomePage() {
+  const user = requireUser();
+  if (!hasEditAccess(user)) redirect('/cap');
   const db = getDb();
   const sources = incomeBySources();
   const timeSeries = incomeByMonthAndSource();

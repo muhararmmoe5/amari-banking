@@ -11,8 +11,44 @@ import {
 } from '@/lib/db/queries';
 import { previewRecurringAllocation } from '@/lib/db/forecasts';
 import { requireUser, hasEditAccess } from '@/lib/auth';
+import type { EntityType, CategoryType } from '@/types';
+
+// Allow-lists to reject bogus enum strings coming from clients or from
+// the Claude classifier. Anything not on the list becomes null so the
+// UI silently falls back to the existing value rather than persisting
+// gibberish.
+const VALID_ENTITIES = new Set<string>([
+  'BYTES_AI', 'ROCKET_WIRELESS', 'DELICIOUS_BYTES', 'AMARI_VENTURES',
+  'BYTES_REST_TECH', 'AMARI_HOLDINGS', 'PERSONAL', 'MULTI_ENTITY',
+  'BUSINESS_SHARED', 'UNKNOWN',
+]);
+const VALID_CATEGORIES = new Set<string>([
+  'INCOME_SPACETEL', 'INCOME_TCETRA', 'INCOME_STRIPE', 'INCOME_DOORDASH',
+  'INCOME_GRUBHUB', 'INCOME_UBEREATS', 'INCOME_WIRE', 'INCOME_ZELLE',
+  'INCOME_OTHER', 'EXPENSE_PAYROLL', 'EXPENSE_SOFTWARE_BYTES',
+  'EXPENSE_SOFTWARE_GENERAL', 'EXPENSE_PROCESSING_FEES',
+  'EXPENSE_COGS_FOOD', 'EXPENSE_COGS_WIRELESS', 'EXPENSE_RENT',
+  'EXPENSE_TRAVEL', 'EXPENSE_FOOD_DINING', 'EXPENSE_TRANSPORT',
+  'EXPENSE_FUEL', 'EXPENSE_INSURANCE', 'EXPENSE_WIRE_INTL',
+  'EXPENSE_WIRE_DOMESTIC', 'EXPENSE_REMITTANCE', 'EXPENSE_ZELLE',
+  'EXPENSE_APPLE_CASH', 'EXPENSE_PAYPAL', 'EXPENSE_CREDIT_CARD_PMT',
+  'EXPENSE_BANK_FEES', 'EXPENSE_PERSONAL', 'EXPENSE_MARKETING',
+  'EXPENSE_CONTRACTORS', 'EXPENSE_CASH_DEPOSIT', 'INTERNAL_TRANSFER',
+  'UNCATEGORIZED',
+]);
+function safeEntity(v: string | null | undefined): EntityType | null {
+  if (v == null) return null;
+  return VALID_ENTITIES.has(v) ? (v as EntityType) : null;
+}
+function safeCategory(v: string | null | undefined): CategoryType | null {
+  if (v == null) return null;
+  return VALID_CATEGORIES.has(v) ? (v as CategoryType) : null;
+}
 
 export async function saveTransaction(id: string, patch: UpdateTxPatch) {
+  const user = requireUser();
+  if (!hasEditAccess(user)) throw new Error('read-only role cannot edit transactions');
+  if (typeof id !== 'string' || id.length === 0 || id.length > 64) throw new Error('invalid id');
   updateTransaction(id, patch);
   revalidatePath('/transactions');
   revalidatePath('/audit');
@@ -73,12 +109,12 @@ export async function bulkApplyReviewsAction(items: BulkApplyItem[]): Promise<{ 
   let skipped = 0;
   for (const item of items) {
     if (!item.txId || typeof item.txId !== 'string' || item.txId.length > 64) { skipped++; continue; }
-    // Widen the patch type to string here — updateTransaction stores the
-    // values as raw strings and the union types on UpdateTxPatch just
-    // reflect the currently-known enum values, not a runtime constraint.
+    // Enum values are allow-listed; anything unrecognized becomes null.
+    // Prevents Claude or a bad client from persisting garbage like
+    // 'OopsCorp' as confirmed_entity.
     const patch: UpdateTxPatch = {};
-    if (item.confirmedEntity !== undefined) (patch as Record<string, unknown>).confirmedEntity = item.confirmedEntity;
-    if (item.confirmedCategory !== undefined) (patch as Record<string, unknown>).confirmedCategory = item.confirmedCategory;
+    if (item.confirmedEntity !== undefined) patch.confirmedEntity = safeEntity(item.confirmedEntity);
+    if (item.confirmedCategory !== undefined) patch.confirmedCategory = safeCategory(item.confirmedCategory);
     if (item.individual !== undefined) patch.individual = item.individual;
     if (item.customSourceTag !== undefined) patch.customSourceTag = item.customSourceTag;
     if (item.fundedByTransactionId !== undefined) patch.fundedByTransactionId = item.fundedByTransactionId;

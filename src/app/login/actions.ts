@@ -50,5 +50,9 @@ export async function loginAction(formData: FormData): Promise<{ error?: string 
     maxAge: 60 * 60 * 24 * 30,
   });
 
-  redirect(next.startsWith('/') ? next : '/');
+  // Only accept same-origin relative paths for `next`. Reject
+  // protocol-relative URLs like //evil.com — Next resolves those as
+  // off-site redirects, which is a phishing vector.
+  const isSafeNext = next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\');
+  redirect(isSafeNext ? next : '/');
 }

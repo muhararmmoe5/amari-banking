@@ -4,6 +4,8 @@ import { ACCOUNTS } from '@/constants/accounts';
 import VirtualTable from './VirtualTable';
 import RescanDatesButton from './RescanDatesButton';
 import type { EntityType, AuditStatus } from '@/types';
+import { requireUser, hasEditAccess } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,6 +63,8 @@ function presetToRange(preset?: string): { from?: string; to?: string } {
 }
 
 export default function TransactionsPage({ searchParams }: { searchParams: SearchProps }) {
+  const user = requireUser();
+  if (!hasEditAccess(user)) redirect('/cap');
   const hideInternal = searchParams.internal !== '1';
   const presetRange = presetToRange(searchParams.preset);
   const dateFrom = searchParams.from || presetRange.from;
@@ -450,7 +454,10 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
             <option value="DELICIOUS_BYTES">Delicious Bytes</option>
             <option value="AMARI_VENTURES">Amari Ventures</option>
             <option value="BYTES_REST_TECH">Bytes Rest Tech</option>
+            <option value="AMARI_HOLDINGS">Amari Holdings</option>
             <option value="PERSONAL">Personal</option>
+            <option value="MULTI_ENTITY">Multi-entity</option>
+            <option value="BUSINESS_SHARED">Business (shared)</option>
             <option value="UNKNOWN">Unknown</option>
           </select>
           <select name="status" defaultValue={searchParams.status || ''}>

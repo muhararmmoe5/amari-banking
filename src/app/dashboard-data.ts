@@ -100,15 +100,36 @@ export function moneyFlowBuckets(dateFrom?: string, dateTo?: string): { sources:
     GROUP BY cat
     ORDER BY total DESC
   `).all(...params) as Array<{ cat: string; total: number }>;
+  // Keys must match the real CategoryType values in src/types/index.ts —
+  // previously used abbreviated aliases (EXPENSE_COGS, EXPENSE_SOFTWARE,
+  // EXPENSE_LEGAL) that never existed, so every destination fell back to
+  // the grey fallback and the Sankey looked broken.
   const destColorMap: Record<string, string> = {
     EXPENSE_PAYROLL: '#b18ac9',
-    EXPENSE_COGS: '#c98a7a',
-    EXPENSE_SOFTWARE: '#6b8aa8',
+    EXPENSE_COGS_FOOD: '#c98a7a',
+    EXPENSE_COGS_WIRELESS: '#8a5a4a',
+    EXPENSE_SOFTWARE_BYTES: '#6b8aa8',
+    EXPENSE_SOFTWARE_GENERAL: '#4a6d88',
     EXPENSE_MARKETING: '#c9a87a',
-    EXPENSE_OPERATIONS: '#7a8c6b',
+    EXPENSE_RENT: '#7a8c6b',
     EXPENSE_TRAVEL: '#c9b8a8',
-    EXPENSE_LEGAL: '#9f9a8c',
-    EXPENSE_TAXES: '#88724a',
+    EXPENSE_FOOD_DINING: '#d18876',
+    EXPENSE_TRANSPORT: '#8ac9b8',
+    EXPENSE_FUEL: '#c8a058',
+    EXPENSE_INSURANCE: '#9f9a8c',
+    EXPENSE_WIRE_INTL: '#a878c9',
+    EXPENSE_WIRE_DOMESTIC: '#889fc9',
+    EXPENSE_REMITTANCE: '#c9a0d0',
+    EXPENSE_ZELLE: '#88b0c9',
+    EXPENSE_PROCESSING_FEES: '#88724a',
+    EXPENSE_BANK_FEES: '#a89078',
+    EXPENSE_CONTRACTORS: '#c99878',
+    EXPENSE_CREDIT_CARD_PMT: '#8898c9',
+    EXPENSE_APPLE_CASH: '#c8c8b0',
+    EXPENSE_PAYPAL: '#7898b0',
+    EXPENSE_PERSONAL: '#c9b0a0',
+    EXPENSE_CASH_DEPOSIT: '#a0c090',
+    INTERNAL_TRANSFER: '#666666',
   };
   const destLabel = (raw: string) =>
     raw.replace(/^EXPENSE_/, '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());

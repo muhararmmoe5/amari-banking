@@ -2,6 +2,7 @@ import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { TOOL_DEFINITIONS, executeTool, type ToolResult } from '@/lib/ai/tools';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -72,6 +73,12 @@ interface ApiResponseTurn {
 }
 
 export async function POST(req: NextRequest) {
+  // Gate on hasEditAccess so anonymous callers can't burn Anthropic budget
+  // or invoke the AI tools that read/mutate the DB.
+  const user = getCurrentUser();
+  if (!user || !hasEditAccess(user)) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json(

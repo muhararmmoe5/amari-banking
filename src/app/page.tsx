@@ -30,6 +30,8 @@ import {
   Download,
   FileText,
 } from 'lucide-react';
+import { requireUser, hasEditAccess } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +52,10 @@ function fmtMoneyFull(n: number): string {
 }
 
 export default function DashboardPage({ searchParams }: { searchParams: { period?: string } }) {
+  // Full-portfolio dashboard — restricted to editors/owners. Non-editors
+  // land on /cap which routes them to their own team page.
+  const user = requireUser();
+  if (!hasEditAccess(user)) redirect('/cap');
   const { from, to } = periodToDateRange(searchParams.period);
   const p = portfolioSummary(from, to);
   const accountSummaries = summarizeAccounts(from, to);
@@ -129,17 +135,28 @@ export default function DashboardPage({ searchParams }: { searchParams: { period
                 ) : (
                   <>All time · </>
                 )}
-                all five entities · {p.totalCount.toLocaleString()} transactions
+                all six entities · {p.totalCount.toLocaleString()} transactions
               </div>
             </div>
             <div className="flex-1" />
             <div className="flex gap-2 items-center">
-              <span className="chip">
-                <span className="chip-dot" style={{ background: '#7fb892', color: '#7fb892' }} />
-                Books up to date
+              {/* Books-up-to-date pill drives from the real review progress
+                  — was previously a cosmetic green pill regardless of state. */}
+              <span
+                className="chip"
+                style={{
+                  color: p.openFlagCount === 0 ? '#7fb892' : '#c9a87a',
+                }}
+              >
+                <span
+                  className="chip-dot"
+                  style={{ background: p.openFlagCount === 0 ? '#7fb892' : '#c9a87a', color: p.openFlagCount === 0 ? '#7fb892' : '#c9a87a' }}
+                />
+                {p.openFlagCount === 0 ? 'Books up to date' : `${p.openFlagCount} open flag${p.openFlagCount === 1 ? '' : 's'}`}
               </span>
               <Link href="/cpa" className="btn btn-ghost btn-sm"><Download size={13} /> CPA export</Link>
-              <button className="btn btn-sm"><FileText size={13} /> Investor update</button>
+              {/* 'Investor update' had no handler — removed until it's a
+                  real report generator. */}
               <Link href="/audit" className="btn btn-primary btn-sm"><Tag size={13} /> Tag transactions</Link>
             </div>
           </div>
@@ -153,9 +170,12 @@ export default function DashboardPage({ searchParams }: { searchParams: { period
               background: 'rgba(255,255,255,0.055)',
             }}
           >
-            {/* Cell A — Net cash position */}
+            {/* Cell A — Period net (income minus expenses in-period).
+                Labeled 'Net for period' to be honest — the previous 'Net
+                cash position' label suggested current bank balances,
+                which this figure isn't. See /flow for real balances. */}
             <div className="bg-bg-1 p-6">
-              <div className="section-label">Net cash position</div>
+              <div className="section-label">Net for period</div>
               <div className="flex items-baseline gap-1.5 mt-3.5">
                 <span className="serif-display" style={{ fontSize: 52 }}>{fmtMoneyCompact(netCash).replace(/[KM]$/, '').replace('$', '$')}</span>
                 <span className="text-[18px] text-ink-dim font-medium">{Math.abs(netCash) >= 1e6 ? 'M' : Math.abs(netCash) >= 1e3 ? 'K' : ''}</span>
@@ -218,13 +238,28 @@ export default function DashboardPage({ searchParams }: { searchParams: { period
             {/* Cell C — Runway */}
             <div className="bg-bg-1 p-6">
               <div className="section-label">Runway at current burn</div>
-              <div className="flex items-baseline gap-2 mt-3.5">
-                <span className="serif-display" style={{ fontSize: 52 }}>{runwayDays > 9999 ? '∞' : runwayDays}</span>
-                <span className="text-[16px] text-ink-dim">days</span>
-              </div>
-              <div className="text-[11.5px] text-ink-mute mt-3.5">
-                ~{Math.round(runwayDays / 30)} months · <span className="num">${Math.round(avgDailyBurn).toLocaleString()}</span>/day avg burn
-              </div>
+              {/* When net cash is negative, showing '-30 days' is worse than
+                  saying 'burning cash' — the bar can't go below zero. */}
+              {runwayDays < 0 ? (
+                <>
+                  <div className="flex items-baseline gap-2 mt-3.5">
+                    <span className="serif-display" style={{ fontSize: 40, color: '#d18876' }}>Burning</span>
+                  </div>
+                  <div className="text-[11.5px] text-ink-mute mt-3.5">
+                    Net cash negative · <span className="num">${Math.round(avgDailyBurn).toLocaleString()}</span>/day avg burn
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-baseline gap-2 mt-3.5">
+                    <span className="serif-display" style={{ fontSize: 52 }}>{runwayDays > 9999 ? '∞' : runwayDays}</span>
+                    <span className="text-[16px] text-ink-dim">days</span>
+                  </div>
+                  <div className="text-[11.5px] text-ink-mute mt-3.5">
+                    ~{Math.max(0, Math.round(runwayDays / 30))} months · <span className="num">${Math.round(avgDailyBurn).toLocaleString()}</span>/day avg burn
+                  </div>
+                </>
+              )}
               <div className="relative h-1.5 bg-bg-3 rounded-sm mt-4">
                 <div
                   className="absolute left-0 top-0 h-full rounded-sm"
@@ -233,7 +268,10 @@ export default function DashboardPage({ searchParams }: { searchParams: { period
                     background: 'linear-gradient(90deg, #c9a87a, #88724a)',
                   }}
                 />
-                <div className="absolute -top-1 w-0.5 h-3" style={{ left: '10%', background: '#f0eee9' }} />
+                {/* 'Now' marker sits at the start of the bar — it was
+                    previously pinned at 10% regardless of runway, which
+                    misled about how much burn had already happened. */}
+                <div className="absolute -top-1 w-0.5 h-3" style={{ left: '0%', background: '#f0eee9' }} />
               </div>
               <div className="flex justify-between mt-1.5 text-[10px] text-ink-ghost">
                 <span>now</span>
@@ -380,20 +418,10 @@ function MoneyFlow({ flow }: { flow: { sources: any[]; destinations: any[] } }) 
           <div className="card-sub">Where capital came from and where it went</div>
         </div>
         <div className="flex-1" />
-        <div className="flex gap-1.5 p-0.5 bg-bg-2 rounded-md border border-line">
-          {['Sources → Uses', 'By entity', 'Daily'].map((label, i) => (
-            <button
-              key={label}
-              type="button"
-              className="px-2.5 py-1 text-[11.5px] rounded font-medium transition-colors"
-              style={{
-                background: i === 0 ? '#0a0a0c' : 'transparent',
-                color: i === 0 ? '#f0eee9' : '#6f6e68',
-              }}
-            >
-              {label}
-            </button>
-          ))}
+        {/* Segmented tab strip was fake — only 'Sources → Uses' was implemented.
+            Replace with a single label so nothing looks clickable that isn't. */}
+        <div className="px-2.5 py-1 text-[11.5px] rounded font-medium bg-bg-2 border border-line" style={{ color: '#f0eee9' }}>
+          Sources → Uses
         </div>
       </div>
 
@@ -539,7 +567,8 @@ function AttentionQueue({ items }: { items: any[] }) {
           <div className="card-sub">{items.length} item{items.length === 1 ? '' : 's'} · sorted by urgency</div>
         </div>
         <div className="flex-1" />
-        <button className="btn btn-ghost btn-sm"><Check size={12} /> Clear done</button>
+        {/* 'Clear done' was dead; removed until we build a real bulk-dismiss.
+            Same for 'Filter' in Recent activity below. */}
       </div>
       <div>
         {items.length === 0 ? (
@@ -570,7 +599,12 @@ function AttentionQueue({ items }: { items: any[] }) {
                 </div>
                 <div className="text-[11.5px] text-ink-mute mt-0.5">{item.detail}</div>
               </div>
-              <button className="btn btn-sm">{item.cta} <ArrowRight size={11} /></button>
+              {/* Was <button> nested inside <Link> — invalid HTML with
+                  browsers making inconsistent click decisions. Turned into
+                  a plain span so only the outer Link handles the click. */}
+              <span className="btn btn-sm pointer-events-none">
+                {item.cta} <ArrowRight size={11} />
+              </span>
             </Link>
           );
         })}
@@ -592,7 +626,7 @@ function RecentActivity({ transactions }: { transactions: any[] }) {
           <div className="card-sub">Last {transactions.length} transactions across all accounts</div>
         </div>
         <div className="flex-1" />
-        <button className="btn btn-ghost btn-sm"><Filter size={12} /> Filter</button>
+        {/* 'Filter' was dead; the transactions list has real filters. */}
         <Link href="/transactions" className="btn btn-ghost btn-sm">All transactions <ArrowRight size={11} /></Link>
       </div>
       <table className="w-full">

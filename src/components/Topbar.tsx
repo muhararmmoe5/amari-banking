@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, Sparkles, Bell, HelpCircle, Calendar, ChevronDown, Upload, Download, Tag } from 'lucide-react';
+import { useState } from 'react';
+import { Search, Calendar, ChevronDown, Upload, Download, Tag } from 'lucide-react';
 
 const PERIOD_OPTS = [
   { v: '', l: 'All time' },
@@ -19,7 +20,7 @@ export default function Topbar({ title: _title }: { title?: string }) {
   const router = useRouter();
   const params = useSearchParams();
   const period = params.get('period') || '';
-  const currentLabel = PERIOD_OPTS.find((p) => p.v === period)?.l || 'All time';
+  const [searchInput, setSearchInput] = useState('');
 
   function setPeriod(next: string) {
     const sp = new URLSearchParams(params.toString());
@@ -28,12 +29,21 @@ export default function Topbar({ title: _title }: { title?: string }) {
     router.push('?' + sp.toString());
   }
 
+  function submitSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const q = searchInput.trim();
+    if (!q) return;
+    // Route to the transactions list with the search prefilled — that page
+    // reads `search` from its `SearchProps` and applies it via listTransactions.
+    router.push(`/transactions?search=${encodeURIComponent(q)}`);
+  }
+
   return (
     <div className="h-14 flex-none border-b border-line surface-glass flex items-center px-6 gap-3.5 sticky top-0 z-20">
-      {/* Entity scope (placeholder — wire to real switcher later) */}
-      <button
-        type="button"
-        className="flex items-center gap-2.5 pl-1.5 pr-2.5 py-1.5 rounded-md bg-bg-2 border border-line hover:bg-bg-3 hover:border-line-strong transition"
+      {/* Entity scope — display-only badge (was a dead placeholder button
+          claiming a switcher; we removed the switcher UI until it's real). */}
+      <div
+        className="flex items-center gap-2.5 pl-1.5 pr-2.5 py-1.5 rounded-md bg-bg-2 border border-line"
         title="Scope: all entities"
       >
         <div
@@ -44,10 +54,9 @@ export default function Topbar({ title: _title }: { title?: string }) {
         </div>
         <div className="flex flex-col items-start leading-tight">
           <span className="text-[12.5px] font-medium">All entities</span>
-          <span className="text-[10.5px] text-ink-mute">5 entities · 15 accounts</span>
+          <span className="text-[10.5px] text-ink-mute">6 entities · 15 accounts</span>
         </div>
-        <ChevronDown size={12} className="text-ink-mute ml-1" />
-      </button>
+      </div>
 
       {/* Period selector */}
       <div className="relative">
@@ -65,12 +74,21 @@ export default function Topbar({ title: _title }: { title?: string }) {
 
       <div className="flex-1" />
 
-      {/* Search */}
-      <div className="flex items-center gap-2 bg-bg-2 border border-line px-3 py-1.5 rounded-md text-ink-mute min-w-[280px] focus-within:border-line-2 transition">
+      {/* Search — submits to /transactions?search=… */}
+      <form
+        onSubmit={submitSearch}
+        className="flex items-center gap-2 bg-bg-2 border border-line px-3 py-1.5 rounded-md text-ink-mute min-w-[280px] focus-within:border-line-2 transition"
+      >
         <Search size={13} />
-        <input className="flex-1 !bg-transparent !border-0 !p-0 !text-[12.5px] !text-ink !rounded-none focus:!shadow-none placeholder:text-ink-mute" placeholder="Search transactions, merchants, accounts…" />
-        <kbd>⌘K</kbd>
-      </div>
+        <input
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="flex-1 !bg-transparent !border-0 !p-0 !text-[12.5px] !text-ink !rounded-none focus:!shadow-none placeholder:text-ink-mute"
+          placeholder="Search transactions, merchants…"
+          aria-label="Search transactions"
+        />
+        <kbd>↵</kbd>
+      </form>
 
       <Link href="/import" className="btn btn-sm" title="Import CSV">
         <Upload size={13} />
@@ -84,17 +102,9 @@ export default function Topbar({ title: _title }: { title?: string }) {
         <Tag size={13} />
         <span className="hidden lg:inline">Tag</span>
       </Link>
-
-      <button className="w-8 h-8 grid place-items-center rounded-md text-ink-dim hover:bg-bg-2 hover:text-ink transition" title="AI assistant">
-        <Sparkles size={15} className="text-accent" style={{ color: '#c9a87a' }} />
-      </button>
-      <button className="w-8 h-8 grid place-items-center rounded-md text-ink-dim hover:bg-bg-2 hover:text-ink transition relative" title="Notifications">
-        <Bell size={15} />
-        <span className="absolute top-[7px] right-[7px] w-1.5 h-1.5 rounded-full" style={{ background: '#c9a87a', boxShadow: '0 0 0 2px #111114' }} />
-      </button>
-      <button className="w-8 h-8 grid place-items-center rounded-md text-ink-dim hover:bg-bg-2 hover:text-ink transition" title="Help">
-        <HelpCircle size={15} />
-      </button>
+      {/* The AI assistant / notifications / help icon buttons that were
+          previously here weren't wired to anything and just ate clicks.
+          Removed until we have real implementations. */}
     </div>
   );
 }

@@ -104,6 +104,31 @@ export function finishIngestion(logId: string, counts: PlaidSyncCounts, notes?: 
  *     (fingerprint collision; two real transactions look identical).
  *
  *  Returns the branch taken so the caller can update counts. */
+/**
+ * Every INSERT into transactions must reference an import_batches row
+ * (import_batch_id is NOT NULL in the schema). Plaid syncs previously
+ * passed NULL, which meant the first real Plaid ingestion would throw
+ * `NOT NULL constraint failed: transactions.import_batch_id`. We now
+ * lazily create a per-account 'plaid-sync' batch and reuse it.
+ */
+const _plaidBatchCache = new Map<string, string>();
+function ensurePlaidBatch(accountId: string): string {
+  const db = getDb();
+  const cached = _plaidBatchCache.get(accountId);
+  if (cached) return cached;
+  const existing = db.prepare(
+    `SELECT id FROM import_batches WHERE file_name = 'plaid-sync' AND account_id = ? LIMIT 1`
+  ).get(accountId) as { id: string } | undefined;
+  if (existing) { _plaidBatchCache.set(accountId, existing.id); return existing.id; }
+  const id = crypto.randomUUID();
+  db.prepare(
+    `INSERT INTO import_batches (id, file_name, account_id, imported_at, row_count, date_range_from, date_range_to)
+     VALUES (?, 'plaid-sync', ?, ?, 0, NULL, NULL)`
+  ).run(id, accountId, Date.now());
+  _plaidBatchCache.set(accountId, id);
+  return id;
+}
+
 export function applyPlaidTransaction(p: PlaidTransaction): 'inserted' | 'merged' | 'duplicate' {
   const db = getDb();
   const fingerprint = computeFingerprint(p.amount, p.date, p.merchantName || p.name);
@@ -111,6 +136,7 @@ export function applyPlaidTransaction(p: PlaidTransaction): 'inserted' | 'merged
 
   const merchantNormalized = normalizeMerchant(p.merchantName || p.name);
   const now = Date.now();
+  const batchId = ensurePlaidBatch(p.accountId);
 
   if (!existing) {
     const id = crypto.randomUUID();
@@ -128,7 +154,7 @@ export function applyPlaidTransaction(p: PlaidTransaction): 'inserted' | 'merged
         0, 'plaid', @externalId, @rawData, @fingerprint,
         @pending, @pendingExternalId,
         'UNREVIEWED', '[]', 0,
-        @now, @now, NULL, @fingerprint
+        @now, @now, @batchId, @fingerprint
       )
     `).run({
       id,
@@ -137,6 +163,7 @@ export function applyPlaidTransaction(p: PlaidTransaction): 'inserted' | 'merged
       description: p.name,
       amount: p.amount,
       merchantName: p.merchantName || p.name,
+      batchId,
       merchantNormalized,
       externalId: p.transactionId,
       rawData: JSON.stringify(p.raw),
@@ -213,7 +240,7 @@ export function applyPlaidTransaction(p: PlaidTransaction): 'inserted' | 'merged
       0, 'plaid', @externalId, @rawData, @fingerprint,
       @pending, @pendingExternalId,
       'UNREVIEWED', '[]', 0,
-      @now, @now, NULL, @collisionHash
+      @now, @now, @batchId, @collisionHash
     )
   `).run({
     id,
@@ -231,6 +258,7 @@ export function applyPlaidTransaction(p: PlaidTransaction): 'inserted' | 'merged
     // hash column has a UNIQUE constraint — append the Plaid id to avoid collision.
     collisionHash: `${fingerprint}:${p.transactionId}`,
     now,
+    batchId,
   });
   return 'inserted';
 }

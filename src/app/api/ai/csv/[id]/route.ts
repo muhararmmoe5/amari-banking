@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStoredCsv } from '@/lib/ai/tools';
+import { getCurrentUser, hasEditAccess } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const user = getCurrentUser();
+  if (!user || !hasEditAccess(user)) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
   const stored = getStoredCsv(params.id);
   if (!stored) {
     return NextResponse.json({ error: 'not_found_or_expired' }, { status: 404 });

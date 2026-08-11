@@ -34,7 +34,16 @@ export async function POST(req: NextRequest) {
   if (!email || !email.includes('@')) {
     return NextResponse.json({ error: 'valid email required' }, { status: 400 });
   }
-  const role = (body.role || 'PARTNER') as UserRole;
+  // Only true OWNERs can hand out the OWNER role — an EDITOR granting
+  // OWNER to a confederate would be a privilege escalation. Anything not
+  // on the whitelist (or 'OWNER' asked-for by a non-owner) collapses to
+  // 'PARTNER' — the safest default.
+  const requested = (body.role || 'PARTNER') as UserRole;
+  const allowed: UserRole[] = ['OWNER', 'EDITOR', 'PARTNER', 'TEAM_MEMBER'];
+  const isWhitelisted = allowed.includes(requested);
+  const role: UserRole = (isWhitelisted && !(requested === 'OWNER' && user.role !== 'OWNER'))
+    ? requested
+    : 'PARTNER';
 
   // Reuse an existing person with this email if there is one.
   const existing = listPeople().find(

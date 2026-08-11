@@ -1,12 +1,14 @@
 import { listBudgetsWithSpend } from '@/lib/db/budgets';
 import { listCommitments, getPerson, listPeople } from '@/lib/db/cap';
-import { requireOwner } from '@/lib/auth';
+import { requireUser, hasEditAccess } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 import BudgetsClient from './BudgetsClient';
 
 export const dynamic = 'force-dynamic';
 
 export default function BudgetsPage() {
-  requireOwner();
+  const user = requireUser();
+  if (!hasEditAccess(user)) redirect('/cap');
   const budgets = listBudgetsWithSpend();
   const commitments = listCommitments().filter((c) => c.status === 'ACTIVE').map((c) => {
     const person = getPerson(c.personId);

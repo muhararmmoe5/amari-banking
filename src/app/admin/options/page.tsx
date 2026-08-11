@@ -1,5 +1,6 @@
 import { listOptionsGrouped, OPTION_FIELDS, OPTION_FIELD_LABELS, type OptionField } from '@/lib/db/options';
-import { requireOwner } from '@/lib/auth';
+import { requireUser, hasEditAccess } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 import OptionsClient from './OptionsClient';
 
 const AUTO_NOTES: Partial<Record<OptionField, string>> = {
@@ -11,7 +12,8 @@ const AUTO_NOTES: Partial<Record<OptionField, string>> = {
 export const dynamic = 'force-dynamic';
 
 export default function AdminOptionsPage() {
-  requireOwner();
+  const user = requireUser();
+  if (!hasEditAccess(user)) redirect('/cap');
   const grouped = listOptionsGrouped();
   return (
     <div className="p-8 space-y-6 max-w-[1200px] mx-auto">

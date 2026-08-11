@@ -2,10 +2,14 @@ import { entityPLs } from '@/lib/db/queries';
 import { ENTITY_LABELS, ENTITY_COLORS } from '@/constants/accounts';
 import { fmtMoney } from '@/lib/format';
 import { Money } from '@/components/Money';
+import { requireUser, hasEditAccess } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 export default function PLPage() {
+  const user = requireUser();
+  if (!hasEditAccess(user)) redirect('/cap');
   const data = entityPLs();
   const order = ['BYTES_AI', 'ROCKET_WIRELESS', 'DELICIOUS_BYTES', 'AMARI_VENTURES', 'BYTES_REST_TECH', 'AMARI_HOLDINGS', 'PERSONAL', 'BUSINESS_SHARED', 'MULTI_ENTITY', 'UNKNOWN'];
   const sorted = [...data].sort((a, b) => order.indexOf(a.entity) - order.indexOf(b.entity));

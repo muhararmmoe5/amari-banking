@@ -22,6 +22,9 @@ const HOLDER_TYPES: Record<string, { label: string; color: string }> = {
   PARTNER: { label: 'Partner', color: '#C8F060' },
   TEAM_MEMBER: { label: 'Team member', color: '#60C8F0' },
   OBSERVER: { label: 'Observer', color: '#888888' },
+  // Was missing — investor holdings (like Omar Alghazali's Bytes AI stake)
+  // were rendering with the fallback Partner color/label.
+  INVESTOR: { label: 'Investor', color: '#b18ac9' },
 };
 
 export default function PersonDetailPage({ params }: { params: { id: string } }) {

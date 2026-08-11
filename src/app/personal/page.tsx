@@ -6,7 +6,8 @@ import { PageTitle } from '@/components/PageTitle';
 import Topbar from '@/components/Topbar';
 import { periodToDateRange } from '@/lib/period';
 import { fmtDate } from '@/lib/format';
-import { requireOwner } from '@/lib/auth';
+import { requireUser, hasEditAccess } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,8 @@ function fmtMoneyFull(n: number): string {
 }
 
 export default function PersonalFinancePage({ searchParams }: { searchParams: { period?: string } }) {
-  requireOwner();
+  const user = requireUser();
+  if (!hasEditAccess(user)) redirect('/cap');
   const { from, to } = periodToDateRange(searchParams.period);
   const s = personalSummary(from, to);
   const forecasts = recurringForecasts({ personalOnly: true, monthsAhead: 12 });

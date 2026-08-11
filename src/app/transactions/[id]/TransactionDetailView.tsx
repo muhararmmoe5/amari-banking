@@ -78,9 +78,14 @@ export default function TransactionDetailView({
   const [docRef, setDocRef] = useState<string>(tx.receiptRef || '');
   const [customSourceTag, setCustomSourceTag] = useState<string>(tx.customSourceTag || '');
   const [notes, setNotes] = useState<string>(tx.notes || '');
-  const [bookingDateMode, setBookingDateMode] = useState<'DAY' | 'MONTH'>(
-    (tx.bookingDateMode as 'DAY' | 'MONTH') || 'MONTH',
-  );
+  // Older rows may not have a bookingDateMode column populated. Infer
+  // it from the tagged_date shape: full YYYY-MM-DD means DAY mode; a
+  // month-first-of value or missing tag defaults to MONTH. Previously
+  // this always defaulted to MONTH and silently rewrote a DAY tag to
+  // the first of the month the moment the user toggled the switch.
+  const inferredMode: 'DAY' | 'MONTH' = tx.bookingDateMode as 'DAY' | 'MONTH'
+    || (tx.taggedDate && /^\d{4}-\d{2}-\d{2}$/.test(tx.taggedDate) && !tx.taggedDate.endsWith('-01') ? 'DAY' : 'MONTH');
+  const [bookingDateMode, setBookingDateMode] = useState<'DAY' | 'MONTH'>(inferredMode);
   const [taggedDate, setTaggedDate] = useState<string>(tx.taggedDate || '');
   // Default to split=true when this transaction already has split rows saved.
   // Earlier categorization persists in transaction_splits — surface it instead
@@ -167,13 +172,8 @@ export default function TransactionDetailView({
           <ArrowLeft size={12} /> Back to transactions
         </Link>
         <span style={{ flex: 1 }} />
-        <button type="button" className="btn btn-ghost btn-sm" disabled>
-          <ArrowLeft size={11} /> Prev
-        </button>
-        <button type="button" className="btn btn-ghost btn-sm" disabled>
-          Next <ArrowRight size={11} />
-        </button>
-        <span style={{ color: 'var(--ink-4, #44443f)' }}>·</span>
+        {/* Prev / Next were rendered permanently disabled with no wiring —
+            removed until they have a real cursor-through-list handler. */}
         <button
           type="button"
           className="btn btn-ghost btn-sm"
@@ -729,8 +729,14 @@ export default function TransactionDetailView({
                   </div>
                   <div>
                     <FieldLabel>Counterparty</FieldLabel>
+                    {/* Was previously an unbound <input> — typed values
+                        vanished on reload. Bound to customSourceTag which
+                        is the right home for 'who got paid' free text. */}
                     <input
                       type="text"
+                      value={customSourceTag}
+                      onChange={(e) => setCustomSourceTag(e.target.value)}
+                      onBlur={() => persist({ customSourceTag: customSourceTag || null })}
                       placeholder="Who got paid"
                       style={fieldInStyle}
                     />
@@ -1070,13 +1076,16 @@ function AiSourceTraceCard({ tx, fifoSource, sourceIsOverride }: {
     const toastId = saveStart();
     try {
       // Clear any manual override so the FIFO trace runs fresh on next render.
+      // When there IS no override we still refresh — the FIFO queue can shift
+      // if you added new transactions since this page loaded, so a re-fetch
+      // is meaningful even without unlinking.
       if (sourceIsOverride) {
         await saveTransaction(tx.id, { fundedByTransactionId: null });
       }
       saveEnd(toastId);
       router.refresh();
-    } catch (e: any) {
-      saveError(toastId, e?.message || 'Retrace failed');
+    } catch (e: unknown) {
+      saveError(toastId, e instanceof Error ? e.message : 'Retrace failed');
     } finally {
       setBusy(false);
     }

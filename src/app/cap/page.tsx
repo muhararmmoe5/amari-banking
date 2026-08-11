@@ -15,11 +15,25 @@ export default function CapOverviewPage() {
   const user = requireUser();
   const isOwner = hasEditAccess(user);
 
-  // Non-owners with a single holding go straight to that entity / their portfolio
+  // Non-owners: route them to their personal team page if they have one,
+  // else show a bare 'no access' view (rendered below by the empty state).
+  // Previously this had a dead branch (personId redirect ran unconditionally)
+  // and a broken /login redirect for non-owners without a personId that
+  // bounced them right back to /.
   if (!isOwner) {
-    const my = user.personId ? listHoldingsForPerson(user.personId) : [];
     if (user.personId) redirect(`/team/${user.personId}`);
-    if (my.length === 0) redirect('/login');
+    // Fall through — the rendered UI below has a non-owner branch that
+    // just shows their (empty) portfolio without exposing the full cap
+    // table. Render simple message instead of the owner overview.
+    return (
+      <div style={{ padding: 40, textAlign: 'center', maxWidth: 480, margin: '80px auto', color: 'var(--ink-3)' }}>
+        <div style={{ fontSize: 22, marginBottom: 8, color: 'var(--ink-2)' }}>No access</div>
+        <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+          Your account isn&apos;t linked to a person profile yet. Ask the owner to link you
+          from the <b>Team</b> page, or to invite you with a specific role.
+        </div>
+      </div>
+    );
   }
 
   const summaries = allEntitySummaries();

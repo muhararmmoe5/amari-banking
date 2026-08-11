@@ -24,7 +24,12 @@ export async function POST(req: NextRequest) {
   const name = String(body.name || '').trim();
   if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 });
   const email = body.email ? String(body.email).trim() : null;
-  const role = body.role ? String(body.role).trim() : 'OTHER';
-  const p = createPerson({ name, email, role: role as any });
+  // Allow-list on PersonRole so a rogue client can't pollute people.role.
+  const VALID_PERSON_ROLES = ['FOUNDER', 'INVESTOR', 'EMPLOYEE', 'CONTRACTOR', 'ADVISOR', 'OTHER'] as const;
+  type PersonRoleUnion = typeof VALID_PERSON_ROLES[number];
+  const requestedRole = body.role ? String(body.role).trim() : 'OTHER';
+  const role: PersonRoleUnion = (VALID_PERSON_ROLES as readonly string[]).includes(requestedRole)
+    ? (requestedRole as PersonRoleUnion) : 'OTHER';
+  const p = createPerson({ name, email, role });
   return NextResponse.json({ person: { id: p.id, name: p.name, role: p.role, email: p.email } });
 }

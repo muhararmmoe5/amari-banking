@@ -4,10 +4,14 @@ import { summarizeAccounts, getCurrentBalances } from '@/lib/db/queries';
 import { Money } from '@/components/Money';
 import { EntityBadge } from '@/components/EntityBadge';
 import { fmtMoney } from '@/lib/format';
+import { requireUser, hasEditAccess } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 export default function AccountsPage() {
+  const user = requireUser();
+  if (!hasEditAccess(user)) redirect('/cap');
   const summaries = summarizeAccounts();
   const map = new Map(summaries.map((s) => [s.accountId, s]));
   const balances = getCurrentBalances();

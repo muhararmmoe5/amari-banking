@@ -81,6 +81,11 @@ export function updateUserPassword(userId: string, passwordHash: string): void {
   );
 }
 
+export function updateUserRole(userId: string, role: UserRole): void {
+  const db = getDb();
+  db.prepare('UPDATE users SET role = ?, updated_at = ? WHERE id = ?').run(role, Date.now(), userId);
+}
+
 export function recordLoginFailure(userId: string, currentCount: number): { locked: boolean } {
   const db = getDb();
   const next = currentCount + 1;

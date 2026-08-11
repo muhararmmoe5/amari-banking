@@ -3,6 +3,8 @@ import { listTransactions, portfolioSummary, flagCountsByEntity } from '@/lib/db
 import { ENTITY_LABELS, ENTITY_COLORS } from '@/constants/accounts';
 import type { EntityType } from '@/types';
 import AuditClient from './AuditClient';
+import { requireUser, hasEditAccess } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,6 +44,8 @@ function presetDates(preset?: string): { from: string; to: string } | null {
 }
 
 export default function AuditPage({ searchParams }: { searchParams: SP }) {
+  const user = requireUser();
+  if (!hasEditAccess(user)) redirect('/cap');
   const sev = searchParams.sev;
   const selectedEntity = (searchParams.entity || '') as EntityType | '';
   const dateFrom = searchParams.from || '';

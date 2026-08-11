@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
   if (body.confirm !== 'clear my transactions') {
     return NextResponse.json(
-      { error: 'confirmation phrase required', hint: 'send { confirm: "delete everything" }' },
+      { error: 'confirmation phrase required', hint: 'send { confirm: "clear my transactions" }' },
       { status: 400 },
     );
   }

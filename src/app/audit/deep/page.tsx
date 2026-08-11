@@ -5,6 +5,8 @@ import { traceAllExpensesOnAccount } from '@/lib/db/flow-trace';
 import { ACCOUNTS, getAccount } from '@/constants/accounts';
 import { fmtMoney, fmtDate, fmtDateShort } from '@/lib/format';
 import { SOURCE_LABEL } from '@/lib/source-labels';
+import { requireUser, hasEditAccess } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +20,8 @@ interface Search {
 }
 
 export default function DeepAuditPage({ searchParams }: { searchParams: Search }) {
+  const user = requireUser();
+  if (!hasEditAccess(user)) redirect('/cap');
   const accountId = searchParams.account || '';
   const hideInternal = searchParams.hideInternal !== '0';
   const dateFrom = searchParams.from || '';
@@ -34,7 +38,7 @@ export default function DeepAuditPage({ searchParams }: { searchParams: Search }
             Pre-computed FIFO source trace for every expense on a single account. One pass, no per-row clicks.
           </p>
         </div>
-        <Link href="/transactions" className="btn">← All transactions</Link>
+        <Link href="/audit" className="btn">← Back to audit</Link>
       </div>
 
       <form className="card p-4 text-xs flex flex-wrap gap-3 items-end" method="GET">

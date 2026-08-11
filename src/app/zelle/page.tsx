@@ -2,10 +2,14 @@ import { zelleByPerson } from '@/lib/db/queries';
 import { fmtMoney, fmtDate } from '@/lib/format';
 import { lookupZellePerson } from '@/constants/zelle-persons';
 import { ENTITY_LABELS } from '@/constants/accounts';
+import { requireUser, hasEditAccess } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 export default function ZellePage() {
+  const user = requireUser();
+  if (!hasEditAccess(user)) redirect('/cap');
   const rows = zelleByPerson();
   const total = rows.reduce((s, r) => s + r.totalPaid, 0);
   const required1099 = rows.filter((r) => r.totalPaid >= 600 && (r.zelleType === 'CONTRACTOR' || r.zelleType === 'COMPENSATION')).length;
