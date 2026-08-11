@@ -702,6 +702,36 @@ export function countUnclaimedTransactions(): number {
   return r.c;
 }
 
+/**
+ * Distinct list of custom_category values users have used, most-common first.
+ * Powers the autocomplete on the '+ Custom' category input — as the user
+ * types, the datalist offers back the names they (or their team) have
+ * used before, avoiding drift like 'Legal Delaware' vs 'Legal — Delaware'.
+ */
+export function listCustomCategorySuggestions(limit = 100): Array<{
+  name: string;
+  description: string | null;
+  useCount: number;
+}> {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT
+      custom_category AS name,
+      MAX(custom_category_description) AS description,
+      COUNT(*) AS use_count
+    FROM transactions
+    WHERE custom_category IS NOT NULL AND TRIM(custom_category) != ''
+    GROUP BY custom_category
+    ORDER BY use_count DESC, custom_category ASC
+    LIMIT ?
+  `).all(limit) as Array<{ name: string; description: string | null; use_count: number }>;
+  return rows.map((r) => ({
+    name: r.name,
+    description: r.description ?? null,
+    useCount: r.use_count,
+  }));
+}
+
 /** List inflows on a given account that are candidates for the
  *  "source of money" picker when creating/editing an expense. */
 export function listInflowsOnAccount(accountId: string, limit = 50): Array<{

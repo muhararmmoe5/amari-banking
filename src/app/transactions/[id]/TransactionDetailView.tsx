@@ -16,6 +16,7 @@ import {
 import { saveTransaction, deleteTransactionAction, flagForIdentificationAction } from '../actions';
 import { Trash2, UserSearch } from 'lucide-react';
 import BackToTransactionsLink from '../BackToTransactionsLink';
+import PersonPicker from '@/components/PersonPicker';
 import { useToast } from '@/components/Toast';
 import BankChip from '@/components/BankChip';
 import DrawerSplitEditor from '../DrawerSplitEditor';
@@ -771,13 +772,13 @@ export default function TransactionDetailView({
                 <div className="grid grid-cols-2" style={{ gap: 14, marginBottom: 14 }}>
                   <div>
                     <FieldLabel gold>Whose</FieldLabel>
-                    <input
-                      type="text"
+                    <PersonPicker
                       value={individual}
-                      onChange={(e) => setIndividual(e.target.value)}
-                      onBlur={() => persist({ individual: individual || null })}
-                      placeholder="Person on your team"
-                      style={fieldInStyle}
+                      onChange={(name) => {
+                        setIndividual(name);
+                        persist({ individual: name || null });
+                      }}
+                      placeholder="Pick a team member"
                     />
                   </div>
                   {viewerIsEditor ? (
@@ -878,13 +879,13 @@ export default function TransactionDetailView({
               </div>
               <div>
                 <FieldLabel>Individual</FieldLabel>
-                <input
-                  type="text"
+                <PersonPicker
                   value={individual}
-                  onChange={(e) => setIndividual(e.target.value)}
-                  onBlur={() => persist({ individual: individual || null })}
-                  placeholder="Person tied to this charge"
-                  style={fieldInStyle}
+                  onChange={(name) => {
+                    setIndividual(name);
+                    persist({ individual: name || null });
+                  }}
+                  placeholder="Pick or add a person"
                 />
               </div>
               {viewerIsEditor ? (
@@ -1640,6 +1641,8 @@ function pathBtnStyle(active: boolean, color: string): React.CSSProperties {
   };
 }
 
+interface CustomCategorySuggestion { name: string; description: string | null; useCount: number }
+
 function CustomCategoryInputs({
   name, desc, onNameChange, onDescChange, onNameBlur, onDescBlur, tone,
 }: {
@@ -1651,6 +1654,34 @@ function CustomCategoryInputs({
   onDescBlur: () => void;
   tone: string;
 }) {
+  // Load previously-used custom categories so autocomplete can suggest
+  // them as the user types. Fetched once on mount — the list rarely
+  // changes fast enough to warrant reactivity here.
+  const [suggestions, setSuggestions] = useState<CustomCategorySuggestion[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/transactions/custom-categories', { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled && Array.isArray(d?.suggestions)) setSuggestions(d.suggestions);
+      })
+      .catch(() => { /* fall through, autocomplete just stays empty */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // When the user picks (or types) a name that matches a suggestion, we
+  // auto-fill the description too — unless they've already put something
+  // in the description field themselves.
+  function handleNameChange(v: string) {
+    onNameChange(v);
+    const hit = suggestions.find((s) => s.name.trim().toLowerCase() === v.trim().toLowerCase());
+    if (hit && hit.description && !desc.trim()) {
+      onDescChange(hit.description);
+    }
+  }
+
+  const datalistId = 'custom-cat-suggestions';
+
   return (
     <div style={{
       marginTop: 14, padding: 12, borderRadius: 8,
@@ -1661,19 +1692,29 @@ function CustomCategoryInputs({
         <em style={{ fontStyle: 'italic', color: tone }}>Custom category</em>
         {' — '}
         <span style={{ color: 'var(--ink-3)' }}>
-          use this when none of the presets fit. Autocompletes on future rows once used a few times.
+          use this when none of the presets fit.
+          {suggestions.length > 0 ? ` ${suggestions.length} previously used — type to see suggestions.` : ' Autocompletes on future rows once used.'}
         </span>
       </div>
       <div className="grid" style={{ gap: 8 }}>
         <input
           type="text"
           value={name}
-          onChange={(e) => onNameChange(e.target.value)}
+          onChange={(e) => handleNameChange(e.target.value)}
           onBlur={onNameBlur}
           placeholder="Category name (e.g. Legal — Delaware filings)"
           maxLength={80}
+          list={datalistId}
+          autoComplete="off"
           style={{ ...fieldInStyle }}
         />
+        <datalist id={datalistId}>
+          {suggestions.map((s) => (
+            <option key={s.name} value={s.name}>
+              {s.description ? `${s.description} · used ${s.useCount}×` : `used ${s.useCount}×`}
+            </option>
+          ))}
+        </datalist>
         <textarea
           rows={2}
           value={desc}
