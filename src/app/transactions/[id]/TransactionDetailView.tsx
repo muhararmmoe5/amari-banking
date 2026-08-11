@@ -762,6 +762,7 @@ export default function TransactionDetailView({
                     onNameBlur={() => persist({ customCategory: customCategory || null })}
                     onDescBlur={() => persist({ customCategoryDescription: customCategoryDescription || null })}
                     tone="var(--gold)"
+                    path="BUSINESS"
                   />
                 ) : businessCat1Key && businessCats[businessCat1Key] ? (
                   <div style={{ marginTop: 14 }}>
@@ -840,6 +841,7 @@ export default function TransactionDetailView({
                     onNameBlur={() => persist({ customCategory: customCategory || null })}
                     onDescBlur={() => persist({ customCategoryDescription: customCategoryDescription || null })}
                     tone="var(--purple)"
+                    path="PERSONAL"
                   />
                 ) : personalCat1Key && personalCats[personalCat1Key] ? (
                   <div style={{ marginTop: 14 }}>
@@ -1772,7 +1774,7 @@ function pathBtnStyle(active: boolean, color: string): React.CSSProperties {
 interface CustomCategorySuggestion { name: string; description: string | null; useCount: number }
 
 function CustomCategoryInputs({
-  name, desc, onNameChange, onDescChange, onNameBlur, onDescBlur, tone,
+  name, desc, onNameChange, onDescChange, onNameBlur, onDescBlur, tone, path,
 }: {
   name: string;
   desc: string;
@@ -1781,13 +1783,28 @@ function CustomCategoryInputs({
   onNameBlur: () => void;
   onDescBlur: () => void;
   tone: string;
+  /** Filters the preset catalog to only categories that belong to this
+   *  path — 'BUSINESS' hides Personal buckets, 'PERSONAL' hides Business
+   *  ones. Previously-used DB entries always show regardless. */
+  path: 'BUSINESS' | 'PERSONAL';
 }) {
-  // Seed with embedded preset catalog; merge in previously-used entries
-  // from the DB. DB entries win on name collision (real usage count +
-  // user's own description).
-  const [suggestions, setSuggestions] = useState<CustomCategorySuggestion[]>(() =>
-    CUSTOM_CATEGORY_PRESETS.map((p) => ({ name: p.name, description: p.description, useCount: 0 })),
+  // Build the seed list filtered by path — a business row only sees
+  // business presets, a personal row only sees personal ones.
+  const scopedPresets = useMemo(
+    () => CUSTOM_CATEGORY_PRESETS.filter((p) => p.path === path),
+    [path],
   );
+
+  const [suggestions, setSuggestions] = useState<CustomCategorySuggestion[]>(() =>
+    scopedPresets.map((p) => ({ name: p.name, description: p.description, useCount: 0 })),
+  );
+
+  useEffect(() => {
+    // Reset local state whenever the user flips between Business and
+    // Personal paths so the dropdown reflects the new scope immediately.
+    setSuggestions(scopedPresets.map((p) => ({ name: p.name, description: p.description, useCount: 0 })));
+  }, [scopedPresets]);
+
   useEffect(() => {
     let cancelled = false;
     fetch('/api/transactions/custom-categories', { credentials: 'same-origin' })
@@ -1796,14 +1813,17 @@ function CustomCategoryInputs({
         if (cancelled || !Array.isArray(d?.suggestions)) return;
         const fromDb = d.suggestions as CustomCategorySuggestion[];
         const seen = new Set(fromDb.map((s) => s.name.trim().toLowerCase()));
-        const presetsNotYetUsed = CUSTOM_CATEGORY_PRESETS
+        const presetsNotYetUsed = scopedPresets
           .filter((p) => !seen.has(p.name.trim().toLowerCase()))
           .map((p) => ({ name: p.name, description: p.description, useCount: 0 }));
+        // DB entries carry the user's real usage — keep them visible
+        // regardless of path so cross-scope custom names still appear
+        // once they've been used.
         setSuggestions([...fromDb, ...presetsNotYetUsed]);
       })
       .catch(() => { /* keep the presets */ });
     return () => { cancelled = true; };
-  }, []);
+  }, [scopedPresets]);
 
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
