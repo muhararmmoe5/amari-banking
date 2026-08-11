@@ -35,7 +35,10 @@ export interface ClassifySuggestion {
   reasoning: string;
 }
 
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5';
+// Default to Opus 4.7 for the most careful classification. Override with
+// ANTHROPIC_MODEL env var (e.g. claude-haiku-4-5 or claude-sonnet-4-6) if
+// you'd rather trade accuracy for cost.
+const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-4-7';
 
 function buildSystemPrompt(): string {
   const entities = [...BUSINESS_ENTITIES, 'PERSONAL' as const, 'MULTI_ENTITY' as const, 'UNKNOWN' as const]
