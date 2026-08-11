@@ -38,6 +38,11 @@ interface FifoSource {
    *  ownerLabel which reflects the source transaction's confirmed
    *  entity / individual. */
   accountEntityLabel: string | null;
+  /** Grandparent chain — when this source is itself an internal
+   *  transfer, this is the FIFO trace of what funded THAT transfer
+   *  on the upstream account. Recursive up to MAX_DEPTH. Empty for
+   *  leaf sources (external income). */
+  upstream?: FifoSource[];
 }
 interface DownstreamConsumer { txId: string; date: string; merchant: string | null; description: string; amountFromThisInflow: number; expenseAmount: number }
 interface DownstreamTrace { totalSpent: number; remaining: number; pctSpent: number; consumers: DownstreamConsumer[] }
@@ -1455,24 +1460,38 @@ function AiSourceTraceCard({ tx, fifoSource, fifoSources = [], sourceIsOverride 
           const s = sources[0];
           const pctOfExpense = total > 0 ? Math.min(100, (s.attributedAmount / total) * 100) : 0;
           return (
-            <div className="flex items-center">
-              <FlowNode
-                type="inflow"
-                eyebrow={`INFLOW · ${s.date}${s.accountEntityLabel ? ' · ' + s.accountEntityLabel : ''}`}
-                title={s.merchant.toUpperCase()}
-                meta={`+${fmtMoney(s.attributedAmount)} of ${fmtMoney(s.amount)} · ····${s.accountId}${s.accountEntityLabel ? ' (' + s.accountEntityLabel + ')' : ''}`}
-                owner={s.ownerLabel}
-                href={`/transactions/${s.txId}`}
-              />
-              <div style={{ padding: '0 10px', color: 'var(--ink-3)' }}>
-                <ArrowRight size={20} strokeWidth={1.4} />
+            <div>
+              <div className="flex items-center">
+                <FlowNode
+                  type="inflow"
+                  eyebrow={`INFLOW · ${s.date}${s.accountEntityLabel ? ' · ' + s.accountEntityLabel : ''}`}
+                  title={s.merchant.toUpperCase()}
+                  meta={`+${fmtMoney(s.attributedAmount)} of ${fmtMoney(s.amount)} · ····${s.accountId}${s.accountEntityLabel ? ' (' + s.accountEntityLabel + ')' : ''}`}
+                  owner={s.ownerLabel}
+                  href={`/transactions/${s.txId}`}
+                />
+                <div style={{ padding: '0 10px', color: 'var(--ink-3)' }}>
+                  <ArrowRight size={20} strokeWidth={1.4} />
+                </div>
+                <FlowNode
+                  type="outflow"
+                  eyebrow="OUTFLOW · NOW"
+                  title={(tx.merchantName || tx.description.slice(0, 50)).toUpperCase()}
+                  meta={`−${fmtMoney(-total)} · ${pctOfExpense.toFixed(0)}% covered`}
+                />
               </div>
-              <FlowNode
-                type="outflow"
-                eyebrow="OUTFLOW · NOW"
-                title={(tx.merchantName || tx.description.slice(0, 50)).toUpperCase()}
-                meta={`−${fmtMoney(-total)} · ${pctOfExpense.toFixed(0)}% covered`}
-              />
+              {/* If the single source is an internal transfer, show the
+                  origin chain right below so the user sees the real
+                  source, not just the immediate hop. */}
+              {s.isInternal && s.upstream && s.upstream.length > 0 ? (
+                <div style={{
+                  marginTop: 10, padding: 10, borderRadius: 8,
+                  border: '0.5px dashed rgba(255,255,255,0.08)',
+                  background: 'color-mix(in oklab, var(--income) 3%, transparent)',
+                }}>
+                  <UpstreamChain sources={s.upstream} depth={1} />
+                </div>
+              ) : null}
             </div>
           );
         }
@@ -1525,6 +1544,12 @@ function AiSourceTraceCard({ tx, fifoSource, fifoSources = [], sourceIsOverride 
                         <span style={{ color: 'var(--ink-4, #44443f)' }}>Owner · </span>{s.ownerLabel}
                       </div>
                     ) : null}
+                    {/* When this source is an internal transfer with a known
+                        upstream, unroll the grandparent chain — 'money came
+                        from Stripe → Account 1 → Account 2' etc. */}
+                    {s.isInternal && s.upstream && s.upstream.length > 0 ? (
+                      <UpstreamChain sources={s.upstream} depth={1} />
+                    ) : null}
                   </Link>
                 );
               })}
@@ -1556,6 +1581,72 @@ function AiSourceTraceCard({ tx, fifoSource, fifoSources = [], sourceIsOverride 
               ? `Funded across ${fifoSources.length} inflows · audit trail complete · CPA-ready`
               : 'Fully allocated · audit trail complete · CPA-ready')
           : 'No source linked — tag manually or run AI trace from the drawer'}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Recursive renderer for the upstream chain of an internal-transfer
+ * source. Shows 'Originally from: [external source]' — if that source
+ * is ALSO an internal transfer, it renders its own upstream nested
+ * inside. Cap depth mirrors the server-side MAX_DEPTH so infinite
+ * bounces can't happen at render time either.
+ */
+function UpstreamChain({ sources, depth }: { sources: FifoSource[]; depth: number }) {
+  if (depth > 4 || sources.length === 0) return null;
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        marginTop: 8, paddingTop: 8, paddingLeft: depth * 6,
+        borderTop: '0.5px dashed rgba(255,255,255,0.06)',
+      }}
+    >
+      <div style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--ink-4, #44443f)', marginBottom: 4 }}>
+        {depth === 1 ? 'Originally from' : `Hop ${depth}`}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {sources.map((u) => (
+          <div
+            key={u.txId}
+            style={{
+              padding: '5px 8px',
+              background: 'var(--bg-2, #16161a)',
+              borderRadius: 6,
+              borderLeft: `2px solid ${u.isInternal ? 'var(--gold)' : 'var(--income)'}`,
+            }}
+          >
+            <div className="flex items-baseline" style={{ gap: 6, flexWrap: 'wrap' }}>
+              <span
+                className="num"
+                style={{
+                  fontSize: 9, textTransform: 'uppercase', letterSpacing: '.1em',
+                  color: u.isInternal ? 'var(--gold)' : 'var(--income)', fontWeight: 600,
+                }}
+              >
+                {u.isInternal ? 'TRANSFER' : 'INCOME'} · {u.date}
+              </span>
+              {u.accountEntityLabel ? (
+                <span style={{ fontSize: 10, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+                  {u.accountEntityLabel}
+                </span>
+              ) : null}
+              <span style={{ fontSize: 10, color: 'var(--ink-4, #44443f)' }}>····{u.accountId}</span>
+            </div>
+            <div className="flex items-baseline" style={{ gap: 6, marginTop: 2 }}>
+              <span className="truncate" style={{ fontSize: 11.5, color: 'var(--ink)', flex: 1 }}>
+                {u.merchant}
+              </span>
+              <span className="num" style={{ fontSize: 11.5, color: 'var(--income)', fontWeight: 500 }}>
+                {`+$${u.attributedAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              </span>
+            </div>
+            {u.isInternal && u.upstream && u.upstream.length > 0 ? (
+              <UpstreamChain sources={u.upstream} depth={depth + 1} />
+            ) : null}
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -48,8 +48,12 @@ export interface SourceTraceResult {
   clearedBy?: ClearingInflow[];
 }
 
-const MAX_DEPTH = 2;
-const MAX_QUERIES_PER_TRACE = 200;
+// 4 hops is enough for the realistic chains we see:
+//   external income → hub → entity account → payroll → expense
+// The MAX_QUERIES_PER_TRACE kill-switch protects against pathological
+// bounces, so bumping depth here is safe.
+const MAX_DEPTH = 4;
+const MAX_QUERIES_PER_TRACE = 400;
 
 export function traceAllExpensesOnAccount(
   accountId: string,

@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { requireUser, hasEditAccess } from '@/lib/auth';
 import { getTransaction } from '@/lib/db/queries';
-import { traceFundingSource, traceDownstreamFromInflow } from '@/lib/db/flow-trace';
+import { traceFundingSource, traceDownstreamFromInflow, type SourceTraceResult, type TraceSource } from '@/lib/db/flow-trace';
 import { listSplits } from '@/lib/db/splits';
 import { listBudgets } from '@/lib/db/budgets';
 import { ACCOUNTS, ENTITY_LABELS } from '@/constants/accounts';
@@ -61,26 +61,47 @@ export default function TransactionDetailPage({ params }: Props) {
   // manual-multi-source case uses expense_funding_splits (a separate
   // table with a per-slice UI) — not shown here yet.
   const totalExpense = Math.abs(tx.amount);
-  // Helper: label the entity that OWNS the source account (from the
-  // ACCOUNTS mapping). Distinct from the transaction's confirmedEntity
-  // — this is the fixed 'which of my companies does this bank account
-  // belong to' answer. Shown next to each source so the user can see
-  // 'this money came from a Bytes AI bank account' at a glance.
   const accountEntityLabelFor = (accountId: string): string | null => {
     const acct = ACCOUNTS.find((a) => a.id === accountId);
     if (!acct) return null;
     return ENTITY_LABELS[acct.entity as EntityType] || acct.entity;
   };
-  let fifoSources: Array<{
+
+  // Recursively flatten a TraceSource into the plain shape the client
+  // component needs. Each source can have its own `upstream` — the
+  // grandparent chain when this source is itself an internal transfer.
+  // We keep that as a nested array so the UI can render "originally
+  // came from ..." underneath each internal hop.
+  interface UpstreamSource {
     txId: string; merchant: string; amount: number; accountId: string; date: string;
     isInternal: boolean; attributedAmount: number; ownerLabel: string | null;
     accountEntityLabel: string | null;
-  }> = [];
+    upstream: UpstreamSource[]; // grandparents — leaves are external inflows
+  }
+  function shapeTraceSource(s: TraceSource): UpstreamSource {
+    const upstreamSources = (s.upstream?.sources || []).map(shapeTraceSource);
+    return {
+      txId: s.txId,
+      merchant: s.merchant || s.description.slice(0, 60),
+      amount: s.totalInflow ?? s.amount,
+      accountId: s.accountId,
+      date: s.date,
+      isInternal: s.isInternal,
+      attributedAmount: s.amount,
+      ownerLabel: ownerLabelFor(s.txId),
+      accountEntityLabel: accountEntityLabelFor(s.accountId),
+      upstream: upstreamSources,
+    };
+  }
+
+  let fifoSources: UpstreamSource[] = [];
   let sourceIsOverride = false;
 
   if (tx.amount < 0 && tx.fundedByTransactionId) {
     const linked = getTransaction(tx.fundedByTransactionId);
     if (linked) {
+      // Manual overrides don't recursively trace — the user explicitly
+      // said 'this row was funded by that inflow', end of story.
       fifoSources = [{
         txId: linked.id,
         merchant: linked.merchantName || linked.description.slice(0, 60),
@@ -91,25 +112,15 @@ export default function TransactionDetailPage({ params }: Props) {
         attributedAmount: Math.min(linked.amount, totalExpense),
         ownerLabel: ownerLabelFor(linked.id),
         accountEntityLabel: accountEntityLabelFor(linked.accountId),
+        upstream: [],
       }];
       sourceIsOverride = true;
     }
   }
   if (fifoSources.length === 0 && tx.amount < 0) {
-    const trace = traceFundingSource(tx.id);
+    const trace: SourceTraceResult | null = traceFundingSource(tx.id);
     if (trace?.sources?.length) {
-      fifoSources = trace.sources.map((s) => ({
-        txId: s.txId,
-        merchant: s.merchant || s.description.slice(0, 60),
-        amount: s.totalInflow ?? s.amount,
-        accountId: s.accountId,
-        date: s.date,
-        isInternal: s.isInternal,
-        // s.amount from traceFundingSource is already the attributed slice.
-        attributedAmount: s.amount,
-        ownerLabel: ownerLabelFor(s.txId),
-        accountEntityLabel: accountEntityLabelFor(s.accountId),
-      }));
+      fifoSources = trace.sources.map(shapeTraceSource);
     }
   }
   // Keep the single-source prop for backwards compatibility with the
