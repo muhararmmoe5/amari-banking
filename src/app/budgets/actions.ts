@@ -45,6 +45,7 @@ export async function actCreateFounderAllowance(input: {
   personName: string;
   monthlyAmountCents: number;
   periodMonth?: string | null; // YYYY-MM, null = applies to every month by default
+  linkedAccountIds?: string[]; // specific bank accounts to attribute against
   notes?: string | null;
 }) {
   checkOwner();
@@ -56,6 +57,7 @@ export async function actCreateFounderAllowance(input: {
     personId: input.personId,
     monthlyAmountCents: input.monthlyAmountCents,
     periodMonth: input.periodMonth || null,
+    linkedAccountIds: input.linkedAccountIds || [],
     notes: input.notes || null,
   });
   revalidateAll();

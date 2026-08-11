@@ -2,7 +2,7 @@ import { listBudgetsWithSpend, listFounderAllowancesWithUsage } from '@/lib/db/b
 import { listCommitments, getPerson, listPeople } from '@/lib/db/cap';
 import { requireUser, hasEditAccess } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { BUSINESS_ENTITIES, ENTITY_LABELS } from '@/constants/accounts';
+import { ACCOUNTS, BUSINESS_ENTITIES, ENTITY_LABELS } from '@/constants/accounts';
 import BudgetsClient from './BudgetsClient';
 import FounderAllowancesSection from './FounderAllowancesSection';
 
@@ -30,6 +30,11 @@ export default function BudgetsPage() {
   const people = listPeople().map((p) => ({ id: p.id, name: p.name }));
   const founderAllowances = listFounderAllowancesWithUsage();
   const entityOptions = BUSINESS_ENTITIES.map((e) => ({ value: e, label: ENTITY_LABELS[e] }));
+  const accountOptions = ACCOUNTS.filter((a) => a.isActive).map((a) => ({
+    id: a.id,
+    label: `····${a.last4} — ${a.label}`,
+    entity: a.entity,
+  }));
   return (
     <div className="p-8 space-y-8 max-w-[1200px] mx-auto">
       <div>
@@ -42,6 +47,7 @@ export default function BudgetsPage() {
         allowances={founderAllowances}
         people={people}
         entityOptions={entityOptions}
+        accountOptions={accountOptions}
       />
       <BudgetsClient initial={budgets} commitments={commitments} people={people} />
     </div>

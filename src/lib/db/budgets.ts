@@ -19,6 +19,7 @@ export interface Budget {
   fundingCommitmentId: string | null;  // links to an investor's funding commitment
   subKind: BudgetSubKind | null;
   personId: string | null;             // person this budget tracks (e.g. the investor)
+  linkedAccountIds: string[];          // specific bank accounts this budget scopes to
   notes: string | null;
   status: BudgetStatus;
   createdAt: number;
@@ -38,6 +39,7 @@ function rowToBudget(r: any): Budget {
     fundingCommitmentId: r.funding_commitment_id ?? null,
     subKind: r.sub_kind ?? null,
     personId: r.person_id ?? null,
+    linkedAccountIds: (r.linked_account_ids || '').split(',').map((s: string) => s.trim()).filter(Boolean),
     notes: r.notes,
     status: r.status,
     createdAt: r.created_at,
@@ -56,6 +58,7 @@ export interface BudgetInput {
   fundingCommitmentId?: string | null;
   subKind?: BudgetSubKind | null;
   personId?: string | null;
+  linkedAccountIds?: string[];
   notes?: string | null;
 }
 
@@ -76,9 +79,10 @@ export function createBudget(input: BudgetInput): Budget {
   const db = getDb();
   const id = crypto.randomUUID();
   const now = Date.now();
+  const linked = (input.linkedAccountIds || []).filter(Boolean).join(',') || null;
   db.prepare(
-    `INSERT INTO budgets (id, name, entity, kind, monthly_amount_cents, total_amount_cents, runway_months, period_month, funding_commitment_id, sub_kind, person_id, notes, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)`
+    `INSERT INTO budgets (id, name, entity, kind, monthly_amount_cents, total_amount_cents, runway_months, period_month, funding_commitment_id, sub_kind, person_id, linked_account_ids, notes, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)`
   ).run(
     id,
     input.name.trim(),
@@ -91,6 +95,7 @@ export function createBudget(input: BudgetInput): Budget {
     input.fundingCommitmentId || null,
     input.subKind || null,
     input.personId || null,
+    linked,
     input.notes?.trim() || null,
     now,
     now,
@@ -112,6 +117,10 @@ export function updateBudget(id: string, patch: Partial<BudgetInput> & { status?
   if (patch.fundingCommitmentId !== undefined) { fields.push('funding_commitment_id = @commitment_id'); params.commitment_id = patch.fundingCommitmentId || null; }
   if (patch.subKind !== undefined) { fields.push('sub_kind = @sub_kind'); params.sub_kind = patch.subKind || null; }
   if (patch.personId !== undefined) { fields.push('person_id = @person_id'); params.person_id = patch.personId || null; }
+  if (patch.linkedAccountIds !== undefined) {
+    fields.push('linked_account_ids = @linked');
+    params.linked = (patch.linkedAccountIds || []).filter(Boolean).join(',') || null;
+  }
   if (patch.notes !== undefined) { fields.push('notes = @notes'); params.notes = patch.notes?.trim() || null; }
   if (patch.status !== undefined) { fields.push('status = @status'); params.status = patch.status; }
   if (!fields.length) return;
@@ -416,32 +425,52 @@ export function getFounderAllowanceUsage(allowanceId: string): FounderAllowanceU
   const effectiveMonth = budget.periodMonth || new Date().toISOString().slice(0, 7);
   const { from, to } = monthBounds(effectiveMonth);
   const lowerName = personName.trim().toLowerCase();
-  // Accounts belonging to this entity — resolved via the ACCOUNTS
-  // constant since accounts.entity is a fixed mapping.
-  const accountRows = db.prepare(
-    `SELECT id FROM accounts WHERE entity = ?`
-  ).all(budget.entity) as Array<{ id: string }>;
-  if (accountRows.length === 0) {
-    return {
-      ...budget, personName,
-      spentThisMonthCents: 0, txCountThisMonth: 0,
-      remainingCents: budget.monthlyAmountCents ?? 0,
-      effectiveMonth, transactions: [],
-    };
+
+  // Attribution model — a transaction counts against this allowance if
+  // BOTH the person matches AND at least one of:
+  //   (a) it's on an account explicitly linked to the budget
+  //       (budgets.linked_account_ids), OR
+  //   (b) it's booked to this entity via confirmed_entity — i.e. the
+  //       user tagged the row 'Books to Bytes AI' even if the account
+  //       itself is a personal card, OR
+  //   (c) fallback: no explicit links AND the account's default entity
+  //       matches the budget's entity (the previous default behavior).
+  //
+  // This handles the founder's case cleanly: 'I spent from my personal
+  // card and tagged it to Bytes AI' — (b) picks it up. Or 'I linked the
+  // Chase 6562 Bytes AI Main account explicitly' — (a) picks it up.
+  const linked = budget.linkedAccountIds;
+  const orClauses: string[] = [];
+  const sqlParams: unknown[] = [];
+  if (linked.length > 0) {
+    orClauses.push(`account_id IN (${linked.map(() => '?').join(',')})`);
+    sqlParams.push(...linked);
   }
-  const accountIds = accountRows.map((r) => r.id);
-  const placeholders = accountIds.map(() => '?').join(',');
+  orClauses.push(`confirmed_entity = ?`);
+  sqlParams.push(budget.entity);
+  if (linked.length === 0) {
+    // Only fall back to entity-mapped accounts when the user hasn't
+    // explicitly linked any accounts — otherwise we'd double-count.
+    const entityAccounts = db.prepare(`SELECT id FROM accounts WHERE entity = ?`).all(budget.entity) as Array<{ id: string }>;
+    if (entityAccounts.length > 0) {
+      const ids = entityAccounts.map((r) => r.id);
+      orClauses.push(`account_id IN (${ids.map(() => '?').join(',')})`);
+      sqlParams.push(...ids);
+    }
+  }
+  const attributionSql = `(${orClauses.join(' OR ')})`;
+
   const txRows = db.prepare(
     `SELECT id, posting_date, description, merchant_name, amount
        FROM transactions
        WHERE amount < 0
-         AND account_id IN (${placeholders})
+         AND ${attributionSql}
          AND lower(trim(COALESCE(individual, ''))) = ?
          AND posting_date >= ?
          AND posting_date <= ?
        ORDER BY posting_date DESC, id DESC
        LIMIT 500`
-  ).all(...accountIds, lowerName, from, to) as Array<{
+  ).all(...sqlParams, lowerName, from, to) as Array<{
     id: string; posting_date: string; description: string; merchant_name: string | null; amount: number;
   }>;
   const spentCents = txRows.reduce((s, r) => s + Math.round(Math.abs(r.amount) * 100), 0);

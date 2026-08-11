@@ -388,6 +388,11 @@ export function getDb(): Database.Database {
     `ALTER TABLE budgets ADD COLUMN person_id TEXT REFERENCES people(id) ON DELETE SET NULL`,
     `ALTER TABLE budgets ADD COLUMN total_amount_cents INTEGER`,
     `ALTER TABLE budgets ADD COLUMN runway_months INTEGER`,
+    // Comma-separated account IDs linked to this budget. Used by founder
+    // allowances to say 'count transactions on THESE bank accounts',
+    // regardless of the account's default entity mapping. Empty / null
+    // means fall back to matching by entity (default behavior).
+    `ALTER TABLE budgets ADD COLUMN linked_account_ids TEXT`,
     `ALTER TABLE transactions ADD COLUMN is_salary INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE transactions ADD COLUMN salary_entity TEXT`,
     `ALTER TABLE transactions ADD COLUMN salary_person_id TEXT REFERENCES people(id) ON DELETE SET NULL`,

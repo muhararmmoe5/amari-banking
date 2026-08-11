@@ -9,13 +9,15 @@ import type { FounderAllowanceUsage } from '@/lib/db/budgets';
 
 interface Person { id: string; name: string }
 interface EntityOpt { value: string; label: string }
+interface AccountOpt { id: string; label: string; entity: string }
 
 export default function FounderAllowancesSection({
-  allowances: initial, people, entityOptions,
+  allowances: initial, people, entityOptions, accountOptions,
 }: {
   allowances: FounderAllowanceUsage[];
   people: Person[];
   entityOptions: EntityOpt[];
+  accountOptions: AccountOpt[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -51,6 +53,7 @@ export default function FounderAllowancesSection({
         <NewAllowanceForm
           people={people}
           entityOptions={entityOptions}
+          accountOptions={accountOptions}
           disabled={isPending}
           onSubmit={(data) => {
             startTransition(async () => {
@@ -63,6 +66,7 @@ export default function FounderAllowancesSection({
                   personName: person.name,
                   monthlyAmountCents: Math.round(data.monthlyDollars * 100),
                   periodMonth: data.periodMonth || null,
+                  linkedAccountIds: data.linkedAccountIds,
                   notes: data.notes || null,
                 });
                 setCreating(false);
@@ -87,6 +91,7 @@ export default function FounderAllowancesSection({
           <AllowanceCard
             key={a.id}
             allowance={a}
+            accountOptions={accountOptions}
             disabled={isPending}
             onUpdate={(patch) => {
               startTransition(async () => {
@@ -121,23 +126,33 @@ export default function FounderAllowancesSection({
 // ─────────────────────────────────────────────────────────────────────
 
 function NewAllowanceForm({
-  people, entityOptions, disabled, onSubmit,
+  people, entityOptions, accountOptions, disabled, onSubmit,
 }: {
   people: Person[];
   entityOptions: EntityOpt[];
+  accountOptions: AccountOpt[];
   disabled: boolean;
   onSubmit: (data: {
     entity: string; personId: string; monthlyDollars: number;
-    periodMonth: string; notes: string;
+    periodMonth: string; linkedAccountIds: string[]; notes: string;
   }) => void;
 }) {
   const [entity, setEntity] = useState(entityOptions[0]?.value || '');
   const [personId, setPersonId] = useState(people[0]?.id || '');
   const [monthlyDollars, setMonthlyDollars] = useState('6000');
   const [periodMonth, setPeriodMonth] = useState('');
+  const [linkedAccounts, setLinkedAccounts] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState('');
 
   const canSubmit = !!entity && !!personId && parseFloat(monthlyDollars) > 0 && !disabled;
+
+  function toggleAccount(id: string) {
+    setLinkedAccounts((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
 
   return (
     <form
@@ -147,7 +162,9 @@ function NewAllowanceForm({
         onSubmit({
           entity, personId,
           monthlyDollars: parseFloat(monthlyDollars),
-          periodMonth, notes,
+          periodMonth,
+          linkedAccountIds: Array.from(linkedAccounts),
+          notes,
         });
       }}
       className="mb-4 p-4 rounded-lg space-y-3"
@@ -191,17 +208,52 @@ function NewAllowanceForm({
             className="w-full"
           />
         </label>
-        <label className="block md:col-span-2">
-          <div className="text-[10px] uppercase tracking-wider text-ink-mute mb-1">Notes (optional)</div>
-          <input
-            type="text"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="w-full"
-            placeholder="e.g. In lieu of salary until Series A closes"
-          />
-        </label>
       </div>
+
+      {/* Bank account picker — the missing piece: tell the allowance
+          exactly which accounts to attribute against. Falls back to
+          entity-mapped accounts + confirmed_entity if nothing is
+          checked, so the old default still works. */}
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-ink-mute mb-1">
+          Bank accounts to attribute{' '}
+          <span className="text-ink-dim normal-case tracking-normal">
+            — optional. Leave all unchecked to include any account
+            booked to this company via the Books-to tag.
+          </span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-1 max-h-52 overflow-y-auto pr-1">
+          {accountOptions.map((a) => (
+            <label
+              key={a.id}
+              className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer"
+              style={{
+                background: linkedAccounts.has(a.id) ? 'color-mix(in oklab, var(--gold) 10%, transparent)' : 'transparent',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={linkedAccounts.has(a.id)}
+                onChange={() => toggleAccount(a.id)}
+              />
+              <span className="text-xs text-ink flex-1 truncate">{a.label}</span>
+              <span className="text-[10px] text-ink-mute">{a.entity.replace(/_/g, ' ').toLowerCase()}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <label className="block">
+        <div className="text-[10px] uppercase tracking-wider text-ink-mute mb-1">Notes (optional)</div>
+        <input
+          type="text"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="w-full"
+          placeholder="e.g. In lieu of salary until Series A closes"
+        />
+      </label>
+
       <div className="flex justify-end">
         <button
           type="submit"
@@ -217,16 +269,29 @@ function NewAllowanceForm({
 }
 
 function AllowanceCard({
-  allowance: a, disabled, onUpdate, onDelete,
+  allowance: a, accountOptions, disabled, onUpdate, onDelete,
 }: {
   allowance: FounderAllowanceUsage;
+  accountOptions: AccountOpt[];
   disabled: boolean;
-  onUpdate: (patch: { monthlyAmountCents?: number; periodMonth?: string | null }) => void;
+  onUpdate: (patch: {
+    monthlyAmountCents?: number;
+    periodMonth?: string | null;
+    linkedAccountIds?: string[];
+  }) => void;
   onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState(((a.monthlyAmountCents ?? 0) / 100).toString());
   const [period, setPeriod] = useState(a.periodMonth || '');
+  const [linked, setLinked] = useState<Set<string>>(() => new Set(a.linkedAccountIds));
+  function toggleLinked(id: string) {
+    setLinked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
 
   const cap = a.monthlyAmountCents ?? 0;
   const spent = a.spentThisMonthCents;
@@ -284,6 +349,11 @@ function AllowanceCard({
       </div>
       <div className="text-[10.5px] text-ink-dim mt-1.5">
         {a.txCountThisMonth} transaction{a.txCountThisMonth === 1 ? '' : 's'} · {a.effectiveMonth}
+        {a.linkedAccountIds.length > 0 ? (
+          <> · linked to {a.linkedAccountIds.length} account{a.linkedAccountIds.length === 1 ? '' : 's'}</>
+        ) : (
+          <> · any account booked to {a.entity?.replace(/_/g, ' ').toLowerCase()}</>
+        )}
       </div>
 
       <div className="mt-3 flex items-center gap-2 flex-wrap">
@@ -294,7 +364,7 @@ function AllowanceCard({
               onClick={() => setEditing(true)}
               className="btn btn-sm text-xs"
             >
-              Edit cap
+              Edit
             </button>
             <Link
               href={`/transactions?entity=${a.entity}&search=${encodeURIComponent(a.personName)}`}
@@ -304,46 +374,78 @@ function AllowanceCard({
             </Link>
           </>
         ) : (
-          <>
-            <input
-              type="number" min="0" step="100"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="text-xs w-24"
-              placeholder="cap $"
-            />
-            <input
-              type="month"
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className="text-xs"
-              placeholder="every month"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                const cents = Math.round(parseFloat(amount || '0') * 100);
-                if (!(cents >= 0)) return;
-                onUpdate({ monthlyAmountCents: cents, periodMonth: period || null });
-                setEditing(false);
-              }}
-              disabled={disabled}
-              className="btn btn-primary btn-sm text-xs"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditing(false);
-                setAmount(((a.monthlyAmountCents ?? 0) / 100).toString());
-                setPeriod(a.periodMonth || '');
-              }}
-              className="btn btn-sm text-xs"
-            >
-              Cancel
-            </button>
-          </>
+          <div className="w-full space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="number" min="0" step="100"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="text-xs w-24"
+                placeholder="cap $"
+              />
+              <input
+                type="month"
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
+                className="text-xs"
+                placeholder="every month"
+              />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-ink-mute mb-1">
+                Bank accounts to attribute
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-48 overflow-y-auto pr-1">
+                {accountOptions.map((acc) => (
+                  <label
+                    key={acc.id}
+                    className="flex items-center gap-2 px-2 py-1 rounded cursor-pointer"
+                    style={{
+                      background: linked.has(acc.id) ? 'color-mix(in oklab, var(--gold) 10%, transparent)' : 'transparent',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={linked.has(acc.id)}
+                      onChange={() => toggleLinked(acc.id)}
+                    />
+                    <span className="text-[11px] flex-1 truncate">{acc.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const cents = Math.round(parseFloat(amount || '0') * 100);
+                  if (!(cents >= 0)) return;
+                  onUpdate({
+                    monthlyAmountCents: cents,
+                    periodMonth: period || null,
+                    linkedAccountIds: Array.from(linked),
+                  });
+                  setEditing(false);
+                }}
+                disabled={disabled}
+                className="btn btn-primary btn-sm text-xs"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditing(false);
+                  setAmount(((a.monthlyAmountCents ?? 0) / 100).toString());
+                  setPeriod(a.periodMonth || '');
+                  setLinked(new Set(a.linkedAccountIds));
+                }}
+                className="btn btn-sm text-xs"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
