@@ -477,6 +477,59 @@ input[type="checkbox"], input[type="radio"] { @apply w-4 h-4; accent-color: var(
     padding: 14px !important;
   }
 
+  /* ---- Transaction detail page ---- */
+  /* Top sticky action bar (Back + Personal/Needs receipt/Confirm tag) —
+     shrink padding, let buttons wrap onto a second row, tighten
+     button padding so 3 buttons + Back actually fit. */
+  .tx-topbar {
+    padding: 10px 12px !important;
+    row-gap: 8px !important;
+    column-gap: 6px !important;
+  }
+  .tx-topbar .btn {
+    font-size: 12px !important;
+    padding: 6px 10px !important;
+    min-height: 34px;
+    flex: 0 0 auto;
+  }
+  /* Kill the invisible flex-1 spacer on mobile so buttons pack tight */
+  .tx-topbar > span[style*="flex: 1"] {
+    display: none;
+  }
+  /* Bottom sticky footer — hide the keyboard-shortcut hints on mobile
+     (they're irrelevant on touch devices and eat all the width). */
+  .tx-kbd-hints {
+    display: none !important;
+  }
+  .tx-footbar {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+  }
+  .tx-footbar .btn {
+    font-size: 12px !important;
+    padding: 6px 10px !important;
+  }
+  /* Header row: icon+title on one line, amount drops below at a
+     reasonable size — 48px doesn't fit on any phone. */
+  .tx-header-row {
+    flex-wrap: wrap !important;
+    row-gap: 12px !important;
+  }
+  .tx-header-amount {
+    flex: 1 1 100% !important;
+    text-align: left !important;
+    order: 3;
+  }
+  .tx-amount-number {
+    font-size: 32px !important;
+  }
+  /* Charge / Posted / Booked date grid — 3 columns don't fit; drop to
+     stacked on phones so inputs are usable. */
+  .tx-dates-3col {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
   /* ---- Floating AI Chat launcher ---- */
   /* AIChat's floating pill defaults to bottom-right on desktop. On phones
      it collides with the browser bottom nav / Ask AI button; nudge up. */

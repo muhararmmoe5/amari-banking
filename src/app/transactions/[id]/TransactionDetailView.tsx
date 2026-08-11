@@ -165,7 +165,7 @@ export default function TransactionDetailView({
     <>
       {/* Sticky top action bar */}
       <div
-        className="sticky top-0 z-30 flex items-center"
+        className="sticky top-0 z-30 flex items-center flex-wrap tx-topbar"
         style={{
           padding: '14px 36px',
           gap: 10,
@@ -222,7 +222,7 @@ export default function TransactionDetailView({
           }}
         >
           {/* Transaction header */}
-          <div className="flex items-start" style={{ gap: 18, marginBottom: 28 }}>
+          <div className="flex items-start tx-header-row" style={{ gap: 18, marginBottom: 28 }}>
             <div
               className="grid place-items-center"
               style={{
@@ -312,9 +312,9 @@ export default function TransactionDetailView({
                 ) : null}
               </div>
             </div>
-            <div style={{ textAlign: 'right' }}>
+            <div className="tx-header-amount" style={{ textAlign: 'right' }}>
               <div
-                className="num"
+                className="num tx-amount-number"
                 style={{
                   fontSize: 48, fontWeight: 500, letterSpacing: '-.04em',
                   lineHeight: 1,
@@ -1041,7 +1041,7 @@ export default function TransactionDetailView({
 
       {/* Sticky footer */}
       <div
-        className="sticky flex items-center"
+        className="sticky flex items-center tx-footbar"
         style={{
           bottom: 0,
           padding: '14px 36px',
@@ -1052,7 +1052,7 @@ export default function TransactionDetailView({
           zIndex: 5,
         }}
       >
-        <div className="flex" style={{ gap: 14, marginRight: 'auto', fontSize: 10.5, color: 'var(--ink-4, #44443f)' }}>
+        <div className="flex tx-kbd-hints" style={{ gap: 14, marginRight: 'auto', fontSize: 10.5, color: 'var(--ink-4, #44443f)' }}>
           <KbdHint k="← →" label="Navigate" />
           <KbdHint k="C" label="Confirm" />
           <KbdHint k="P" label="Personal" />
@@ -1778,7 +1778,7 @@ function DatesSection({
   return (
     <div style={{ marginTop: 24 }}>
       <div
-        className="grid"
+        className="grid tx-dates-3col"
         style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}
       >
         {/* Charge date — from transaction description / source */}
