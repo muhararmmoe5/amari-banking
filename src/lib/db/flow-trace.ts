@@ -321,6 +321,8 @@ export interface DownstreamConsumer {
   pctOfExpense: number;           // amountFromThisInflow / |expenseAmount| * 100
   confirmedEntity: string | null;
   category: string;
+  customSourceTag: string | null;
+  accountId: string;
 }
 
 export interface DownstreamTraceResult {
@@ -351,8 +353,8 @@ export function traceDownstreamFromInflow(txId: string): DownstreamTraceResult |
   // outflow we drain from queue head. When the outflow takes some of OUR
   // target inflow's slot, we record it as a consumer.
   const all = db.prepare(`
-    SELECT id, posting_date, description, merchant_name, amount,
-      confirmed_entity, entity_tag, category
+    SELECT id, posting_date, description, merchant_name, amount, account_id,
+      confirmed_entity, entity_tag, category, custom_source_tag
     FROM transactions
     WHERE account_id = ?
     ORDER BY posting_date ASC, id ASC
@@ -383,6 +385,8 @@ export function traceDownstreamFromInflow(txId: string): DownstreamTraceResult |
             pctOfExpense: (take / Math.abs(t.amount)) * 100,
             confirmedEntity: t.confirmed_entity,
             category: t.category,
+            customSourceTag: t.custom_source_tag ?? null,
+            accountId: t.account_id,
           });
         }
         head.remaining -= take;

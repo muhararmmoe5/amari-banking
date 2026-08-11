@@ -1245,6 +1245,7 @@ export interface InflowEvent {
   amount: number;
   incomeSource: string | null;
   entity: string;
+  customSourceTag: string | null;
 }
 
 export function listLargeInflows(opts: {
@@ -1265,7 +1266,7 @@ export function listLargeInflows(opts: {
   if (opts.incomeSource) { where.push('income_source = @incomeSource'); p.incomeSource = opts.incomeSource; }
   const rows = db.prepare(`
     SELECT id, account_id, posting_date, description, merchant_name, amount, income_source,
-      COALESCE(confirmed_entity, entity_tag) as entity
+      COALESCE(confirmed_entity, entity_tag) as entity, custom_source_tag
     FROM transactions
     WHERE ${where.join(' AND ')}
     ORDER BY amount DESC, posting_date DESC
@@ -1280,6 +1281,7 @@ export function listLargeInflows(opts: {
     amount: r.amount,
     incomeSource: r.income_source,
     entity: r.entity,
+    customSourceTag: r.custom_source_tag ?? null,
   }));
 }
 

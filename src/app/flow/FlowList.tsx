@@ -1,48 +1,51 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronDown, ChevronRight, ArrowDownToLine, ArrowUpFromLine, Repeat2 } from 'lucide-react';
+import { useState, useTransition } from 'react';
+import Link from 'next/link';
+import { ChevronDown, ChevronRight, ExternalLink, Check } from 'lucide-react';
 import type { InflowEvent } from '@/lib/db/queries';
-import { ENTITY_COLORS, ENTITY_LABELS, getAccount } from '@/constants/accounts';
-import { fmtMoney, fmtDate } from '@/lib/format';
-import type { EntityType } from '@/types';
+import { getAccount, ENTITY_COLORS } from '@/constants/accounts';
+import { fmtMoney } from '@/lib/format';
+import { saveCustomSourceTagAction } from '../transactions/actions';
 
-const SOURCE_LABELS: Record<string, string> = {
-  SPACETEL: 'Spacetel',
-  OMAR_ALGHAZALI: 'Omar Alghazali',
-  TCETRA: 'TCETRA',
-  VIDAPAY: 'Vidapay',
-  STRIPE: 'Stripe',
-  DOORDASH: 'DoorDash',
-  GRUBHUB: 'Grubhub',
-  UBER_EATS: 'Uber Eats',
-  GUSTO: 'Gusto',
-  ZELLE_IN: 'Zelle inbound',
-  WIRE_UNKNOWN: 'Wire (unknown)',
-  OTHER: 'Other',
-};
-
-interface DayRow {
-  id: string;
+interface DownstreamConsumer {
+  txId: string;
+  postingDate: string;
   description: string;
-  merchantName: string | null;
-  amount: number;
-  balanceAfter: number | null;
-  isInternal: boolean;
-  counterpartyAccountId: string | null;
+  merchant: string | null;
+  expenseAmount: number;
+  amountFromThisInflow: number;
+  pctOfThisInflow: number;
+  confirmedEntity: string | null;
   category: string;
+  customSourceTag: string | null;
+  accountId: string;
+}
+
+interface DownstreamResult {
+  totalSpent: number;
+  remaining: number;
+  pctSpent: number;
+  consumers: DownstreamConsumer[];
 }
 
 export default function FlowList({ inflows }: { inflows: InflowEvent[] }) {
   if (inflows.length === 0) {
     return (
-      <div className="card p-10 text-center text-ink-mute text-sm">
-        No inflows match the filters. Try lowering the minimum amount or widening the date range.
+      <div
+        style={{
+          padding: 40, textAlign: 'center',
+          border: '0.5px dashed rgba(255,255,255,0.08)', borderRadius: 12,
+          color: 'var(--ink-3)',
+        }}
+      >
+        <div style={{ fontSize: 13, color: 'var(--ink-2)' }}>No inflows match these filters</div>
+        <div style={{ fontSize: 11, marginTop: 4 }}>Try lowering min amount or widening the date range.</div>
       </div>
     );
   }
   return (
-    <div className="space-y-2">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {inflows.map((i) => <InflowRow key={i.id} inflow={i} />)}
     </div>
   );
@@ -50,19 +53,28 @@ export default function FlowList({ inflows }: { inflows: InflowEvent[] }) {
 
 function InflowRow({ inflow }: { inflow: InflowEvent }) {
   const [open, setOpen] = useState(false);
-  const [activity, setActivity] = useState<DayRow[] | null>(null);
+  const [downstream, setDownstream] = useState<DownstreamResult | null>(null);
   const [loading, setLoading] = useState(false);
   const acct = getAccount(inflow.accountId);
 
   async function toggle() {
-    if (!open && activity == null) {
+    if (!open && downstream == null) {
       setLoading(true);
       try {
-        const res = await fetch(`/api/flow/day?account=${inflow.accountId}&date=${inflow.postingDate}`);
+        const res = await fetch(`/api/flow/downstream?txId=${inflow.id}`);
         const data = await res.json();
-        setActivity(data.rows || []);
-      } catch (e) {
-        setActivity([]);
+        if (data && Array.isArray(data.consumers)) {
+          setDownstream({
+            totalSpent: data.totalSpent,
+            remaining: data.remaining,
+            pctSpent: data.pctSpent,
+            consumers: data.consumers,
+          });
+        } else {
+          setDownstream({ totalSpent: 0, remaining: inflow.amount, pctSpent: 0, consumers: [] });
+        }
+      } catch {
+        setDownstream({ totalSpent: 0, remaining: inflow.amount, pctSpent: 0, consumers: [] });
       } finally {
         setLoading(false);
       }
@@ -71,151 +83,249 @@ function InflowRow({ inflow }: { inflow: InflowEvent }) {
   }
 
   return (
-    <div className="card overflow-hidden">
-      <button
-        type="button"
-        onClick={toggle}
-        className="w-full text-left p-4 grid grid-cols-[24px_1fr_180px_140px_140px] items-center gap-3 hover:bg-bg-2/40 transition"
+    <div
+      style={{
+        borderRadius: 10, overflow: 'hidden',
+        background: 'var(--bg-1, #111114)',
+        border: '1px solid ' + (open
+          ? 'color-mix(in oklab, var(--income) 30%, rgba(255,255,255,0.06))'
+          : 'rgba(255,255,255,0.06)'),
+      }}
+    >
+      {/* Inflow header */}
+      <div
+        style={{
+          padding: '14px 16px',
+          display: 'grid',
+          gridTemplateColumns: '20px 1fr auto auto',
+          gap: 12, alignItems: 'center',
+          borderBottom: open ? '1px solid rgba(255,255,255,0.06)' : 'none',
+        }}
       >
-        {open ? <ChevronDown size={16} className="text-ink-mute" /> : <ChevronRight size={16} className="text-ink-mute" />}
-        <div className="min-w-0">
-          <div className="font-medium">
-            {inflow.merchantName || inflow.description.slice(0, 80)}
-            {inflow.incomeSource ? (
-              <span className="ml-2 pill text-[10px] bg-income/10 text-income border border-income/30">
-                {SOURCE_LABELS[inflow.incomeSource] || inflow.incomeSource}
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={open ? 'collapse' : 'expand'}
+          style={{ background: 'transparent', border: 0, color: 'var(--ink-3)', cursor: 'pointer', padding: 0 }}
+        >
+          {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        </button>
+
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <span
+              style={{
+                fontSize: 9, textTransform: 'uppercase', letterSpacing: '.14em',
+                color: 'var(--income)', fontWeight: 600,
+              }}
+            >
+              INFLOW · {inflow.postingDate}
+            </span>
+            {acct ? (
+              <span
+                style={{
+                  fontSize: 9, padding: '1px 7px', borderRadius: 999,
+                  background: `${ENTITY_COLORS[acct.entity]}22`,
+                  color: ENTITY_COLORS[acct.entity],
+                  border: `0.5px solid ${ENTITY_COLORS[acct.entity]}55`,
+                }}
+              >
+                ····{acct.last4}
               </span>
             ) : null}
           </div>
-          <div className="text-[11px] text-ink-mute truncate">{inflow.description}</div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full" style={{ background: ENTITY_COLORS[inflow.entity as EntityType] || '#888' }} />
-          <span className="text-xs">{ENTITY_LABELS[inflow.entity as EntityType] || inflow.entity}</span>
-        </div>
-        <div className="text-xs text-ink-dim">
-          <span className="mono">···{inflow.accountId}</span>
-          {acct ? <span className="ml-1 text-ink-mute">· {acct.label}</span> : null}
-        </div>
-        <div className="text-right mono tabnum text-income text-lg">
-          +{fmtMoney(inflow.amount).replace(/^-/, '')}
-        </div>
-      </button>
-
-      {open ? (
-        <div className="border-t border-line bg-bg-0/30 p-4">
-          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-2">
-            Same-day activity on ···{inflow.accountId} · {fmtDate(inflow.postingDate)}
+          <div style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--ink)' }} className="truncate">
+            {inflow.merchantName || inflow.description.slice(0, 60)}
           </div>
-          {loading ? (
-            <div className="text-xs text-ink-mute py-3">Loading…</div>
-          ) : !activity || activity.length === 0 ? (
-            <div className="text-xs text-ink-mute py-3">No same-day activity recorded.</div>
-          ) : (
-            <DayTrace inflow={inflow} rows={activity} />
-          )}
+          <InlineTagEditor
+            txId={inflow.id}
+            initialValue={inflow.customSourceTag}
+            placeholder="+ Add custom source tag (e.g. Bytes AI investor wire — Omar tranche 2)"
+          />
         </div>
+
+        <div className="num" style={{ fontSize: 20, fontWeight: 500, color: 'var(--income)', textAlign: 'right' }}>
+          +{fmtMoney(inflow.amount)}
+        </div>
+
+        <Link
+          href={`/transactions/${inflow.id}`}
+          title="Full detail"
+          style={{
+            color: 'var(--ink-3)', textDecoration: 'none',
+            padding: 4, display: 'flex', alignItems: 'center', gap: 4, fontSize: 10,
+          }}
+        >
+          Detail <ExternalLink size={11} />
+        </Link>
+      </div>
+
+      {/* Expanded downstream section */}
+      {open ? (
+        loading ? (
+          <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: 'var(--ink-3)' }}>
+            Tracing where this money went…
+          </div>
+        ) : downstream ? (
+          <DownstreamPanel downstream={downstream} inflowAmount={inflow.amount} />
+        ) : null
       ) : null}
     </div>
   );
 }
 
-function DayTrace({ inflow, rows }: { inflow: InflowEvent; rows: DayRow[] }) {
-  // Split the day into: this inflow + other inflows + outflows + internal transfers
-  const others = rows.filter((r) => r.id !== inflow.id);
-  const outflows = others.filter((r) => r.amount < 0 && !r.isInternal);
-  const internals = others.filter((r) => r.isInternal);
-  const otherInflows = others.filter((r) => r.amount > 0 && !r.isInternal);
-
-  const totalOut = outflows.reduce((s, r) => s + Math.abs(r.amount), 0);
-  const totalInternal = internals.filter((r) => r.amount < 0).reduce((s, r) => s + Math.abs(r.amount), 0);
-  const totalOtherIn = otherInflows.reduce((s, r) => s + r.amount, 0);
-  const residual = inflow.amount + totalOtherIn - totalOut - totalInternal;
-
+function DownstreamPanel({ downstream, inflowAmount }: { downstream: DownstreamResult; inflowAmount: number }) {
+  const pct = Math.min(100, Math.max(0, downstream.pctSpent));
   return (
-    <div className="space-y-4">
-      {/* Outflows */}
-      {outflows.length > 0 ? (
-        <Section icon={<ArrowUpFromLine size={12} className="text-expense" />} title={`External outflows (${outflows.length})`} subtitle={`-${fmtMoney(totalOut).replace(/^-/, '')}`}>
-          {outflows.map((r) => (
-            <FlowLine key={r.id} description={r.description} merchant={r.merchantName} amount={r.amount} note={r.category.replace(/^(EXPENSE_|INCOME_)/, '').replace(/_/g, ' ').toLowerCase()} />
+    <div style={{ padding: '14px 16px 16px' }}>
+      {/* Summary bar */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 6 }}>
+          <span className="num" style={{ color: 'var(--gold)', fontWeight: 600 }}>{fmtMoney(downstream.totalSpent)}</span>
+          spent of <span className="num">{fmtMoney(inflowAmount)}</span>
+          <span style={{ marginLeft: 'auto' }}>
+            {pct >= 99.5 ? 'Fully allocated' : `${fmtMoney(downstream.remaining)} still available on this account`}
+          </span>
+        </div>
+        <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+          <div
+            style={{
+              height: '100%', width: `${pct}%`,
+              background: 'linear-gradient(90deg, color-mix(in oklab, var(--gold) 60%, transparent), var(--gold))',
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Consumers */}
+      {downstream.consumers.length === 0 ? (
+        <div style={{ fontSize: 11.5, color: 'var(--ink-3)', textAlign: 'center', padding: 12 }}>
+          No downstream expenses yet — this inflow is still fully available.
+        </div>
+      ) : (
+        <div
+          style={{
+            display: 'flex', flexDirection: 'column',
+            border: '0.5px solid rgba(255,255,255,0.06)', borderRadius: 8,
+          }}
+        >
+          {downstream.consumers.slice(0, 20).map((c, idx) => (
+            <ConsumerRow
+              key={c.txId}
+              consumer={c}
+              isLast={idx === Math.min(downstream.consumers.length, 20) - 1}
+            />
           ))}
-        </Section>
-      ) : null}
-
-      {/* Internal transfers (money moved to another account) */}
-      {internals.length > 0 ? (
-        <Section icon={<Repeat2 size={12} className="text-warn" />} title={`Internal transfers (${internals.length})`} subtitle={totalInternal > 0 ? `-${fmtMoney(totalInternal).replace(/^-/, '')} moved out` : ''}>
-          {internals.map((r) => {
-            const dest = r.counterpartyAccountId ? getAccount(r.counterpartyAccountId) : null;
-            return (
-              <FlowLine
-                key={r.id}
-                description={r.description}
-                merchant={r.merchantName}
-                amount={r.amount}
-                note={r.counterpartyAccountId ? `to ···${r.counterpartyAccountId}${dest ? ' (' + dest.label + ')' : ''}` : 'internal'}
-                isInternal
-              />
-            );
-          })}
-        </Section>
-      ) : null}
-
-      {/* Other inflows the same day */}
-      {otherInflows.length > 0 ? (
-        <Section icon={<ArrowDownToLine size={12} className="text-income" />} title={`Other inflows (${otherInflows.length})`} subtitle={`+${fmtMoney(totalOtherIn).replace(/^-/, '')}`}>
-          {otherInflows.map((r) => (
-            <FlowLine key={r.id} description={r.description} merchant={r.merchantName} amount={r.amount} />
-          ))}
-        </Section>
-      ) : null}
-
-      {/* Summary */}
-      <div className="border-t border-line pt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-        <Stat label="This inflow" value={`+${fmtMoney(inflow.amount).replace(/^-/, '')}`} tone="income" />
-        <Stat label="Outflows" value={totalOut > 0 ? `-${fmtMoney(totalOut).replace(/^-/, '')}` : '—'} tone="expense" />
-        <Stat label="Moved to other accounts" value={totalInternal > 0 ? `-${fmtMoney(totalInternal).replace(/^-/, '')}` : '—'} tone="warn" />
-        <Stat label="Net change on day" value={fmtMoney(residual)} tone={residual >= 0 ? 'income' : 'expense'} />
-      </div>
+          {downstream.consumers.length > 20 ? (
+            <div style={{ padding: '10px 12px', fontSize: 11, color: 'var(--ink-3)' }}>
+              + {downstream.consumers.length - 20} more not shown
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
 
-function Section({ icon, title, subtitle, children }: { icon: React.ReactNode; title: string; subtitle?: string; children: React.ReactNode }) {
+function ConsumerRow({ consumer, isLast }: { consumer: DownstreamConsumer; isLast: boolean }) {
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between text-[11px]">
-        <span className="inline-flex items-center gap-1.5 text-ink-dim font-medium">{icon} {title}</span>
-        {subtitle ? <span className="mono tabnum text-ink-dim">{subtitle}</span> : null}
+    <div
+      style={{
+        padding: '10px 12px',
+        borderBottom: isLast ? 'none' : '0.5px solid rgba(255,255,255,0.045)',
+        display: 'grid',
+        gridTemplateColumns: '60px 1fr auto auto',
+        gap: 12, alignItems: 'center',
+      }}
+    >
+      <div className="num" style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>
+        {consumer.postingDate.slice(5)}
       </div>
-      <div className="rounded-md bg-bg-2 divide-y divide-line/60">
-        {children}
+      <div style={{ minWidth: 0 }}>
+        <div className="truncate" style={{ fontSize: 12.5, color: 'var(--ink)' }}>
+          {consumer.merchant || consumer.description.slice(0, 50)}
+        </div>
+        <InlineTagEditor
+          txId={consumer.txId}
+          initialValue={consumer.customSourceTag}
+          placeholder="+ Tag what this spend is (e.g. Bytes AI production API)"
+          compact
+        />
       </div>
+      <div className="num" style={{ fontSize: 12, color: 'var(--gold)', textAlign: 'right' }}>
+        {fmtMoney(-consumer.amountFromThisInflow)}
+      </div>
+      <Link
+        href={`/transactions/${consumer.txId}`}
+        title="Full detail"
+        style={{ color: 'var(--ink-4, #44443f)', display: 'flex', alignItems: 'center' }}
+      >
+        <ExternalLink size={11} />
+      </Link>
     </div>
   );
 }
 
-function FlowLine({ description, merchant, amount, note, isInternal }: { description: string; merchant: string | null; amount: number; note?: string; isInternal?: boolean }) {
-  return (
-    <div className="grid grid-cols-[1fr_auto] items-center gap-3 px-3 py-2">
-      <div className="min-w-0">
-        <div className="text-sm truncate">{merchant || description.slice(0, 80)}</div>
-        {note ? <div className="text-[11px] text-ink-mute">{note}</div> : null}
-      </div>
-      <div className={`mono tabnum text-sm ${amount > 0 ? 'text-income' : isInternal ? 'text-warn' : 'text-expense'}`}>
-        {fmtMoney(amount)}
-      </div>
-    </div>
-  );
-}
+function InlineTagEditor({ txId, initialValue, placeholder, compact }: {
+  txId: string;
+  initialValue: string | null;
+  placeholder: string;
+  compact?: boolean;
+}) {
+  const [value, setValue] = useState(initialValue || '');
+  const [saved, setSaved] = useState(initialValue);
+  const [isPending, startTransition] = useTransition();
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'err'>('idle');
 
-function Stat({ label, value, tone }: { label: string; value: string; tone: 'income' | 'expense' | 'warn' | 'neutral' }) {
-  const colors = { income: 'text-income', expense: 'text-expense', warn: 'text-warn', neutral: 'text-ink' } as const;
+  function save(next: string) {
+    if (next === (saved || '')) return;
+    setStatus('saving');
+    startTransition(async () => {
+      try {
+        await saveCustomSourceTagAction(txId, next || null);
+        setSaved(next || null);
+        setStatus('saved');
+        setTimeout(() => setStatus('idle'), 1200);
+      } catch {
+        setStatus('err');
+      }
+    });
+  }
+
   return (
-    <div>
-      <div className="text-[10px] uppercase tracking-wider text-ink-mute">{label}</div>
-      <div className={`mono tabnum font-medium ${colors[tone]}`}>{value}</div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: compact ? 3 : 5 }}>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => save(value)}
+        onClick={(e) => e.stopPropagation()}
+        placeholder={placeholder}
+        style={{
+          flex: 1,
+          padding: compact ? '3px 8px' : '5px 10px',
+          background: value
+            ? 'color-mix(in oklab, var(--gold) 6%, var(--bg-2, #16161a))'
+            : 'transparent',
+          border: '1px dashed ' + (value
+            ? 'color-mix(in oklab, var(--gold) 30%, rgba(255,255,255,0.05))'
+            : 'rgba(255,255,255,0.08)'),
+          borderRadius: 6,
+          fontSize: compact ? 10.5 : 11.5,
+          color: value ? 'var(--gold)' : 'var(--ink-3)',
+          outline: 'none',
+          fontStyle: value ? 'italic' : 'normal',
+        }}
+      />
+      {status === 'saving' || isPending ? (
+        <span style={{ fontSize: 9, color: 'var(--ink-3)' }}>saving…</span>
+      ) : status === 'saved' ? (
+        <span style={{ fontSize: 9, color: 'var(--income)', display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Check size={9} /> saved
+        </span>
+      ) : status === 'err' ? (
+        <span style={{ fontSize: 9, color: 'var(--danger, #ff7676)' }}>failed</span>
+      ) : null}
     </div>
   );
 }

@@ -95,6 +95,18 @@ export async function bulkApplyReviewsAction(items: BulkApplyItem[]): Promise<{ 
   return { updated, skipped };
 }
 
+/** Tiny setter for the inline tag editor on /flow — accepts one tx id and
+ *  a new custom_source_tag value, saves, returns nothing. */
+export async function saveCustomSourceTagAction(id: string, tag: string | null): Promise<void> {
+  const user = requireUser();
+  if (!hasEditAccess(user)) throw new Error('read-only');
+  if (typeof id !== 'string' || id.length > 64) throw new Error('bad id');
+  const clean = tag && tag.trim() ? tag.trim().slice(0, 200) : null;
+  updateTransaction(id, { customSourceTag: clean });
+  revalidatePath('/flow');
+  revalidatePath('/transactions');
+}
+
 export async function deleteTransactionAction(id: string): Promise<void> {
   const user = requireUser();
   if (!hasEditAccess(user)) throw new Error('Only the owner can delete transactions');
