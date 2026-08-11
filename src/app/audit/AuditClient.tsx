@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import Link from 'next/link';
+import { ExternalLink, Sparkles } from 'lucide-react';
 import type { Transaction, AuditStatus, EntityType } from '@/types';
-import { ACCOUNTS, ENTITY_LABELS, ENTITY_COLORS } from '@/constants/accounts';
+import { ACCOUNTS, ENTITY_LABELS } from '@/constants/accounts';
 import { Money } from '@/components/Money';
 import { FlagBadge } from '@/components/FlagBadge';
 import { EntityBadge } from '@/components/EntityBadge';
@@ -21,7 +23,7 @@ export default function AuditClient({ initialRows }: { initialRows: Transaction[
   const [activeIdx, setActiveIdx] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
   const [, startTx] = useTransition();
-  const { saveStart, saveEnd, saveError } = useToast();
+  const { saveStart, saveEnd, saveError, toast } = useToast();
   const cardsRef = useRef<(HTMLDivElement | null)[]>([]);
 
   const active = rows[activeIdx];
@@ -34,31 +36,28 @@ export default function AuditClient({ initialRows }: { initialRows: Transaction[
 
   function setStatus(tx: Transaction, status: AuditStatus) {
     const toastId = saveStart();
-    const idx = rows.findIndex((r) => r.id === tx.id);
     startTx(async () => {
       try {
         await saveTransaction(tx.id, { auditStatus: status });
         saveEnd(toastId);
-        // Remove from queue and advance
         setRows((cur) => cur.filter((r) => r.id !== tx.id));
         setActiveIdx((i) => Math.min(i, Math.max(0, rows.length - 2)));
-        if (idx >= 0) {
-          // already removed by filter; activeIdx will be capped above
-        }
-      } catch (e: any) {
-        saveError(toastId, e?.message);
+      } catch (e: unknown) {
+        saveError(toastId, e instanceof Error ? e.message : 'save failed');
       }
     });
   }
 
-  function persistField(tx: Transaction, patch: any) {
+  function persistField(tx: Transaction, patch: Record<string, unknown>) {
     const toastId = saveStart();
     startTx(async () => {
       try {
-        await saveTransaction(tx.id, patch);
+        // saveTransaction is loosely typed on the server; the audit card only
+        // sets known-safe keys so a Record<string, unknown> is fine here.
+        await saveTransaction(tx.id, patch as never);
         saveEnd(toastId);
-      } catch (e: any) {
-        saveError(toastId, e?.message);
+      } catch (e: unknown) {
+        saveError(toastId, e instanceof Error ? e.message : 'save failed');
       }
     });
   }
@@ -86,7 +85,19 @@ export default function AuditClient({ initialRows }: { initialRows: Transaction[
   }, [active, rows.length]);
 
   if (rows.length === 0) {
-    return <div className="card p-12 text-center text-ink-mute">All clear in this bucket 🎉</div>;
+    return (
+      <div
+        style={{
+          padding: 40, textAlign: 'center',
+          border: '0.5px dashed rgba(255,255,255,0.08)', borderRadius: 12,
+          color: 'var(--ink-3)',
+        }}
+      >
+        <div style={{ fontSize: 22, marginBottom: 6 }}>🎉</div>
+        <div style={{ fontSize: 13, color: 'var(--ink-2)' }}>All clear in this bucket</div>
+        <div style={{ fontSize: 11, marginTop: 4 }}>Adjust the filters above or head over to bulk-review.</div>
+      </div>
+    );
   }
 
   return (
@@ -110,6 +121,7 @@ export default function AuditClient({ initialRows }: { initialRows: Transaction[
             onClick={() => setActiveIdx(idx)}
             onStatus={(s) => setStatus(tx, s)}
             onPersist={(p) => persistField(tx, p)}
+            onToast={(msg) => toast({ kind: 'ok', title: msg })}
           />
         ))}
       </div>
@@ -150,24 +162,75 @@ export default function AuditClient({ initialRows }: { initialRows: Transaction[
 }
 
 function Card({
-  tx, isActive, innerRef, onClick, onStatus, onPersist,
+  tx, isActive, innerRef, onClick, onStatus, onPersist, onToast,
 }: {
   tx: Transaction;
   isActive: boolean;
   innerRef: (el: HTMLDivElement | null) => void;
   onClick: () => void;
   onStatus: (s: AuditStatus) => void;
-  onPersist: (p: any) => void;
+  onPersist: (p: Record<string, unknown>) => void;
+  onToast: (msg: string) => void;
 }) {
   const [confirmedEntity, setConfirmedEntity] = useState<EntityType>(tx.confirmedEntity || tx.entityTag);
+  const [category, setCategory] = useState<string>(String(tx.confirmedCategory || tx.category || ''));
   const [purpose, setPurpose] = useState(tx.businessPurpose || '');
   const [docRef, setDocRef] = useState(tx.receiptRef || '');
   const [individual, setIndividual] = useState(tx.individual || '');
-  const [sub1, setSub1] = useState(tx.subCategory1 || '');
-  const [sub2, setSub2] = useState(tx.subCategory2 || '');
-  const [sourceOfMoney, setSourceOfMoney] = useState(tx.sourceOfMoney || '');
-  const [needFrom, setNeedFrom] = useState(tx.needToGetFrom || '');
+  const [customTag, setCustomTag] = useState(tx.customSourceTag || '');
+  const [claudeBusy, setClaudeBusy] = useState(false);
+  const [claudeReasoning, setClaudeReasoning] = useState<string | null>(null);
   const acct = ACCOUNTS.find((a) => a.id === tx.accountId);
+
+  const flagLabels = useMemo(
+    () => tx.auditFlags.map((f) => f.replace(/_/g, ' ')),
+    [tx.auditFlags],
+  );
+
+  async function askClaude() {
+    setClaudeBusy(true);
+    setClaudeReasoning(null);
+    try {
+      const res = await fetch('/api/admin/ai-classify-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactions: [{
+            txId: tx.id,
+            description: tx.description,
+            amount: tx.amount,
+            postingDate: tx.postingDate,
+            accountId: tx.accountId,
+            currentEntity: confirmedEntity,
+            currentCategory: category,
+            currentMerchant: tx.merchantName,
+          }],
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || err.error || res.statusText);
+      }
+      const { suggestions } = (await res.json()) as {
+        suggestions: Array<{
+          entity: string | null; category: string | null; individual: string | null;
+          customSourceTag: string | null; reasoning: string;
+        }>;
+      };
+      const g = suggestions[0];
+      if (!g) { onToast('Claude returned nothing — try again'); return; }
+      if (g.entity && !tx.confirmedEntity) { setConfirmedEntity(g.entity as EntityType); onPersist({ confirmedEntity: g.entity }); }
+      if (g.category && !tx.confirmedCategory) { setCategory(g.category); onPersist({ confirmedCategory: g.category }); }
+      if (g.individual && !tx.individual) { setIndividual(g.individual); onPersist({ individual: g.individual }); }
+      if (g.customSourceTag && !tx.customSourceTag) { setCustomTag(g.customSourceTag); onPersist({ customSourceTag: g.customSourceTag }); }
+      setClaudeReasoning(g.reasoning);
+      onToast('Claude filled in what it could');
+    } catch (e) {
+      setClaudeReasoning(`Failed: ${e instanceof Error ? e.message : 'unknown'}`);
+    } finally {
+      setClaudeBusy(false);
+    }
+  }
 
   return (
     <div
@@ -186,18 +249,18 @@ function Card({
         <Money value={tx.amount} className="text-2xl" />
       </div>
       <div>
-        <div className="font-medium">{tx.merchantName}</div>
+        <div className="font-medium">{tx.merchantName || tx.description.slice(0, 60)}</div>
         <div className="text-xs text-ink-mute mt-1 break-all">{tx.description}</div>
       </div>
-      {tx.auditFlags.length > 0 ? (
+      {flagLabels.length > 0 ? (
         <div className="text-xs space-y-1 text-warn">
-          {tx.auditFlags.map((f) => <div key={f}>⚠ {f.replace(/_/g, ' ')}</div>)}
+          {flagLabels.map((f) => <div key={f}>⚠ {f}</div>)}
         </div>
       ) : null}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <label className="block">
-          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Confirm entity</div>
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Entity</div>
           <select
             value={confirmedEntity}
             onChange={(e) => { const v = e.target.value as EntityType; setConfirmedEntity(v); onPersist({ confirmedEntity: v }); }}
@@ -209,6 +272,17 @@ function Card({
           </select>
         </label>
         <label className="block">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Category</div>
+          <input
+            type="text"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            onBlur={() => onPersist({ confirmedCategory: category || null })}
+            className="w-full"
+            placeholder="e.g. SOFTWARE, HOUSING"
+          />
+        </label>
+        <label className="block">
           <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Individual</div>
           <input
             type="text"
@@ -216,51 +290,7 @@ function Card({
             onChange={(e) => setIndividual(e.target.value)}
             onBlur={() => onPersist({ individual: individual || null })}
             className="w-full"
-            placeholder="Person / vendor this is about"
-          />
-        </label>
-        <label className="block">
-          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Sub category 1</div>
-          <input
-            type="text"
-            value={sub1}
-            onChange={(e) => setSub1(e.target.value)}
-            onBlur={() => onPersist({ subCategory1: sub1 || null })}
-            className="w-full"
-            placeholder="e.g. Grubhub revenue, Software"
-          />
-        </label>
-        <label className="block">
-          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Sub category 2</div>
-          <input
-            type="text"
-            value={sub2}
-            onChange={(e) => setSub2(e.target.value)}
-            onBlur={() => onPersist({ subCategory2: sub2 || null })}
-            className="w-full"
-            placeholder="Optional further breakdown"
-          />
-        </label>
-        <label className="block">
-          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Source of money to pay</div>
-          <input
-            type="text"
-            value={sourceOfMoney}
-            onChange={(e) => setSourceOfMoney(e.target.value)}
-            onBlur={() => onPersist({ sourceOfMoney: sourceOfMoney || null })}
-            className="w-full"
-            placeholder="Which account covers this"
-          />
-        </label>
-        <label className="block">
-          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">Need to get from</div>
-          <input
-            type="text"
-            value={needFrom}
-            onChange={(e) => setNeedFrom(e.target.value)}
-            onBlur={() => onPersist({ needToGetFrom: needFrom || null })}
-            className="w-full"
-            placeholder="Where to source funds from"
+            placeholder="Person or vendor tied to this row"
           />
         </label>
         <label className="block">
@@ -271,7 +301,20 @@ function Card({
             onChange={(e) => setDocRef(e.target.value)}
             onBlur={() => onPersist({ receiptRef: docRef || null })}
             className="w-full"
-            placeholder="INV-123 / link to file"
+            placeholder="INV-1234 / link to file"
+          />
+        </label>
+        <label className="block md:col-span-2">
+          <div className="text-[11px] uppercase tracking-wider text-ink-mute mb-1">
+            Custom source tag <span className="text-ink-mute normal-case tracking-normal">— specific client/project/purpose</span>
+          </div>
+          <input
+            type="text"
+            value={customTag}
+            onChange={(e) => setCustomTag(e.target.value)}
+            onBlur={() => onPersist({ customSourceTag: customTag || null })}
+            className="w-full"
+            placeholder={tx.amount > 0 ? 'e.g. Bytes AI — Client Acme, invoice #1234' : 'e.g. Anthropic API for Bytes AI production'}
           />
         </label>
         <label className="block md:col-span-2">
@@ -287,18 +330,47 @@ function Card({
         </label>
       </div>
 
+      {claudeReasoning ? (
+        <div
+          style={{
+            fontSize: 11, lineHeight: 1.45,
+            padding: '8px 12px', borderRadius: 8,
+            background: 'color-mix(in oklab, var(--gold) 6%, transparent)',
+            border: '0.5px solid color-mix(in oklab, var(--gold) 20%, transparent)',
+            color: 'var(--ink-2)',
+          }}
+        >
+          <em style={{ fontStyle: 'italic', color: 'var(--gold)' }}>Claude:</em> {claudeReasoning}
+        </div>
+      ) : null}
+
       <SplitEditor transactionId={tx.id} transactionAmount={tx.amount} />
 
-      <div className="flex flex-wrap gap-2 pt-2 border-t border-line">
-        <button className="btn btn-primary" onClick={(e) => { e.stopPropagation(); onStatus('CONFIRMED'); }}>
+      <div className="flex flex-wrap gap-2 pt-2 border-t border-line" onClick={(e) => e.stopPropagation()}>
+        <button className="btn btn-primary" onClick={() => onStatus('CONFIRMED')}>
           <kbd>1</kbd> ✅ Confirm
         </button>
-        <button className="btn" onClick={(e) => { e.stopPropagation(); onStatus('NEEDS_RECEIPT'); }}>
+        <button className="btn" onClick={() => onStatus('NEEDS_RECEIPT')}>
           <kbd>2</kbd> 🔴 Needs receipt
         </button>
-        <button className="btn" onClick={(e) => { e.stopPropagation(); onStatus('PERSONAL_NO_DEDUCT'); }}>
+        <button className="btn" onClick={() => onStatus('PERSONAL_NO_DEDUCT')}>
           <kbd>3</kbd> ❌ Personal
         </button>
+        <button
+          className="btn"
+          onClick={askClaude}
+          disabled={claudeBusy}
+          style={{ color: 'var(--gold)', borderColor: 'color-mix(in oklab, var(--gold) 25%, rgba(255,255,255,0.08))' }}
+        >
+          <Sparkles size={12} /> {claudeBusy ? 'Asking…' : 'Ask Claude'}
+        </button>
+        <Link
+          href={`/transactions/${tx.id}`}
+          className="btn"
+          style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}
+        >
+          Full detail <ExternalLink size={11} />
+        </Link>
       </div>
     </div>
   );
