@@ -327,3 +327,147 @@ export function getBudgetDetail(id: string): BudgetDetail | null {
     transactions,
   };
 }
+
+// ═════════════════════════════════════════════════════════════════════
+//   FOUNDER ALLOWANCES
+// ═════════════════════════════════════════════════════════════════════
+//
+// A founder allowance is a monthly personal-spend cap the company gives
+// a founder in lieu of formal salary. It's just a budget row with
+// kind='FOUNDER_ALLOWANCE', person_id set to the founder, entity set to
+// the paying company, and monthly_amount_cents as the cap. period_month
+// optionally scopes the cap to a specific YYYY-MM.
+//
+// Spend attribution: transactions where individual matches the person's
+// name (case-insensitive) AND the account belongs to `entity`. Direction
+// negative (outflow) only — inbound reimbursements don't count against
+// the cap.
+
+export interface FounderAllowance extends Budget {
+  personName: string;
+}
+
+export interface FounderAllowanceUsage extends FounderAllowance {
+  /** How much has been spent in the effective month against this
+   *  allowance. Absolute cents (always positive). */
+  spentThisMonthCents: number;
+  txCountThisMonth: number;
+  /** monthly_amount_cents minus spentThisMonthCents, floored at 0. */
+  remainingCents: number;
+  /** Which YYYY-MM 'this month' refers to (periodMonth if set, else
+   *  current calendar month). */
+  effectiveMonth: string;
+  /** Individual transaction rows counting against the allowance. */
+  transactions: Array<{
+    id: string;
+    postingDate: string;
+    merchant: string | null;
+    description: string;
+    amount: number; // signed
+  }>;
+}
+
+export function listFounderAllowances(opts: { activeOnly?: boolean; personId?: string } = {}): FounderAllowance[] {
+  const db = getDb();
+  const clauses = ["kind = 'FOUNDER_ALLOWANCE'"];
+  const params: Record<string, unknown> = {};
+  if (opts.activeOnly) clauses.push("status = 'ACTIVE'");
+  if (opts.personId) { clauses.push('person_id = @personId'); params.personId = opts.personId; }
+  const rows = db.prepare(
+    `SELECT b.*, p.name AS person_name
+       FROM budgets b
+       LEFT JOIN people p ON p.id = b.person_id
+       WHERE ${clauses.join(' AND ')}
+       ORDER BY b.entity, b.period_month DESC NULLS LAST, b.name`
+  ).all(params) as Array<Record<string, unknown> & { person_name?: string | null }>;
+  return rows.map((r) => ({
+    ...rowToBudget(r),
+    personName: (r.person_name as string) || 'Unknown',
+  }));
+}
+
+/**
+ * Compute usage for a single founder allowance. Sums personal-spend
+ * transactions tagged to the founder (by name) on accounts belonging
+ * to the entity, within the effective month.
+ */
+export function getFounderAllowanceUsage(allowanceId: string): FounderAllowanceUsage | null {
+  const db = getDb();
+  const row = db.prepare(
+    `SELECT b.*, p.name AS person_name
+       FROM budgets b
+       LEFT JOIN people p ON p.id = b.person_id
+       WHERE b.id = ? AND b.kind = 'FOUNDER_ALLOWANCE'`
+  ).get(allowanceId) as (Record<string, unknown> & { person_name?: string | null }) | undefined;
+  if (!row) return null;
+  const budget = rowToBudget(row);
+  const personName = (row.person_name as string) || 'Unknown';
+  if (!budget.entity || !personName) {
+    return {
+      ...budget,
+      personName,
+      spentThisMonthCents: 0,
+      txCountThisMonth: 0,
+      remainingCents: budget.monthlyAmountCents ?? 0,
+      effectiveMonth: budget.periodMonth || new Date().toISOString().slice(0, 7),
+      transactions: [],
+    };
+  }
+  const effectiveMonth = budget.periodMonth || new Date().toISOString().slice(0, 7);
+  const { from, to } = monthBounds(effectiveMonth);
+  const lowerName = personName.trim().toLowerCase();
+  // Accounts belonging to this entity — resolved via the ACCOUNTS
+  // constant since accounts.entity is a fixed mapping.
+  const accountRows = db.prepare(
+    `SELECT id FROM accounts WHERE entity = ?`
+  ).all(budget.entity) as Array<{ id: string }>;
+  if (accountRows.length === 0) {
+    return {
+      ...budget, personName,
+      spentThisMonthCents: 0, txCountThisMonth: 0,
+      remainingCents: budget.monthlyAmountCents ?? 0,
+      effectiveMonth, transactions: [],
+    };
+  }
+  const accountIds = accountRows.map((r) => r.id);
+  const placeholders = accountIds.map(() => '?').join(',');
+  const txRows = db.prepare(
+    `SELECT id, posting_date, description, merchant_name, amount
+       FROM transactions
+       WHERE amount < 0
+         AND account_id IN (${placeholders})
+         AND lower(trim(COALESCE(individual, ''))) = ?
+         AND posting_date >= ?
+         AND posting_date <= ?
+       ORDER BY posting_date DESC, id DESC
+       LIMIT 500`
+  ).all(...accountIds, lowerName, from, to) as Array<{
+    id: string; posting_date: string; description: string; merchant_name: string | null; amount: number;
+  }>;
+  const spentCents = txRows.reduce((s, r) => s + Math.round(Math.abs(r.amount) * 100), 0);
+  const cap = budget.monthlyAmountCents ?? 0;
+  return {
+    ...budget, personName,
+    spentThisMonthCents: spentCents,
+    txCountThisMonth: txRows.length,
+    remainingCents: Math.max(0, cap - spentCents),
+    effectiveMonth,
+    transactions: txRows.map((r) => ({
+      id: r.id,
+      postingDate: r.posting_date,
+      merchant: r.merchant_name,
+      description: r.description,
+      amount: r.amount,
+    })),
+  };
+}
+
+/** Bulk usage query for all active founder allowances — one DB pass
+ *  per allowance, but returns everything the /budgets page needs to
+ *  render the founder-allowance section. */
+export function listFounderAllowancesWithUsage(): FounderAllowanceUsage[] {
+  const allowances = listFounderAllowances({ activeOnly: true });
+  return allowances
+    .map((a) => getFounderAllowanceUsage(a.id))
+    .filter((x): x is FounderAllowanceUsage => x !== null);
+}

@@ -32,3 +32,32 @@ export async function actDeleteBudget(id: string) {
   deleteBudget(id);
   revalidateAll();
 }
+
+/**
+ * Create a founder-allowance budget. Convenience wrapper over
+ * createBudget with the founder-allowance kind pre-set. Everything the
+ * caller cares about — entity, personId, monthly cap, month scope — is
+ * inputs; name auto-generates from entity + person + month.
+ */
+export async function actCreateFounderAllowance(input: {
+  entity: string;
+  personId: string;
+  personName: string;
+  monthlyAmountCents: number;
+  periodMonth?: string | null; // YYYY-MM, null = applies to every month by default
+  notes?: string | null;
+}) {
+  checkOwner();
+  const monthLabel = input.periodMonth ? ` · ${input.periodMonth}` : '';
+  const b = createBudget({
+    name: `${input.personName} allowance from ${input.entity.replace(/_/g, ' ').toLowerCase()}${monthLabel}`,
+    entity: input.entity as BudgetInput['entity'],
+    kind: 'FOUNDER_ALLOWANCE',
+    personId: input.personId,
+    monthlyAmountCents: input.monthlyAmountCents,
+    periodMonth: input.periodMonth || null,
+    notes: input.notes || null,
+  });
+  revalidateAll();
+  return b;
+}

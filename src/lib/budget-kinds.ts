@@ -1,4 +1,13 @@
-export type BudgetKind = 'EXPENSE' | 'INCOME';
+/**
+ * Budget kinds:
+ *  - EXPENSE — a spending cap you're tracking against
+ *  - INCOME — an income target you're comparing to
+ *  - FOUNDER_ALLOWANCE — a monthly personal-spend allowance the company
+ *    gives a founder in lieu of salary. Tracks against personal-tagged
+ *    expenses where individual matches the person and the source
+ *    account belongs to the entity.
+ */
+export type BudgetKind = 'EXPENSE' | 'INCOME' | 'FOUNDER_ALLOWANCE';
 export type BudgetStatus = 'ACTIVE' | 'ARCHIVED';
 
 export const BUDGET_SUB_KINDS = {
