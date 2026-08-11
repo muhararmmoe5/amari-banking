@@ -203,7 +203,7 @@ export default function BulkReviewClient({
                 <div className="num" style={{ fontSize: 12, color: r.amount < 0 ? 'var(--gold)' : 'var(--income)', marginTop: 3, fontWeight: 500 }}>
                   {fmtMoney(r.amount)}
                 </div>
-                <div style={{ marginTop: 6 }}>
+                <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   <span
                     className="pill"
                     style={{
@@ -223,6 +223,19 @@ export default function BulkReviewClient({
                   >
                     {r.confidence.toUpperCase()}
                   </span>
+                  {r.isInternal ? (
+                    <span
+                      className="pill"
+                      style={{
+                        fontSize: 9.5, padding: '2px 8px', borderRadius: 999,
+                        color: 'var(--gold)',
+                        background: 'color-mix(in oklab, var(--gold) 10%, transparent)',
+                        border: '1px solid color-mix(in oklab, var(--gold) 25%, transparent)',
+                      }}
+                    >
+                      INTERNAL ↔
+                    </span>
+                  ) : null}
                 </div>
               </div>
 

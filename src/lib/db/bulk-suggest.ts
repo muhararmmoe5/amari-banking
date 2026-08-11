@@ -57,12 +57,18 @@ export interface BulkSuggestion {
   };
 
   confidence: SuggestionConfidence;
+  isInternal: boolean;
 }
 
 export function suggestForPending(limit = 200): BulkSuggestion[] {
   const pending = listTransactions({
     reviewBucket: 'PENDING_REVIEW',
-    hideInternal: true,
+    // Internal transfers stay in the queue — their outflow leg is
+    // where the owner most wants to lock in an exact source of money
+    // (e.g. 'the $2,500 that moved from Hub to Rocket came from the
+    // May 4 Spacetel wire'). The FIFO trace pass below is what makes
+    // that useful.
+    hideInternal: false,
     limit,
     orderBy: 'posting_date',
     orderDir: 'DESC',
@@ -72,8 +78,12 @@ export function suggestForPending(limit = 200): BulkSuggestion[] {
 
 function buildSuggestion(tx: Transaction): BulkSuggestion {
   const rules = categorize(tx.description, tx.amount, tx.accountId, tx.type || '');
+  const isInternal = !!tx.isInternal || rules.isInternal;
 
-  // FIFO source only meaningful for outflows.
+  // FIFO source only meaningful for outflows. For internal transfers this
+  // is the most valuable field — it identifies the ORIGINAL source of the
+  // money before the transfer, which is what a CPA needs to attribute the
+  // downstream expense correctly.
   let fundedByTransactionId: string | null = null;
   let fundedByLabel: string | null = null;
   if (tx.amount < 0) {
@@ -92,12 +102,20 @@ function buildSuggestion(tx: Transaction): BulkSuggestion {
   const informativeFields = [merchantIsInformative, entityIsInformative, categoryIsInformative].filter(Boolean).length;
 
   let confidence: SuggestionConfidence = 'low';
-  if (informativeFields >= 3 && fundedByTransactionId) confidence = 'high';
+  // Internal transfer with a FIFO source is treated as high confidence:
+  // the rule engine already knows it's an internal transfer, and the
+  // source identifies the original inflow — approving locks in the
+  // audit chain the CPA cares about.
+  if (isInternal && fundedByTransactionId) confidence = 'high';
+  else if (informativeFields >= 3 && fundedByTransactionId) confidence = 'high';
   else if (informativeFields >= 2) confidence = 'medium';
 
   const reasonParts: string[] = [];
-  if (merchantIsInformative) reasonParts.push(`Matched pattern → ${rules.merchantName}`);
-  if (categoryIsInformative) reasonParts.push(`Category → ${rules.category}`);
+  if (isInternal) {
+    reasonParts.push('Internal transfer — pick the ORIGINAL source of the money moving between your accounts');
+  }
+  if (merchantIsInformative && !isInternal) reasonParts.push(`Matched pattern → ${rules.merchantName}`);
+  if (categoryIsInformative && !isInternal) reasonParts.push(`Category → ${rules.category}`);
   if (entityIsInformative) reasonParts.push(`Entity → ${rules.entityTag}`);
   if (fundedByLabel) reasonParts.push(`FIFO source → ${fundedByLabel}`);
   if (!reasonParts.length) reasonParts.push('No rule matched — leave as-is or tag manually');
@@ -125,5 +143,6 @@ function buildSuggestion(tx: Transaction): BulkSuggestion {
       reason: reasonParts.join(' · '),
     },
     confidence,
+    isInternal,
   };
 }

@@ -1102,13 +1102,35 @@ function AiSourceTraceCard({ tx, fifoSource, sourceIsOverride }: {
             <em style={{ fontFamily: 'var(--font-serif, "Instrument Serif", serif)', fontStyle: 'italic', color: 'var(--gold)' }}>
               {sourceIsOverride ? 'manual override' : 'AI-traced'}
             </em>
+            {tx.isInternal ? (
+              <span
+                className="pill"
+                style={{
+                  marginLeft: 8, fontSize: 9.5, padding: '2px 8px', borderRadius: 999,
+                  color: 'var(--gold)',
+                  background: 'color-mix(in oklab, var(--gold) 10%, transparent)',
+                  border: '1px solid color-mix(in oklab, var(--gold) 25%, transparent)',
+                  verticalAlign: 'middle',
+                }}
+              >
+                INTERNAL ↔
+              </span>
+            ) : null}
           </div>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
-            {sourceIsOverride
-              ? 'You set this source manually · Retrace to switch back to the FIFO trace'
-              : has
-                ? 'Funded 100% from a prior inflow · you can override'
-                : 'No prior inflow detected on this account yet'}
+            {tx.isInternal ? (
+              sourceIsOverride
+                ? 'You picked the original source of this transfer · Retrace to re-run FIFO from scratch'
+                : has
+                  ? 'AI picked the FIFO source · override to pin a specific inflow this transfer came from'
+                  : 'Internal transfer — pick the inflow this money originated from before hitting this account'
+            ) : (
+              sourceIsOverride
+                ? 'You set this source manually · Retrace to switch back to the FIFO trace'
+                : has
+                  ? 'Funded 100% from a prior inflow · you can override'
+                  : 'No prior inflow detected on this account yet'
+            )}
           </div>
         </div>
         <button type="button" className="btn btn-ghost btn-sm" onClick={retrace} disabled={busy}>
