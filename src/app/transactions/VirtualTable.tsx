@@ -28,7 +28,17 @@ export default function VirtualTable({ rows }: { rows: Transaction[] }) {
       {/* Inner scroller so phones can pan horizontally through the wide
           11-column row without smashing every cell. Min-width matches
           ROW_GRID's total so cells never collapse. */}
-      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <div
+        className="virtual-table-scroller"
+        style={{
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          // Tell mobile browsers this element expects horizontal pans
+          // and shouldn't hand them to a vertical page scroll parent.
+          touchAction: 'pan-x pan-y',
+          overscrollBehaviorX: 'contain',
+        }}
+      >
       <div style={{ minWidth: 1240 }}>
       <div
         className="grid items-center"

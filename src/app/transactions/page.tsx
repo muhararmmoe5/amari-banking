@@ -516,7 +516,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
       </form>
       </div>
 
-      <div style={{ padding: '8px 36px 56px' }}>
+      <div className="tx-table-outer" style={{ padding: '8px 36px 56px' }}>
         <VirtualTable rows={rows} />
       </div>
     </div>
