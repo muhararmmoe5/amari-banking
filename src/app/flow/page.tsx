@@ -34,7 +34,7 @@ export default function FlowPage({ searchParams }: { searchParams: SP }) {
   const totalInflow = inflows.reduce((s, i) => s + i.amount, 0);
 
   return (
-    <div style={{ padding: '24px 24px 100px', maxWidth: 1400, margin: '0 auto' }}>
+    <div className="page-pad-mobile" style={{ padding: '24px 24px 100px', maxWidth: 1400, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--gold)', marginBottom: 6 }}>
@@ -56,6 +56,7 @@ export default function FlowPage({ searchParams }: { searchParams: SP }) {
 
       {/* Balances + summary */}
       <div
+        className="flow-stats-3col"
         style={{
           display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 24,
         }}

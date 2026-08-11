@@ -367,4 +367,65 @@ input[type="checkbox"], input[type="radio"] { @apply w-4 h-4; accent-color: var(
   .dr {
     width: 100vw;
   }
+
+  /* Squash multi-column inline `grid-template-columns` down to a single
+     column on phones. Any container we tagged with the `.mobile-stack`
+     class collapses; the desktop layout still uses the inline style. */
+  .mobile-stack {
+    grid-template-columns: 1fr !important;
+  }
+  /* Two-column mobile-2col preserves 2 across on phones where a 3+ col
+     desktop grid would be too cramped as a single column. */
+  .mobile-2col {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  /* Reduce oversize page padding on phones. Many pages use `padding: 24px
+     24px 100px` inline; the .page-pad-mobile class trims it. */
+  .page-pad-mobile {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  /* Larger tap-target for icon-only buttons */
+  .btn.btn-sm,
+  .btn-sm {
+    padding: 8px 12px !important;
+    min-height: 36px;
+  }
+  /* Dashboard hero: three-column split collapses to a single column.
+     Targeted via a stable class hook so we don't rely on inline styles. */
+  .dash-hero-3col {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  /* Transaction detail sidebar splits vertically on mobile. */
+  .tx-detail-2col {
+    grid-template-columns: 1fr !important;
+  }
+  /* And its inner main-column padding shrinks so the form actually fits */
+  .tx-detail-main-pad {
+    padding: 20px 14px !important;
+  }
+  /* Right aside becomes a full-width block too */
+  .tx-detail-aside {
+    padding: 20px 14px !important;
+    border-left: 0 !important;
+    border-top: 1px solid rgba(255,255,255,0.055);
+  }
+  /* Bulk-review row grid collapses so date/details/actions stack */
+  .bulk-row-grid {
+    grid-template-columns: 24px 1fr !important;
+    gap: 8px !important;
+  }
+  /* Flow-page stat cards drop to a single column */
+  .flow-stats-3col {
+    grid-template-columns: 1fr !important;
+  }
+  /* Serif hero numbers were sized for desktop — shrink so they fit */
+  .serif-display {
+    font-size: 34px !important;
+  }
+  /* Kill any horizontal overflow on the outer page container */
+  body {
+    overflow-x: hidden;
+  }
 }

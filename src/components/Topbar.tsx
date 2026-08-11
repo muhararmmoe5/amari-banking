@@ -39,7 +39,7 @@ export default function Topbar({ title: _title }: { title?: string }) {
   }
 
   return (
-    <div className="h-14 flex-none border-b border-line surface-glass flex items-center px-6 gap-3.5 sticky top-0 z-20">
+    <div className="hidden md:flex h-14 flex-none border-b border-line surface-glass items-center px-6 gap-3.5 sticky top-0 z-20">
       {/* Entity scope — display-only badge (was a dead placeholder button
           claiming a switcher; we removed the switcher UI until it's real). */}
       <div

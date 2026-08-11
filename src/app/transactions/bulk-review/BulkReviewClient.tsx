@@ -168,7 +168,7 @@ export default function BulkReviewClient({
   };
 
   return (
-    <div style={{ padding: '24px 24px 100px', maxWidth: 1400, margin: '0 auto' }}>
+    <div className="page-pad-mobile" style={{ padding: '24px 24px 100px', maxWidth: 1400, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <Link href="/transactions" className="flex items-center" style={{ gap: 6, fontSize: 11, color: 'var(--ink-3)', textDecoration: 'none' }}>
@@ -298,6 +298,7 @@ export default function BulkReviewClient({
                 gridTemplateColumns: '24px 220px 1fr auto',
                 gap: 12, alignItems: 'start',
               }}
+              className="bulk-row-grid"
             >
               {/* Accept checkbox */}
               <button
@@ -362,8 +363,8 @@ export default function BulkReviewClient({
                 </div>
               </div>
 
-              {/* Middle: editable fields */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, minWidth: 0 }}>
+              {/* Middle: editable fields — collapses to 1-col on mobile */}
+              <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, minWidth: 0 }}>
                 <div>
                   <div style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--ink-4, #44443f)', marginBottom: 3 }}>Entity</div>
                   <select

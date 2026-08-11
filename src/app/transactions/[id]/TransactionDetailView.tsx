@@ -198,13 +198,14 @@ export default function TransactionDetailView({
         </button>
       </div>
 
-      {/* Two-column body */}
+      {/* Two-column body — stacks vertically on mobile */}
       <div
-        className="grid"
+        className="grid tx-detail-2col"
         style={{ gridTemplateColumns: '1fr 380px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}
       >
         {/* ── LEFT MAIN COLUMN ─────────────────────────────────────── */}
         <div
+          className="tx-detail-main-pad"
           style={{
             padding: '36px 36px 32px',
             borderRight: '1px solid rgba(255,255,255,0.055)',
@@ -872,6 +873,7 @@ export default function TransactionDetailView({
 
         {/* ── RIGHT ASIDE ──────────────────────────────────────── */}
         <aside
+          className="tx-detail-aside"
           style={{
             padding: '36px 32px 32px',
             background: 'color-mix(in oklab, var(--gold) 2%, var(--bg-1, #111114))',

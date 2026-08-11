@@ -124,9 +124,9 @@ export default function DashboardPage({ searchParams }: { searchParams: { period
           </div>
         </div>
       ) : (
-        <div className="px-8 pb-12">
+        <div className="px-4 md:px-8 pb-12 pt-14 md:pt-0">
           {/* ────────── 1. Page header ────────── */}
-          <div className="pt-7 pb-6 flex items-end gap-6">
+          <div className="pt-7 pb-6 flex flex-col md:flex-row md:items-end gap-4 md:gap-6">
             <div>
               <PageTitle accent="Dash">board</PageTitle>
               <div className="text-[12.5px] text-ink-mute mt-1">
@@ -163,7 +163,7 @@ export default function DashboardPage({ searchParams }: { searchParams: { period
 
           {/* ────────── 2. Hero strip ────────── */}
           <div
-            className="card overflow-hidden mb-6 grid"
+            className="card overflow-hidden mb-6 grid dash-hero-3col"
             style={{
               gridTemplateColumns: '1.3fr 1fr 1fr',
               gap: 1,
@@ -331,13 +331,13 @@ export default function DashboardPage({ searchParams }: { searchParams: { period
           </div>
 
           {/* ────────── 4 + 5. Money flow + Investor commitments ────────── */}
-          <div className="grid gap-4 mb-6" style={{ gridTemplateColumns: '2fr 1fr' }}>
+          <div className="grid gap-4 mb-6 mobile-stack" style={{ gridTemplateColumns: '2fr 1fr' }}>
             <MoneyFlow flow={flow} />
             <InvestorCommitmentsCard investors={investors} />
           </div>
 
           {/* ────────── 6 + 7. Attention + Recent activity ────────── */}
-          <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 1.5fr' }}>
+          <div className="grid gap-4 mobile-stack" style={{ gridTemplateColumns: '1fr 1.5fr' }}>
             <AttentionQueue items={attention} />
             <RecentActivity transactions={recentTx} />
           </div>
