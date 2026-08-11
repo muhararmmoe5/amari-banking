@@ -17,6 +17,7 @@ import { saveTransaction, deleteTransactionAction, flagForIdentificationAction }
 import { Trash2, UserSearch } from 'lucide-react';
 import BackToTransactionsLink from '../BackToTransactionsLink';
 import PersonPicker from '@/components/PersonPicker';
+import { CUSTOM_CATEGORY_PRESETS } from '@/constants/custom-categories';
 import { useToast } from '@/components/Toast';
 import BankChip from '@/components/BankChip';
 import DrawerSplitEditor from '../DrawerSplitEditor';
@@ -1654,18 +1655,30 @@ function CustomCategoryInputs({
   onDescBlur: () => void;
   tone: string;
 }) {
-  // Load previously-used custom categories so autocomplete can suggest
-  // them as the user types. Fetched once on mount — the list rarely
-  // changes fast enough to warrant reactivity here.
-  const [suggestions, setSuggestions] = useState<CustomCategorySuggestion[]>([]);
+  // Seed the datalist immediately with the embedded preset catalog so
+  // even a fresh DB shows useful suggestions. Then merge in
+  // previously-used custom categories from the API — DB entries take
+  // priority on name collision (they carry the user's real description
+  // and use count).
+  const [suggestions, setSuggestions] = useState<CustomCategorySuggestion[]>(() =>
+    CUSTOM_CATEGORY_PRESETS.map((p) => ({ name: p.name, description: p.description, useCount: 0 })),
+  );
   useEffect(() => {
     let cancelled = false;
     fetch('/api/transactions/custom-categories', { credentials: 'same-origin' })
       .then((r) => r.json())
       .then((d) => {
-        if (!cancelled && Array.isArray(d?.suggestions)) setSuggestions(d.suggestions);
+        if (cancelled || !Array.isArray(d?.suggestions)) return;
+        const fromDb = d.suggestions as CustomCategorySuggestion[];
+        const seen = new Set(fromDb.map((s) => s.name.trim().toLowerCase()));
+        const presetsNotYetUsed = CUSTOM_CATEGORY_PRESETS
+          .filter((p) => !seen.has(p.name.trim().toLowerCase()))
+          .map((p) => ({ name: p.name, description: p.description, useCount: 0 }));
+        // DB entries first (most-used real usage), then the rest of
+        // the preset catalog as a fallback dictionary.
+        setSuggestions([...fromDb, ...presetsNotYetUsed]);
       })
-      .catch(() => { /* fall through, autocomplete just stays empty */ });
+      .catch(() => { /* keep the presets we already have */ });
     return () => { cancelled = true; };
   }, []);
 
@@ -1692,8 +1705,8 @@ function CustomCategoryInputs({
         <em style={{ fontStyle: 'italic', color: tone }}>Custom category</em>
         {' — '}
         <span style={{ color: 'var(--ink-3)' }}>
-          use this when none of the presets fit.
-          {suggestions.length > 0 ? ` ${suggestions.length} previously used — type to see suggestions.` : ' Autocompletes on future rows once used.'}
+          use this when none of the presets fit.{' '}
+          {suggestions.length} suggestions available — type to filter, or pick one from the list.
         </span>
       </div>
       <div className="grid" style={{ gap: 8 }}>
