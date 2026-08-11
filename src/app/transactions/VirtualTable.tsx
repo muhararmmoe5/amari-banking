@@ -17,6 +17,7 @@ export default function VirtualTable({ rows }: { rows: Transaction[] }) {
 
   return (
     <div
+      className="virtual-table-wrap"
       style={{
         background: 'var(--bg-1, #111114)',
         border: '1px solid rgba(255,255,255,0.055)',
@@ -24,6 +25,11 @@ export default function VirtualTable({ rows }: { rows: Transaction[] }) {
         overflow: 'hidden',
       }}
     >
+      {/* Inner scroller so phones can pan horizontally through the wide
+          11-column row without smashing every cell. Min-width matches
+          ROW_GRID's total so cells never collapse. */}
+      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <div style={{ minWidth: 1240 }}>
       <div
         className="grid items-center"
         style={{
@@ -80,6 +86,8 @@ export default function VirtualTable({ rows }: { rows: Transaction[] }) {
           </div>
         </div>
       )}
+      </div>
+      </div>
     </div>
   );
 }

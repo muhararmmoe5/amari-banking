@@ -160,13 +160,13 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
     <div className="max-w-[1600px] mx-auto pb-12">
       {/* ── Page header ─────────────────────────────────────── */}
       <div
-        className="flex items-end gap-5"
+        className="flex flex-col md:flex-row md:items-end gap-4 md:gap-5 tx-page-header"
         style={{
           padding: '36px 36px 24px',
           borderBottom: '1px solid rgba(255,255,255,0.055)',
         }}
       >
-        <div>
+        <div className="min-w-0 flex-1">
           <div
             style={{
               fontSize: 10,
@@ -180,6 +180,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
             Banking · transactions
           </div>
           <h1
+            className="tx-page-title"
             style={{
               fontSize: 42,
               fontWeight: 500,
@@ -190,6 +191,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
             }}
           >
             <em
+              className="tx-page-title-em"
               style={{
                 fontFamily: 'var(--font-serif, "Instrument Serif", serif)',
                 fontStyle: 'italic',
@@ -222,7 +224,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
           </p>
         </div>
         <div className="flex-1" />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap tx-page-actions">
           <Link
             href={`/audit/deep${searchParams.account ? `?account=${searchParams.account}` : ''}`}
             className="btn"
@@ -244,7 +246,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
 
       {/* ── Stat strip — clickable filter cells ────────────── */}
       <div
-        className="grid"
+        className="grid tx-stat-strip"
         style={{
           gridTemplateColumns: '1.2fr 1fr 1fr 1fr 1fr',
           background: 'var(--bg-1, #111114)',
@@ -319,9 +321,9 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
       </div>
 
       {/* ── AI auto-trace strip ────────────────────────────── */}
-      <div style={{ padding: '16px 36px 0' }}>
+      <div className="tx-filter-outer" style={{ padding: '16px 36px 0' }}>
         <div
-          className="flex items-center"
+          className="flex flex-col md:flex-row md:items-center tx-strip-inner"
           style={{
             padding: '14px 18px',
             gap: 14,
@@ -383,7 +385,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
               </b>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, position: 'relative' }}>
+          <div className="tx-strip-actions" style={{ display: 'flex', gap: 8, position: 'relative', flexWrap: 'wrap' }}>
             {/* 'Preview rules' shows the FIFO-attributed source for every expense
                 on the currently-filtered account — that IS the preview of what
                 the auto-tag rules would apply. */}
@@ -406,7 +408,7 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
       </div>
 
       {/* Filter form (existing functionality, restyled wrapper) */}
-      <div style={{ padding: '16px 36px 8px' }}>
+      <div className="tx-filter-outer" style={{ padding: '16px 36px 8px' }}>
 
       <form className="card p-5 space-y-4 text-xs" method="GET">
         {/* Preserve the review tab when the user submits other filters */}

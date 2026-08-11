@@ -428,4 +428,67 @@ input[type="checkbox"], input[type="radio"] { @apply w-4 h-4; accent-color: var(
   body {
     overflow-x: hidden;
   }
+
+  /* ---- /transactions page ---- */
+  /* Trim the 36px side padding to something a phone can use */
+  .tx-page-header,
+  .tx-filter-outer,
+  .tx-strip-outer {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  /* Serif title 'Transactions' is 42/48px on desktop — way too big */
+  .tx-page-title {
+    font-size: 28px !important;
+  }
+  .tx-page-title-em {
+    font-size: 30px !important;
+  }
+  /* Action button row wraps and children get room */
+  .tx-page-actions {
+    width: 100%;
+  }
+  .tx-page-actions .btn {
+    flex: 1 1 auto;
+    min-width: 44%;
+    justify-content: center;
+  }
+  /* 5-cell stat strip becomes 2-across */
+  .tx-stat-strip {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .tx-stat-strip > * {
+    padding: 12px 14px !important;
+  }
+  /* AI auto-trace strip stacks: icon+text on top, buttons below */
+  .tx-strip-inner {
+    align-items: stretch !important;
+  }
+  .tx-strip-actions {
+    width: 100%;
+  }
+  .tx-strip-actions .btn {
+    flex: 1 1 auto;
+    min-width: 46%;
+    justify-content: center;
+  }
+  /* Filter form gets tighter internal padding */
+  .tx-filter-outer .card {
+    padding: 14px !important;
+  }
+
+  /* ---- Floating AI Chat launcher ---- */
+  /* AIChat's floating pill defaults to bottom-right on desktop. On phones
+     it collides with the browser bottom nav / Ask AI button; nudge up. */
+  .aichat-launcher {
+    bottom: 20px !important;
+    right: 12px !important;
+    left: auto !important;
+  }
+  .aichat-panel {
+    width: calc(100vw - 24px) !important;
+    right: 12px !important;
+    bottom: 76px !important;
+    max-height: calc(100vh - 120px) !important;
+  }
 }

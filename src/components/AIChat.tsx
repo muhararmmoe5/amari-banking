@@ -114,14 +114,14 @@ export default function AIChat() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium text-bg-0 shadow-soft hover:opacity-90 transition"
+          className="aichat-launcher fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium text-bg-0 shadow-soft hover:opacity-90 transition"
           style={{ background: 'linear-gradient(135deg, #C8F060 0%, #60C8F0 100%)' }}
         >
           <Sparkles size={16} strokeWidth={2} />
           Ask AI
         </button>
       ) : (
-        <div className="fixed bottom-5 right-5 z-40 w-[min(420px,calc(100vw-32px))] h-[min(640px,calc(100vh-48px))] flex flex-col card overflow-hidden">
+        <div className="aichat-panel fixed bottom-5 right-5 z-40 w-[min(420px,calc(100vw-32px))] h-[min(640px,calc(100vh-48px))] flex flex-col card overflow-hidden">
           <header className="flex items-center justify-between px-4 py-3 border-b border-line">
             <div className="flex items-center gap-2">
               <span
