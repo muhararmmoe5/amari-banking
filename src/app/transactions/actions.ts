@@ -61,6 +61,7 @@ export interface BulkApplyItem {
   confirmedEntity?: string | null;
   confirmedCategory?: string | null;
   individual?: string | null;
+  customSourceTag?: string | null;
   fundedByTransactionId?: string | null;
   markReviewed?: boolean;
 }
@@ -79,6 +80,7 @@ export async function bulkApplyReviewsAction(items: BulkApplyItem[]): Promise<{ 
     if (item.confirmedEntity !== undefined) (patch as Record<string, unknown>).confirmedEntity = item.confirmedEntity;
     if (item.confirmedCategory !== undefined) (patch as Record<string, unknown>).confirmedCategory = item.confirmedCategory;
     if (item.individual !== undefined) patch.individual = item.individual;
+    if (item.customSourceTag !== undefined) patch.customSourceTag = item.customSourceTag;
     if (item.fundedByTransactionId !== undefined) patch.fundedByTransactionId = item.fundedByTransactionId;
     if (item.markReviewed) {
       patch.auditStatus = 'CONFIRMED';

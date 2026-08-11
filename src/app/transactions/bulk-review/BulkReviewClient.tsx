@@ -21,8 +21,10 @@ interface Row extends BulkSuggestion {
   chosenEntity: string | null;
   chosenCategory: string | null;
   chosenIndividual: string | null;
+  chosenCustomTag: string | null;
   chosenFundedBy: string | null;
   accepted: boolean;
+  claudeReasoning?: string | null;
 }
 
 export default function BulkReviewClient({
@@ -41,11 +43,78 @@ export default function BulkReviewClient({
       chosenEntity: s.suggested.entity ?? s.current.entity,
       chosenCategory: s.suggested.category ?? s.current.category,
       chosenIndividual: s.current.individual,
+      chosenCustomTag: s.current.customSourceTag,
       chosenFundedBy: s.suggested.fundedByTransactionId ?? s.current.fundedByTransactionId,
       // Auto-select high-confidence rows so the common case is "check totals, hit apply".
       accepted: s.confidence === 'high',
     })),
   );
+
+  const [claudeBusy, setClaudeBusy] = useState(false);
+  const [claudeMsg, setClaudeMsg] = useState<string | null>(null);
+
+  async function askClaude() {
+    setClaudeBusy(true);
+    setClaudeMsg(null);
+    try {
+      // Batch in groups of 40 so the endpoint's per-call cap is respected.
+      const BATCH = 40;
+      const targets = rows;
+      let filled = 0;
+      for (let i = 0; i < targets.length; i += BATCH) {
+        const batch = targets.slice(i, i + BATCH).map((r) => ({
+          txId: r.txId,
+          description: r.description,
+          amount: r.amount,
+          postingDate: r.postingDate,
+          accountId: r.accountId,
+          currentEntity: r.chosenEntity,
+          currentCategory: r.chosenCategory,
+          currentMerchant: r.current.merchantName,
+        }));
+        const res = await fetch('/api/admin/ai-classify-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transactions: batch }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || err.error || res.statusText);
+        }
+        const { suggestions: got } = (await res.json()) as {
+          suggestions: Array<{
+            txId: string; entity: string | null; category: string | null;
+            individual: string | null; customSourceTag: string | null;
+            confidence: 'high' | 'medium' | 'low'; reasoning: string;
+          }>;
+        };
+        const byId = new Map(got.map((g) => [g.txId, g]));
+        setRows((prev) => prev.map((r) => {
+          const g = byId.get(r.txId);
+          if (!g) return r;
+          filled++;
+          return {
+            ...r,
+            chosenEntity: g.entity || r.chosenEntity,
+            chosenCategory: g.category || r.chosenCategory,
+            chosenIndividual: g.individual || r.chosenIndividual,
+            chosenCustomTag: g.customSourceTag || r.chosenCustomTag,
+            // Upgrade confidence if Claude was more confident than the rules.
+            confidence: (g.confidence === 'high' || (g.confidence === 'medium' && r.confidence === 'low'))
+              ? g.confidence
+              : r.confidence,
+            accepted: g.confidence === 'high' ? true : r.accepted,
+            claudeReasoning: g.reasoning,
+          };
+        }));
+      }
+      setClaudeMsg(`Claude classified ${filled} row${filled === 1 ? '' : 's'}.`);
+    } catch (e) {
+      setClaudeMsg(`Claude failed: ${e instanceof Error ? e.message : 'unknown'}`);
+    } finally {
+      setClaudeBusy(false);
+    }
+  }
 
   const stats = useMemo(() => {
     const total = rows.length;
@@ -72,6 +141,7 @@ export default function BulkReviewClient({
         confirmedEntity: r.chosenEntity || null,
         confirmedCategory: r.chosenCategory || null,
         individual: r.chosenIndividual || null,
+        customSourceTag: r.chosenCustomTag || null,
         fundedByTransactionId: r.chosenFundedBy || null,
         markReviewed: true,
       }));
@@ -142,8 +212,23 @@ export default function BulkReviewClient({
 
         <div style={{ flex: 1 }} />
 
+        {claudeMsg ? <div style={{ fontSize: 11, color: claudeMsg.startsWith('Claude failed') ? 'var(--danger, #ff7676)' : 'var(--gold)' }}>{claudeMsg}</div> : null}
         {msg ? <div style={{ fontSize: 11, color: msg.startsWith('Failed') ? 'var(--danger, #ff7676)' : 'var(--income)' }}>{msg}</div> : null}
 
+        <button
+          type="button"
+          onClick={askClaude}
+          disabled={claudeBusy || rows.length === 0}
+          className="btn"
+          style={{
+            display: 'flex', gap: 6, alignItems: 'center',
+            color: 'var(--gold)',
+            borderColor: 'color-mix(in oklab, var(--gold) 30%, rgba(255,255,255,0.08))',
+            opacity: (claudeBusy || rows.length === 0) ? 0.5 : 1,
+          }}
+        >
+          <Sparkles size={13} /> {claudeBusy ? 'Asking Claude…' : 'Ask Claude'}
+        </button>
         <button
           type="button"
           onClick={applyAccepted}
@@ -275,6 +360,21 @@ export default function BulkReviewClient({
                   />
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
+                  <div style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--ink-4, #44443f)', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    Custom source tag
+                    <span style={{ fontSize: 9, color: 'var(--ink-4, #44443f)', textTransform: 'none', letterSpacing: 0 }}>
+                      — free text, e.g. &quot;Bytes AI — Client Acme, invoice #1234&quot;
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    value={r.chosenCustomTag || ''}
+                    onChange={(e) => updateRow(r.txId, { chosenCustomTag: e.target.value || null })}
+                    placeholder={r.amount > 0 ? 'What specifically is this income?' : 'What is this spend for?'}
+                    style={cellStyle}
+                  />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
                   <div style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--ink-4, #44443f)', marginBottom: 3 }}>Funding source</div>
                   {r.suggested.fundedByLabel ? (
                     <div className="num" style={{ fontSize: 11, color: 'var(--ink-2)', padding: '5px 8px', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 6 }}>
@@ -296,6 +396,19 @@ export default function BulkReviewClient({
                 <div style={{ gridColumn: '1 / -1', fontSize: 10.5, color: 'var(--ink-3)', lineHeight: 1.45, marginTop: 2 }}>
                   <em style={{ fontStyle: 'italic', color: 'var(--ink-4, #44443f)' }}>Why:</em> {r.suggested.reason}
                 </div>
+                {r.claudeReasoning ? (
+                  <div
+                    style={{
+                      gridColumn: '1 / -1', fontSize: 10.5, lineHeight: 1.45, marginTop: 2,
+                      padding: '6px 10px', borderRadius: 6,
+                      background: 'color-mix(in oklab, var(--gold) 6%, transparent)',
+                      color: 'var(--ink-2)',
+                      border: '0.5px solid color-mix(in oklab, var(--gold) 20%, transparent)',
+                    }}
+                  >
+                    <em style={{ fontStyle: 'italic', color: 'var(--gold)' }}>Claude:</em> {r.claudeReasoning}
+                  </div>
+                ) : null}
               </div>
 
               {/* Right: link to detail */}

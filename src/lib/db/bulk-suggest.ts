@@ -42,6 +42,7 @@ export interface BulkSuggestion {
     category: string;
     entity: string;
     individual: string | null;
+    customSourceTag: string | null;
     fundedByTransactionId: string | null;
   };
 
@@ -51,6 +52,7 @@ export interface BulkSuggestion {
     category: string | null;
     entity: string | null;
     individual: string | null;
+    customSourceTag: string | null;
     fundedByTransactionId: string | null;
     fundedByLabel: string | null;
     reason: string;
@@ -131,6 +133,7 @@ function buildSuggestion(tx: Transaction): BulkSuggestion {
       category: tx.confirmedCategory || tx.category,
       entity: tx.confirmedEntity || tx.entityTag,
       individual: tx.individual,
+      customSourceTag: tx.customSourceTag,
       fundedByTransactionId: tx.fundedByTransactionId,
     },
     suggested: {
@@ -138,6 +141,7 @@ function buildSuggestion(tx: Transaction): BulkSuggestion {
       category: categoryIsInformative ? rules.category : null,
       entity: entityIsInformative ? rules.entityTag : null,
       individual: null, // categorize() doesn't currently emit individual — leave to user
+      customSourceTag: null, // rule engine can't guess a free-text tag; Claude fills this in
       fundedByTransactionId,
       fundedByLabel,
       reason: reasonParts.join(' · '),

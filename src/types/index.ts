@@ -133,6 +133,12 @@ export interface Transaction {
   passthroughPersonId: string | null;
   passthroughNotes: string | null;
   fundedByTransactionId: string | null;
+  /** Free-text tag for the specific origin/purpose of the money on this row,
+   *  editable manually or by AI suggestion. Distinct from incomeSource
+   *  (enum) and businessPurpose (broader). Example: "Client Acme —
+   *  invoice #1234" on a Stripe payout, "Bytes AI production API"
+   *  on an Anthropic charge. */
+  customSourceTag: string | null;
   bookingDateMode: 'DAY' | 'MONTH' | null;
   isRecurring: boolean;
   recurringFrequency: string | null;

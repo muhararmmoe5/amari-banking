@@ -452,6 +452,11 @@ export function getDb(): Database.Database {
     `ALTER TABLE transactions ADD COLUMN merchant_normalized TEXT`,
     `ALTER TABLE transactions ADD COLUMN pending INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE transactions ADD COLUMN pending_external_id TEXT`,
+    // Free-text tag for the specific origin of the money on this row.
+    // Example: on a Stripe payout the category is INCOME but customSourceTag
+    // might read 'Bytes AI SaaS — Client Acme, invoice #1234'. Distinct from
+    // the enum-typed income_source so the user can write anything.
+    `ALTER TABLE transactions ADD COLUMN custom_source_tag TEXT`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }

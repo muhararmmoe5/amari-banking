@@ -76,6 +76,7 @@ export default function TransactionDetailView({
   const [personalSubCat2, setPersonalSubCat2] = useState<string>(tx.subCategory2 || '');
   const [individual, setIndividual] = useState<string>(tx.individual || '');
   const [docRef, setDocRef] = useState<string>(tx.receiptRef || '');
+  const [customSourceTag, setCustomSourceTag] = useState<string>(tx.customSourceTag || '');
   const [notes, setNotes] = useState<string>(tx.notes || '');
   const [bookingDateMode, setBookingDateMode] = useState<'DAY' | 'MONTH'>(
     (tx.bookingDateMode as 'DAY' | 'MONTH') || 'MONTH',
@@ -806,6 +807,24 @@ export default function TransactionDetailView({
                   onChange={(e) => setIndividual(e.target.value)}
                   onBlur={() => persist({ individual: individual || null })}
                   placeholder="Person tied to this charge"
+                  style={fieldInStyle}
+                />
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <FieldLabel>
+                  Custom source tag{' '}
+                  <span style={{ color: 'var(--ink-4, #44443f)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                    — the specific client / project / purpose behind this row
+                  </span>
+                </FieldLabel>
+                <input
+                  type="text"
+                  value={customSourceTag}
+                  onChange={(e) => setCustomSourceTag(e.target.value)}
+                  onBlur={() => persist({ customSourceTag: customSourceTag || null })}
+                  placeholder={tx.amount > 0
+                    ? 'e.g. Bytes AI — Client Acme SaaS, invoice #1234'
+                    : 'e.g. Anthropic API for Bytes AI production'}
                   style={fieldInStyle}
                 />
               </div>

@@ -55,6 +55,7 @@ function rowToTransaction(r: any): Transaction {
     passthroughPersonId: r.passthrough_person_id ?? null,
     passthroughNotes: r.passthrough_notes ?? null,
     fundedByTransactionId: r.funded_by_transaction_id ?? null,
+    customSourceTag: r.custom_source_tag ?? null,
     bookingDateMode: r.booking_date_mode ?? null,
     isRecurring: !!r.is_recurring,
     recurringFrequency: r.recurring_frequency ?? null,
@@ -427,6 +428,7 @@ export interface UpdateTxPatch {
   passthroughPersonId?: string | null;
   passthroughNotes?: string | null;
   fundedByTransactionId?: string | null;
+  customSourceTag?: string | null;
   bookingDateMode?: 'DAY' | 'MONTH' | null;
   isRecurring?: boolean;
   recurringFrequency?: string | null;
@@ -500,6 +502,7 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   if (patch.passthroughPersonId !== undefined) { fields.push('passthrough_person_id = @passthrough_person_id'); params.passthrough_person_id = patch.passthroughPersonId; }
   if (patch.passthroughNotes !== undefined) { fields.push('passthrough_notes = @passthrough_notes'); params.passthrough_notes = patch.passthroughNotes; }
   if (patch.fundedByTransactionId !== undefined) { fields.push('funded_by_transaction_id = @funded_by_transaction_id'); params.funded_by_transaction_id = patch.fundedByTransactionId; }
+  if (patch.customSourceTag !== undefined) { fields.push('custom_source_tag = @custom_source_tag'); params.custom_source_tag = patch.customSourceTag; }
   if (patch.bookingDateMode !== undefined) { fields.push('booking_date_mode = @booking_date_mode'); params.booking_date_mode = patch.bookingDateMode; }
   if (patch.isRecurring !== undefined) { fields.push('is_recurring = @is_recurring'); params.is_recurring = patch.isRecurring ? 1 : 0; }
   if (patch.recurringFrequency !== undefined) { fields.push('recurring_frequency = @recurring_frequency'); params.recurring_frequency = patch.recurringFrequency; }
