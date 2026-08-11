@@ -389,17 +389,13 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
             >
               Preview rules
             </Link>
-            {/* No true bulk-apply endpoint yet — walk the user into the
-                pending-review filter so they can accept AI suggestions one at
-                a time. */}
-            <Link
-              href={`/transactions?review=pending${searchParams.account ? `&account=${searchParams.account}` : ''}`}
-              className="btn btn-primary"
-            >
+            {/* Bulk review page: preloads AI suggestions for every unreviewed
+                row, user checks/edits, applies in one shot. */}
+            <Link href="/transactions/bulk-review" className="btn btn-primary">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                 <path d="M12 3 L13.5 8.5 L19 10 L13.5 11.5 L12 17 L10.5 11.5 L5 10 L10.5 8.5 Z"/>
               </svg>
-              Review pending
+              Auto-tag all
             </Link>
           </div>
         </div>

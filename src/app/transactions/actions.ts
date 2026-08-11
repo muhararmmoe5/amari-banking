@@ -56,6 +56,43 @@ export async function createTransactionAction(input: CreateTxInput): Promise<{ i
   return { id };
 }
 
+export interface BulkApplyItem {
+  txId: string;
+  confirmedEntity?: string | null;
+  confirmedCategory?: string | null;
+  individual?: string | null;
+  fundedByTransactionId?: string | null;
+  markReviewed?: boolean;
+}
+
+export async function bulkApplyReviewsAction(items: BulkApplyItem[]): Promise<{ updated: number; skipped: number }> {
+  const user = requireUser();
+  if (!hasEditAccess(user)) throw new Error('Only editors and owners can bulk-review');
+  let updated = 0;
+  let skipped = 0;
+  for (const item of items) {
+    if (!item.txId || typeof item.txId !== 'string' || item.txId.length > 64) { skipped++; continue; }
+    // Widen the patch type to string here — updateTransaction stores the
+    // values as raw strings and the union types on UpdateTxPatch just
+    // reflect the currently-known enum values, not a runtime constraint.
+    const patch: UpdateTxPatch = {};
+    if (item.confirmedEntity !== undefined) (patch as Record<string, unknown>).confirmedEntity = item.confirmedEntity;
+    if (item.confirmedCategory !== undefined) (patch as Record<string, unknown>).confirmedCategory = item.confirmedCategory;
+    if (item.individual !== undefined) patch.individual = item.individual;
+    if (item.fundedByTransactionId !== undefined) patch.fundedByTransactionId = item.fundedByTransactionId;
+    if (item.markReviewed) {
+      patch.auditStatus = 'CONFIRMED';
+      patch.reviewState = 'REVIEWED_APPROVED';
+    }
+    if (Object.keys(patch).length === 0) { skipped++; continue; }
+    try { updateTransaction(item.txId, patch); updated++; } catch { skipped++; }
+  }
+  revalidatePath('/transactions');
+  revalidatePath('/audit');
+  revalidatePath('/');
+  return { updated, skipped };
+}
+
 export async function deleteTransactionAction(id: string): Promise<void> {
   const user = requireUser();
   if (!hasEditAccess(user)) throw new Error('Only the owner can delete transactions');
