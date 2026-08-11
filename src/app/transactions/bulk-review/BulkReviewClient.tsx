@@ -28,10 +28,12 @@ interface Row extends BulkSuggestion {
 }
 
 export default function BulkReviewClient({
-  suggestions, entityOptions,
+  suggestions, entityOptions, totalTransactions = 0, alreadyReviewed = 0,
 }: {
   suggestions: BulkSuggestion[];
   entityOptions: { value: EntityType; label: string }[];
+  totalTransactions?: number;
+  alreadyReviewed?: number;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -242,8 +244,44 @@ export default function BulkReviewClient({
 
       {/* Rows */}
       {rows.length === 0 ? (
-        <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13, border: '0.5px dashed rgba(255,255,255,0.1)', borderRadius: 10 }}>
-          Nothing pending review — you&apos;re all caught up.
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13, border: '0.5px dashed rgba(255,255,255,0.1)', borderRadius: 10 }}>
+          {totalTransactions === 0 ? (
+            <>
+              <div style={{ fontSize: 26, marginBottom: 6 }}>📥</div>
+              <div style={{ color: 'var(--ink-2)', fontSize: 14, marginBottom: 6 }}>
+                No transactions yet
+              </div>
+              <div style={{ marginBottom: 14, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto' }}>
+                Import a CSV from your bank or load the demo data to try this out.
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                <Link href="/import" className="btn btn-primary">Import CSV</Link>
+                <Link href="/transactions" className="btn">Back to transactions</Link>
+              </div>
+            </>
+          ) : alreadyReviewed >= totalTransactions ? (
+            <>
+              <div style={{ fontSize: 26, marginBottom: 6 }}>🎉</div>
+              <div style={{ color: 'var(--ink-2)', fontSize: 14, marginBottom: 6 }}>
+                All caught up
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                Every one of your {totalTransactions.toLocaleString()} transactions is already reviewed.
+              </div>
+              <Link href="/transactions" className="btn btn-primary">Back to transactions</Link>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 26, marginBottom: 6 }}>🔍</div>
+              <div style={{ color: 'var(--ink-2)', fontSize: 14, marginBottom: 6 }}>
+                Nothing in the pending queue right now
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                {alreadyReviewed.toLocaleString()} of {totalTransactions.toLocaleString()} transactions are marked reviewed.
+              </div>
+              <Link href="/transactions" className="btn">Back to transactions</Link>
+            </>
+          )}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

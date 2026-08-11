@@ -75,7 +75,20 @@ export function suggestForPending(limit = 200): BulkSuggestion[] {
     orderBy: 'posting_date',
     orderDir: 'DESC',
   });
-  return pending.map(buildSuggestion);
+  // Guard against a single misshapen row (unexpected type, FIFO trace
+  // crashing, etc.) taking down the whole page. Silently drop bad rows
+  // and log them for debugging — the user just sees the rows that
+  // worked.
+  const out: BulkSuggestion[] = [];
+  for (const tx of pending) {
+    try {
+      out.push(buildSuggestion(tx));
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[bulk-suggest] failed on', tx.id, e);
+    }
+  }
+  return out;
 }
 
 function buildSuggestion(tx: Transaction): BulkSuggestion {
