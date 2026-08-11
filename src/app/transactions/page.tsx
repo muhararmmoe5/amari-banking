@@ -380,13 +380,27 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, position: 'relative' }}>
-            <button type="button" className="btn btn-ghost btn-sm">Preview rules</button>
-            <button type="button" className="btn btn-primary">
+            {/* 'Preview rules' shows the FIFO-attributed source for every expense
+                on the currently-filtered account — that IS the preview of what
+                the auto-tag rules would apply. */}
+            <Link
+              href={`/audit/deep${searchParams.account ? `?account=${searchParams.account}` : ''}`}
+              className="btn btn-ghost btn-sm"
+            >
+              Preview rules
+            </Link>
+            {/* No true bulk-apply endpoint yet — walk the user into the
+                pending-review filter so they can accept AI suggestions one at
+                a time. */}
+            <Link
+              href={`/transactions?review=pending${searchParams.account ? `&account=${searchParams.account}` : ''}`}
+              className="btn btn-primary"
+            >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                 <path d="M12 3 L13.5 8.5 L19 10 L13.5 11.5 L12 17 L10.5 11.5 L5 10 L10.5 8.5 Z"/>
               </svg>
-              Auto-tag all
-            </button>
+              Review pending
+            </Link>
           </div>
         </div>
       </div>
