@@ -79,7 +79,7 @@ export async function classifyBatchWithClaude(
   batch: ClassifyInput[],
 ): Promise<ClassifySuggestion[]> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set — cannot run Claude classification');
+  if (!apiKey) throw new Error('AI features are off — set ANTHROPIC_API_KEY in Railway Variables (Service → Variables → ANTHROPIC_API_KEY = sk-ant-…) and redeploy.');
   if (batch.length === 0) return [];
 
   const client = new Anthropic({ apiKey });

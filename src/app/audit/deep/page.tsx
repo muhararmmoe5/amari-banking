@@ -22,7 +22,20 @@ interface Search {
 export default function DeepAuditPage({ searchParams }: { searchParams: Search }) {
   const user = requireUser();
   if (!hasEditAccess(user)) redirect('/cap');
-  const accountId = searchParams.account || '';
+  // Auto-pick the account with the most activity when none is specified,
+  // so 'Preview rules' from /transactions actually shows data instead of
+  // dropping the user on an empty filter form.
+  let accountId = searchParams.account || '';
+  if (!accountId) {
+    const db = getDb();
+    const top = db.prepare(
+      `SELECT account_id, COUNT(*) c FROM transactions
+         WHERE amount < 0
+         GROUP BY account_id
+         ORDER BY c DESC LIMIT 1`
+    ).get() as { account_id: string; c: number } | undefined;
+    accountId = top?.account_id || (ACCOUNTS.find((a) => a.isActive)?.id ?? '');
+  }
   const hideInternal = searchParams.hideInternal !== '0';
   const dateFrom = searchParams.from || '';
   const dateTo = searchParams.to || '';

@@ -82,7 +82,10 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'missing_api_key', message: 'Set ANTHROPIC_API_KEY in .env.local to enable AI chat.' },
+      {
+        error: 'missing_api_key',
+        message: 'AI features are off — no Anthropic API key configured. On Railway: Service → Variables → add ANTHROPIC_API_KEY = sk-ant-… and redeploy.',
+      },
       { status: 500 }
     );
   }
