@@ -77,4 +77,74 @@ export const CUSTOM_CATEGORY_PRESETS: CustomCategoryPreset[] = [
   // ── One-off / project ─────────────────────────────────────────────
   { name: 'Project — R&D prototype',       description: 'One-off hardware / materials for a specific prototype' },
   { name: 'Project — Client-specific',     description: 'Costs directly attributable to one customer contract' },
+
+  // ══════════════════════════════════════════════════════════════════
+  //   PERSONAL — day-to-day non-business spending
+  // ══════════════════════════════════════════════════════════════════
+
+  // ── Shopping ──────────────────────────────────────────────────────
+  { name: 'Shopping — Clothes',            description: 'Apparel, shoes, accessories from any store or online' },
+  { name: 'Shopping — Electronics',        description: 'Phones, laptops, headphones, personal tech' },
+  { name: 'Shopping — Home goods',         description: 'Furniture, appliances, decor, kitchen equipment' },
+  { name: 'Shopping — Amazon (general)',   description: 'Miscellaneous Amazon orders that don’t fit another bucket' },
+  { name: 'Shopping — Gifts',              description: 'Presents for family, friends, birthdays, holidays' },
+  { name: 'Shopping — Books / media',      description: 'Books, ebooks, music, movies, streaming purchases' },
+
+  // ── Food & dining ─────────────────────────────────────────────────
+  { name: 'Food — Groceries',              description: 'Whole Foods, Trader Joe’s, supermarkets, produce' },
+  { name: 'Food — Restaurants',            description: 'Dining out — lunch, dinner, casual and fine' },
+  { name: 'Food — Coffee / cafes',         description: 'Coffee shops, tea, cafes, morning coffee runs' },
+  { name: 'Food — Fast food / takeout',    description: 'Quick service, drive-through, delivery apps for yourself' },
+  { name: 'Food — Alcohol / bars',         description: 'Bars, liquor stores, wine, cocktails' },
+
+  // ── Transportation (personal) ────────────────────────────────────
+  { name: 'Personal — Uber / Lyft',        description: 'Rideshares for personal use (not client travel)' },
+  { name: 'Personal — Gas / fuel',         description: 'Gas station fill-ups for personal vehicle' },
+  { name: 'Personal — Public transit',     description: 'Subway, bus, commuter rail, MetroCard' },
+  { name: 'Personal — Parking / tolls',    description: 'Parking meters, garages, bridge & highway tolls' },
+  { name: 'Personal — Car maintenance',    description: 'Oil changes, tires, repairs, DMV, registration' },
+
+  // ── Housing (personal) ────────────────────────────────────────────
+  { name: 'Housing — Rent',                description: 'Monthly rent to landlord' },
+  { name: 'Housing — Mortgage',            description: 'Mortgage principal + interest payments' },
+  { name: 'Housing — Utilities',           description: 'Electric, gas, water for your home' },
+  { name: 'Housing — Internet / cable',    description: 'Home broadband, cable TV subscriptions' },
+  { name: 'Housing — Repairs',             description: 'Home repairs, plumber, handyman, painting' },
+  { name: 'Housing — Insurance',           description: 'Renter’s or homeowner’s insurance' },
+
+  // ── Health & wellness ────────────────────────────────────────────
+  { name: 'Health — Gym / fitness',        description: 'Gym memberships, fitness classes, personal trainer' },
+  { name: 'Health — Doctor / medical',     description: 'Copays, specialist visits, prescriptions' },
+  { name: 'Health — Dental / vision',      description: 'Dentist, optometrist, contacts, glasses' },
+  { name: 'Health — Mental health',        description: 'Therapy, coaching, mental health apps' },
+  { name: 'Health — Supplements / pharmacy', description: 'Vitamins, over-the-counter meds, wellness products' },
+
+  // ── Entertainment / leisure ───────────────────────────────────────
+  { name: 'Entertainment — Streaming',     description: 'Netflix, Spotify, Apple TV+, HBO, Disney+' },
+  { name: 'Entertainment — Movies / shows',description: 'Movie tickets, theater, concerts, live shows' },
+  { name: 'Entertainment — Hobbies',       description: 'Sports equipment, art supplies, hobby gear' },
+  { name: 'Entertainment — Games',         description: 'Video games, in-app purchases, gaming subscriptions' },
+  { name: 'Entertainment — Events',        description: 'Concerts, sports tickets, festivals' },
+
+  // ── Personal services ────────────────────────────────────────────
+  { name: 'Personal — Haircut / grooming', description: 'Barber, hair salon, nails, spa' },
+  { name: 'Personal — Laundry / dry cleaning', description: 'Wash-and-fold, dry cleaner, alterations' },
+  { name: 'Personal — Cleaning service',   description: 'House cleaner, maid service' },
+  { name: 'Personal — Subscriptions',      description: 'Personal software (iCloud, YouTube Premium, etc.), non-work' },
+
+  // ── Family / relationships ──────────────────────────────────────
+  { name: 'Family — Kids',                 description: 'Kid-related spending: school, activities, clothes, toys' },
+  { name: 'Family — Pets',                 description: 'Pet food, vet, grooming, boarding' },
+  { name: 'Family — Charity / giving',     description: 'Donations, gifts to causes, religious contributions' },
+  { name: 'Family — Support / remittance', description: 'Sending money to family members' },
+
+  // ── Personal travel ──────────────────────────────────────────────
+  { name: 'Personal travel — Flights',     description: 'Vacation / personal flights (not for work)' },
+  { name: 'Personal travel — Lodging',     description: 'Hotels, Airbnb, vacation rentals for personal trips' },
+  { name: 'Personal travel — Activities',  description: 'Excursions, tours, tickets during vacation' },
+
+  // ── Miscellaneous personal ──────────────────────────────────────
+  { name: 'Personal — Cash withdrawal',    description: 'ATM withdrawals — where the cash went is manual' },
+  { name: 'Personal — Fees',               description: 'Late fees, ATM fees on personal accounts' },
+  { name: 'Personal — Other',              description: 'Personal spending that doesn’t fit anywhere else' },
 ];

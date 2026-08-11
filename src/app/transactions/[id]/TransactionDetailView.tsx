@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -1655,11 +1655,9 @@ function CustomCategoryInputs({
   onDescBlur: () => void;
   tone: string;
 }) {
-  // Seed the datalist immediately with the embedded preset catalog so
-  // even a fresh DB shows useful suggestions. Then merge in
-  // previously-used custom categories from the API — DB entries take
-  // priority on name collision (they carry the user's real description
-  // and use count).
+  // Seed with embedded preset catalog; merge in previously-used entries
+  // from the DB. DB entries win on name collision (real usage count +
+  // user's own description).
   const [suggestions, setSuggestions] = useState<CustomCategorySuggestion[]>(() =>
     CUSTOM_CATEGORY_PRESETS.map((p) => ({ name: p.name, description: p.description, useCount: 0 })),
   );
@@ -1674,26 +1672,46 @@ function CustomCategoryInputs({
         const presetsNotYetUsed = CUSTOM_CATEGORY_PRESETS
           .filter((p) => !seen.has(p.name.trim().toLowerCase()))
           .map((p) => ({ name: p.name, description: p.description, useCount: 0 }));
-        // DB entries first (most-used real usage), then the rest of
-        // the preset catalog as a fallback dictionary.
         setSuggestions([...fromDb, ...presetsNotYetUsed]);
       })
-      .catch(() => { /* keep the presets we already have */ });
+      .catch(() => { /* keep the presets */ });
     return () => { cancelled = true; };
   }, []);
 
-  // When the user picks (or types) a name that matches a suggestion, we
-  // auto-fill the description too — unless they've already put something
-  // in the description field themselves.
-  function handleNameChange(v: string) {
-    onNameChange(v);
-    const hit = suggestions.find((s) => s.name.trim().toLowerCase() === v.trim().toLowerCase());
-    if (hit && hit.description && !desc.trim()) {
-      onDescChange(hit.description);
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = name.trim().toLowerCase();
+    if (!q) return suggestions.slice(0, 40);
+    return suggestions.filter((s) => s.name.toLowerCase().includes(q)).slice(0, 40);
+  }, [suggestions, name]);
+
+  function pick(s: CustomCategorySuggestion) {
+    onNameChange(s.name);
+    if (s.description && !desc.trim()) onDescChange(s.description);
+    setOpen(false);
+    // Persist both on pick — no need to blur first.
+    onNameBlur();
+    if (s.description && !desc.trim()) {
+      // Slight tick so onDescChange state settles before onDescBlur fires.
+      setTimeout(onDescBlur, 0);
     }
   }
 
-  const datalistId = 'custom-cat-suggestions';
+  function handleNameChange(v: string) {
+    onNameChange(v);
+    if (!open) setOpen(true);
+  }
 
   return (
     <div style={{
@@ -1705,29 +1723,69 @@ function CustomCategoryInputs({
         <em style={{ fontStyle: 'italic', color: tone }}>Custom category</em>
         {' — '}
         <span style={{ color: 'var(--ink-3)' }}>
-          use this when none of the presets fit.{' '}
-          {suggestions.length} suggestions available — type to filter, or pick one from the list.
+          use this when none of the presets fit. Type to filter or pick from the list.
         </span>
       </div>
       <div className="grid" style={{ gap: 8 }}>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => handleNameChange(e.target.value)}
-          onBlur={onNameBlur}
-          placeholder="Category name (e.g. Legal — Delaware filings)"
-          maxLength={80}
-          list={datalistId}
-          autoComplete="off"
-          style={{ ...fieldInStyle }}
-        />
-        <datalist id={datalistId}>
-          {suggestions.map((s) => (
-            <option key={s.name} value={s.name}>
-              {s.description ? `${s.description} · used ${s.useCount}×` : `used ${s.useCount}×`}
-            </option>
-          ))}
-        </datalist>
+        <div ref={wrapRef} style={{ position: 'relative' }}>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => handleNameChange(e.target.value)}
+            onFocus={() => setOpen(true)}
+            onBlur={onNameBlur}
+            placeholder="Type or pick a category…"
+            maxLength={80}
+            autoComplete="off"
+            style={{ ...fieldInStyle }}
+          />
+          {open && filtered.length > 0 ? (
+            <div
+              style={{
+                position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                zIndex: 20,
+                maxHeight: 260, overflowY: 'auto',
+                background: 'var(--bg-2, #16161a)',
+                border: `1px solid color-mix(in oklab, ${tone} 20%, rgba(255,255,255,0.08))`,
+                borderRadius: 8,
+                boxShadow: '0 12px 40px -12px rgba(0,0,0,0.6)',
+                WebkitOverflowScrolling: 'touch',
+              }}
+              onMouseDown={(e) => e.preventDefault()}
+            >
+              {filtered.map((s, idx) => (
+                <button
+                  key={s.name}
+                  type="button"
+                  onClick={() => pick(s)}
+                  style={{
+                    display: 'flex', alignItems: 'baseline', gap: 8,
+                    width: '100%',
+                    padding: '8px 12px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderTop: idx > 0 ? '0.5px solid rgba(255,255,255,0.04)' : 'none',
+                    color: 'var(--ink)',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    fontSize: 12.5,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = `color-mix(in oklab, ${tone} 10%, transparent)`; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {s.name}
+                  </span>
+                  {s.useCount > 0 ? (
+                    <span className="num" style={{ fontSize: 10, color: tone, flexShrink: 0 }}>
+                      {s.useCount}×
+                    </span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <textarea
           rows={2}
           value={desc}
