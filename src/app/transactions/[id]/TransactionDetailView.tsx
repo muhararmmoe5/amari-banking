@@ -131,6 +131,24 @@ export default function TransactionDetailView({
   }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function pickPath(p: 'PERSONAL' | 'BUSINESS') {
+    // Toggle-off if the user taps the same path they're already on —
+    // clears the entity + resets the sub-category state so nothing
+    // sits stale in the form.
+    if (path === p) {
+      setPath(null);
+      setEntity('UNKNOWN' as EntityType);
+      setBusinessCat1Key('');
+      setBusinessSubCat2('');
+      setPersonalCat1Key('');
+      setPersonalSubCat2('');
+      persist({
+        confirmedEntity: null,
+        businessCat1Key: null,
+        personalCat1Key: null,
+        subCategory2: null,
+      });
+      return;
+    }
     setPath(p);
     if (p === 'PERSONAL') {
       setEntity('PERSONAL');
