@@ -39,7 +39,7 @@ export async function redeemPasswordResetAction(
   const sessionToken = createSession(user.id, ip || undefined, ua || undefined);
   cookies().set(SESSION_COOKIE, sessionToken, {
     httpOnly: true,
-    sameSite: 'strict',
+    sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: 60 * 60 * 24 * 30,
