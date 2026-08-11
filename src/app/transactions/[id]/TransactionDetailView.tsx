@@ -24,7 +24,21 @@ import DrawerSplitEditor from '../DrawerSplitEditor';
 import { fmtMoney } from '@/lib/format';
 
 interface AccountLite { id: string; label: string; entity: EntityType; last4: string }
-interface FifoSource { txId: string; merchant: string; amount: number; accountId: string; date: string; isInternal: boolean; attributedAmount: number; ownerLabel: string | null }
+interface FifoSource {
+  txId: string;
+  merchant: string;
+  amount: number;
+  accountId: string;
+  date: string;
+  isInternal: boolean;
+  attributedAmount: number;
+  ownerLabel: string | null;
+  /** Entity that owns the source bank account — from the ACCOUNTS
+   *  mapping (e.g. 'Bytes AI', 'Amari Ventures'). Distinct from
+   *  ownerLabel which reflects the source transaction's confirmed
+   *  entity / individual. */
+  accountEntityLabel: string | null;
+}
 interface DownstreamConsumer { txId: string; date: string; merchant: string | null; description: string; amountFromThisInflow: number; expenseAmount: number }
 interface DownstreamTrace { totalSpent: number; remaining: number; pctSpent: number; consumers: DownstreamConsumer[] }
 interface SplitSummary {
@@ -1444,9 +1458,9 @@ function AiSourceTraceCard({ tx, fifoSource, fifoSources = [], sourceIsOverride 
             <div className="flex items-center">
               <FlowNode
                 type="inflow"
-                eyebrow={`INFLOW · ${s.date}`}
+                eyebrow={`INFLOW · ${s.date}${s.accountEntityLabel ? ' · ' + s.accountEntityLabel : ''}`}
                 title={s.merchant.toUpperCase()}
-                meta={`+${fmtMoney(s.attributedAmount)} of ${fmtMoney(s.amount)} · ····${s.accountId}`}
+                meta={`+${fmtMoney(s.attributedAmount)} of ${fmtMoney(s.amount)} · ····${s.accountId}${s.accountEntityLabel ? ' (' + s.accountEntityLabel + ')' : ''}`}
                 owner={s.ownerLabel}
                 href={`/transactions/${s.txId}`}
               />
@@ -1490,6 +1504,11 @@ function AiSourceTraceCard({ tx, fifoSource, fifoSources = [], sourceIsOverride 
                     <div className="num" style={{ fontSize: 9.5, color: 'var(--income)', fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase' }}>
                       {s.date} · ····{s.accountId}
                     </div>
+                    {s.accountEntityLabel ? (
+                      <div style={{ fontSize: 10.5, color: 'var(--gold)', marginTop: 3, fontStyle: 'italic', fontFamily: 'var(--font-serif, "Instrument Serif", serif)' }}>
+                        {s.accountEntityLabel}
+                      </div>
+                    ) : null}
                     <div className="truncate" style={{ fontSize: 12.5, color: 'var(--ink)', marginTop: 2 }}>
                       {s.merchant.toUpperCase()}
                     </div>

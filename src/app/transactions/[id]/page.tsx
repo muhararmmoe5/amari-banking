@@ -61,9 +61,20 @@ export default function TransactionDetailPage({ params }: Props) {
   // manual-multi-source case uses expense_funding_splits (a separate
   // table with a per-slice UI) — not shown here yet.
   const totalExpense = Math.abs(tx.amount);
+  // Helper: label the entity that OWNS the source account (from the
+  // ACCOUNTS mapping). Distinct from the transaction's confirmedEntity
+  // — this is the fixed 'which of my companies does this bank account
+  // belong to' answer. Shown next to each source so the user can see
+  // 'this money came from a Bytes AI bank account' at a glance.
+  const accountEntityLabelFor = (accountId: string): string | null => {
+    const acct = ACCOUNTS.find((a) => a.id === accountId);
+    if (!acct) return null;
+    return ENTITY_LABELS[acct.entity as EntityType] || acct.entity;
+  };
   let fifoSources: Array<{
     txId: string; merchant: string; amount: number; accountId: string; date: string;
     isInternal: boolean; attributedAmount: number; ownerLabel: string | null;
+    accountEntityLabel: string | null;
   }> = [];
   let sourceIsOverride = false;
 
@@ -79,6 +90,7 @@ export default function TransactionDetailPage({ params }: Props) {
         isInternal: !!linked.isInternal,
         attributedAmount: Math.min(linked.amount, totalExpense),
         ownerLabel: ownerLabelFor(linked.id),
+        accountEntityLabel: accountEntityLabelFor(linked.accountId),
       }];
       sourceIsOverride = true;
     }
@@ -96,6 +108,7 @@ export default function TransactionDetailPage({ params }: Props) {
         // s.amount from traceFundingSource is already the attributed slice.
         attributedAmount: s.amount,
         ownerLabel: ownerLabelFor(s.txId),
+        accountEntityLabel: accountEntityLabelFor(s.accountId),
       }));
     }
   }
