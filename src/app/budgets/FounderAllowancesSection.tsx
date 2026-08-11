@@ -367,7 +367,7 @@ function AllowanceCard({
               Edit
             </button>
             <Link
-              href={`/transactions?entity=${a.entity}&search=${encodeURIComponent(a.personName)}`}
+              href={`/transactions?individual=${encodeURIComponent(a.personName)}&entity=${a.entity}${a.periodMonth ? `&from=${a.periodMonth}-01&to=${a.periodMonth}-31` : ''}`}
               className="btn btn-sm text-xs"
             >
               See transactions

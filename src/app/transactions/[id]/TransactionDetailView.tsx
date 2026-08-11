@@ -46,24 +46,31 @@ function flagFor(score: number | null | undefined): FlagInfo {
   return { level: 'low', label: 'Low', color: '#6f6e68' };
 }
 
+interface BudgetLite {
+  id: string;
+  name: string;
+  entity: string | null;
+  kind: string;
+  monthlyAmountCents: number | null;
+}
+
 export default function TransactionDetailView({
   tx, account, fifoSource, fifoSources = [], sourceIsOverride, txOwnerLabel, downstream,
-  viewerIsEditor = true, initialSplitCount, initialSplitSummary,
+  viewerIsEditor = true, availableBudgets = [],
+  initialSplitCount, initialSplitSummary,
 }: {
   tx: Transaction;
   account: AccountLite | null;
   fifoSource: FifoSource | null;
-  /** All prior inflows the FIFO trace attributes to this expense —
-   *  in FIFO consumption order. Can be more than one when the expense
-   *  drained multiple deposits. Empty when the FIFO trace found none
-   *  or when a manual override is in place (in which case fifoSource
-   *  holds the single override). */
   fifoSources?: FifoSource[];
   sourceIsOverride?: boolean;
   txOwnerLabel?: string | null;
   downstream?: DownstreamTrace | null;
-  /** Full editor privileges vs claimant-only view. Defaults to full. */
   viewerIsEditor?: boolean;
+  /** Active budgets — surfaces the manual budget-picker so the user
+   *  can tag a specific transaction to a specific budget (founder
+   *  allowance, expense budget, etc.). */
+  availableBudgets?: BudgetLite[];
   initialSplitCount: number;
   initialSplitSummary: SplitSummary[];
 }) {
@@ -889,6 +896,40 @@ export default function TransactionDetailView({
               </div>
             )}
           </SectionEm>
+          ) : null}
+
+          {/* Budget tag — pick which budget this transaction counts against.
+              Applies to founder allowances too (kind = FOUNDER_ALLOWANCE).
+              When set, direct-tags win over the fuzzy allowance
+              attribution so the row lands exactly where the user wants. */}
+          {viewerIsEditor && availableBudgets.length > 0 ? (
+            <SectionEm
+              title="Budget tag"
+              emFirst="Budget"
+              sub="Counts against this budget or founder allowance"
+            >
+              <div>
+                <FieldLabel>Budget</FieldLabel>
+                <select
+                  value={tx.budgetId || ''}
+                  onChange={(e) => persist({ budgetId: e.target.value || null })}
+                  style={fieldInStyle}
+                >
+                  <option value="">— None (auto-attribution) —</option>
+                  {availableBudgets.map((b) => {
+                    const label = b.kind === 'FOUNDER_ALLOWANCE'
+                      ? `Allowance · ${b.name}`
+                      : b.name;
+                    return <option key={b.id} value={b.id}>{label}</option>;
+                  })}
+                </select>
+                <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 6, lineHeight: 1.45 }}>
+                  Picking a budget locks this row to it. Leave blank to let
+                  founder-allowance auto-attribution route it based on
+                  entity + individual.
+                </div>
+              </div>
+            </SectionEm>
           ) : null}
 
           {/* Notes & documentation — hidden when split (per-part notes live in the split editor) */}

@@ -216,6 +216,12 @@ export interface ListFilters {
    *  review_state is null (default state for unreviewed transactions).
    *  'ESCALATIONS' returns rows where needs_escalation = 1. */
   reviewBucket?: 'PENDING_REVIEW' | 'REVIEWED' | 'REVIEWED_APPROVED' | 'ESCALATIONS' | 'ALL';
+  /** Case-insensitive exact match on the `individual` field. Used to
+   *  drill into a founder allowance from /budgets → 'See transactions'. */
+  individual?: string;
+  /** Match a specific budget_id. Used by the same drill-down and by
+   *  budget-scoped views. */
+  budgetId?: string;
   limit?: number;
   offset?: number;
   orderBy?: 'posting_date' | 'audit_score' | 'amount';
@@ -240,6 +246,14 @@ export function listTransactions(filters: ListFilters = {}): Transaction[] {
   if (filters.bookDateFrom) { where.push('tagged_date >= @bookDateFrom'); params.bookDateFrom = filters.bookDateFrom; }
   if (filters.bookDateTo) { where.push('tagged_date <= @bookDateTo'); params.bookDateTo = filters.bookDateTo; }
   if (filters.flaggedOnly) { where.push('audit_score > 0 AND audit_status = \'UNREVIEWED\''); }
+  if (filters.individual) {
+    where.push("lower(trim(COALESCE(individual, ''))) = @individual");
+    params.individual = filters.individual.trim().toLowerCase();
+  }
+  if (filters.budgetId) {
+    where.push('budget_id = @budgetId');
+    params.budgetId = filters.budgetId;
+  }
   if (filters.reviewBucket && filters.reviewBucket !== 'ALL') {
     if (filters.reviewBucket === 'PENDING_REVIEW') {
       where.push("(review_state IS NULL OR review_state = 'PENDING_REVIEW')");

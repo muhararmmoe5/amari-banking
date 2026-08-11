@@ -3,6 +3,7 @@ import { requireUser, hasEditAccess } from '@/lib/auth';
 import { getTransaction } from '@/lib/db/queries';
 import { traceFundingSource, traceDownstreamFromInflow } from '@/lib/db/flow-trace';
 import { listSplits } from '@/lib/db/splits';
+import { listBudgets } from '@/lib/db/budgets';
 import { ACCOUNTS, ENTITY_LABELS } from '@/constants/accounts';
 import TransactionDetailView from './TransactionDetailView';
 import type { EntityType } from '@/types';
@@ -132,6 +133,15 @@ export default function TransactionDetailPage({ params }: Props) {
 
   const splits = listSplits(tx.id);
 
+  // Active budgets for the manual budget-picker on the detail page.
+  const budgets = listBudgets({ activeOnly: true }).map((b) => ({
+    id: b.id,
+    name: b.name,
+    entity: b.entity,
+    kind: b.kind,
+    monthlyAmountCents: b.monthlyAmountCents,
+  }));
+
   return (
     <TransactionDetailView
       tx={tx}
@@ -142,6 +152,7 @@ export default function TransactionDetailPage({ params }: Props) {
       txOwnerLabel={txOwnerLabel}
       downstream={downstream}
       viewerIsEditor={isEditor}
+      availableBudgets={budgets}
       initialSplitCount={splits.length}
       initialSplitSummary={splits.map((s) => ({
         id: s.id,

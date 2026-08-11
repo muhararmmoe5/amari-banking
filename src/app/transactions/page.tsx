@@ -24,6 +24,8 @@ interface SearchProps {
   preset?: string;
   order?: string;
   review?: string;
+  individual?: string;
+  budget?: string;
 }
 
 function presetToRange(preset?: string): { from?: string; to?: string } {
@@ -89,6 +91,8 @@ export default function TransactionsPage({ searchParams }: { searchParams: Searc
     dateTo,
     bookDateFrom: searchParams.bookFrom,
     bookDateTo: searchParams.bookTo,
+    individual: searchParams.individual,
+    budgetId: searchParams.budget,
     orderDir,
     limit: 5000,
   };

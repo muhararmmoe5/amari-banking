@@ -373,6 +373,7 @@ export interface FounderAllowanceUsage extends FounderAllowance {
     merchant: string | null;
     description: string;
     amount: number; // signed
+    budgetId: string | null;
   }>;
 }
 
@@ -460,18 +461,32 @@ export function getFounderAllowanceUsage(allowanceId: string): FounderAllowanceU
   }
   const attributionSql = `(${orClauses.join(' OR ')})`;
 
+  // Two kinds of matches count against the allowance:
+  //  (i) direct — the row is manually tagged with budget_id = this
+  //      allowance. Direct tags win regardless of the fuzzy match
+  //      (person name, entity, account) — user knows best.
+  //  (ii) fuzzy — the row has NO budget_id set AND the individual
+  //       matches AND the attribution SQL matches. This is the auto-
+  //       attribution for rows the user hasn't manually tagged yet.
+  //
+  // Only REVIEWED_APPROVED transactions count. Pending / unapproved
+  // rows don't consume the cap — otherwise unapproving after tagging
+  // wouldn't visibly reduce spend, which is what the user reported.
+  const approvedFilter = `(audit_status = 'CONFIRMED' OR review_state = 'REVIEWED_APPROVED')`;
   const txRows = db.prepare(
-    `SELECT id, posting_date, description, merchant_name, amount
+    `SELECT id, posting_date, description, merchant_name, amount, budget_id
        FROM transactions
        WHERE amount < 0
-         AND ${attributionSql}
-         AND lower(trim(COALESCE(individual, ''))) = ?
-         AND posting_date >= ?
-         AND posting_date <= ?
+         AND ${approvedFilter}
+         AND posting_date >= ? AND posting_date <= ?
+         AND (
+           budget_id = ?
+           OR (budget_id IS NULL AND ${attributionSql} AND lower(trim(COALESCE(individual, ''))) = ?)
+         )
        ORDER BY posting_date DESC, id DESC
        LIMIT 500`
-  ).all(...sqlParams, lowerName, from, to) as Array<{
-    id: string; posting_date: string; description: string; merchant_name: string | null; amount: number;
+  ).all(from, to, allowanceId, ...sqlParams, lowerName) as Array<{
+    id: string; posting_date: string; description: string; merchant_name: string | null; amount: number; budget_id: string | null;
   }>;
   const spentCents = txRows.reduce((s, r) => s + Math.round(Math.abs(r.amount) * 100), 0);
   const cap = budget.monthlyAmountCents ?? 0;
@@ -487,6 +502,7 @@ export function getFounderAllowanceUsage(allowanceId: string): FounderAllowanceU
       merchant: r.merchant_name,
       description: r.description,
       amount: r.amount,
+      budgetId: r.budget_id,
     })),
   };
 }
