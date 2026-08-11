@@ -26,7 +26,7 @@ import {
   X,
 } from 'lucide-react';
 
-type NavItem = { href: string; label: string; icon: any; tag?: string; flagBadge?: boolean; ownerOnly?: boolean };
+type NavItem = { href: string; label: string; icon: any; tag?: string; flagBadge?: boolean; unclaimedBadge?: boolean; ownerOnly?: boolean };
 type NavSection = { sec: string; items: NavItem[] };
 
 const NAV_SECTIONS: NavSection[] = [
@@ -38,6 +38,14 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/transactions', label: 'Transactions', icon: Table2, ownerOnly: true },
       { href: '/reconcile', label: 'Reconciliation', icon: ArrowLeftRight, ownerOnly: true },
       { href: '/audit', label: 'Audit Review', icon: ShieldCheck, flagBadge: true, ownerOnly: true },
+    ],
+  },
+  {
+    sec: 'Shared',
+    items: [
+      // Visible to everyone (no ownerOnly). Cofounders — PARTNER/TEAM_MEMBER
+      // — need to reach this queue to claim their own charges.
+      { href: '/identify', label: 'Identify charges', icon: Users, unclaimedBadge: true },
     ],
   },
   {
@@ -70,9 +78,10 @@ const NAV_SECTIONS: NavSection[] = [
 ];
 
 export default function Sidebar({
-  openFlags, role, userName, userEmail,
+  openFlags, unclaimedCount, role, userName, userEmail,
 }: {
   openFlags?: number;
+  unclaimedCount?: number;
   role?: 'OWNER' | 'EDITOR' | 'PARTNER' | 'TEAM_MEMBER';
   userName?: string;
   userEmail?: string;
@@ -167,7 +176,11 @@ export default function Sidebar({
               {visible.map((n) => {
                 const isActive = n.href === '/' ? path === '/' : path?.startsWith(n.href);
                 const Icon = n.icon;
-                const tag = n.flagBadge && openFlags ? (openFlags > 99 ? '99+' : String(openFlags)) : n.tag;
+                const tag = n.flagBadge && openFlags
+                  ? (openFlags > 99 ? '99+' : String(openFlags))
+                  : n.unclaimedBadge && unclaimedCount
+                    ? (unclaimedCount > 99 ? '99+' : String(unclaimedCount))
+                    : n.tag;
                 return (
                   <Link
                     key={n.href}

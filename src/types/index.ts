@@ -139,6 +139,11 @@ export interface Transaction {
    *  invoice #1234" on a Stripe payout, "Bytes AI production API"
    *  on an Anthropic charge. */
   customSourceTag: string | null;
+  /** True when the owner isn't sure whose charge this is — surfaces on
+   *  /identify for cofounders to claim as theirs. */
+  needsIdentification: boolean;
+  /** Free-text note left by the flagger — e.g. 'was this on the LA trip?'. */
+  identificationNote: string | null;
   bookingDateMode: 'DAY' | 'MONTH' | null;
   isRecurring: boolean;
   recurringFrequency: string | null;

@@ -13,8 +13,8 @@ import {
   PERSONAL_CATEGORIES, BUSINESS_CATEGORIES,
   PERSONAL_INCOME_CATEGORIES, BUSINESS_INCOME_CATEGORIES,
 } from '@/constants/categories';
-import { saveTransaction, deleteTransactionAction } from '../actions';
-import { Trash2 } from 'lucide-react';
+import { saveTransaction, deleteTransactionAction, flagForIdentificationAction } from '../actions';
+import { Trash2, UserSearch } from 'lucide-react';
 import BackToTransactionsLink from '../BackToTransactionsLink';
 import { useToast } from '@/components/Toast';
 import BankChip from '@/components/BankChip';
@@ -866,6 +866,12 @@ export default function TransactionDetailView({
             inter-entity owings, salary &amp; budget tagging, escalation, CPA sign-off all live in the
             quick-edit drawer. Open the row again from the list to use the full editor.
           </div>
+
+          <IdentifyZone
+            txId={tx.id}
+            initialFlagged={!!tx.needsIdentification}
+            initialNote={tx.identificationNote || ''}
+          />
 
           <DangerZone txId={tx.id} />
         </div>
@@ -1853,6 +1859,121 @@ function auditFlagCopy(tx: Transaction): React.ReactNode {
     <>
       Review pending — confirm entity, category, and source of money before CPA sign-off.
     </>
+  );
+}
+
+function IdentifyZone({ txId, initialFlagged, initialNote }: {
+  txId: string;
+  initialFlagged: boolean;
+  initialNote: string;
+}) {
+  const [flagged, setFlagged] = useState(initialFlagged);
+  const [note, setNote] = useState(initialNote);
+  const [expanded, setExpanded] = useState(initialFlagged);
+  const [isPending, startTransition] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+
+  function toggle(next: boolean) {
+    setMsg(null);
+    startTransition(async () => {
+      try {
+        await flagForIdentificationAction(txId, next, next ? note : null);
+        setFlagged(next);
+        setMsg(next ? 'Added to Identify queue' : 'Removed from Identify queue');
+        setTimeout(() => setMsg(null), 1600);
+      } catch (e) {
+        setMsg(`Failed: ${e instanceof Error ? e.message : 'unknown'}`);
+      }
+    });
+  }
+
+  function saveNote() {
+    startTransition(async () => {
+      try {
+        await flagForIdentificationAction(txId, true, note);
+        setMsg('Note saved');
+        setTimeout(() => setMsg(null), 1400);
+      } catch (e) {
+        setMsg(`Failed: ${e instanceof Error ? e.message : 'unknown'}`);
+      }
+    });
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: 24,
+        padding: '14px 16px',
+        borderRadius: 10,
+        border: '0.5px dashed color-mix(in oklab, var(--gold) 30%, rgba(255,255,255,0.08))',
+        background: flagged
+          ? 'color-mix(in oklab, var(--gold) 5%, transparent)'
+          : 'transparent',
+      }}
+    >
+      <div className="flex items-center" style={{ gap: 10 }}>
+        <UserSearch size={14} style={{ color: 'var(--gold)' }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, color: 'var(--ink-2)', fontWeight: 500 }}>
+            {flagged ? 'Flagged — cofounders can claim this on /identify' : 'Not sure whose charge this is?'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+            {flagged
+              ? "It's in the /identify queue. Anyone on the team can claim it."
+              : 'Send it to the /identify queue so cofounders can look at it and claim their own.'}
+          </div>
+        </div>
+        {flagged ? (
+          <button
+            type="button"
+            onClick={() => toggle(false)}
+            disabled={isPending}
+            className="btn"
+            style={{ fontSize: 12, padding: '6px 12px' }}
+          >
+            Remove flag
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => { setExpanded(true); toggle(true); }}
+            disabled={isPending}
+            className="btn"
+            style={{ fontSize: 12, padding: '6px 12px', color: 'var(--gold)', borderColor: 'color-mix(in oklab, var(--gold) 30%, rgba(255,255,255,0.08))' }}
+          >
+            Send to /identify
+          </button>
+        )}
+      </div>
+
+      {flagged && expanded ? (
+        <div style={{ marginTop: 10 }}>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            onBlur={saveNote}
+            placeholder="Optional note — e.g. 'anyone recognize this?', 'LA trip?', 'Uber on 5/12'"
+            style={{
+              width: '100%',
+              padding: '7px 10px',
+              background: 'var(--bg-1, #111114)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 6,
+              fontSize: 12,
+              color: 'var(--ink)',
+              outline: 'none',
+            }}
+          />
+        </div>
+      ) : null}
+
+      {msg ? (
+        <div style={{ fontSize: 10.5, color: msg.startsWith('Failed') ? 'var(--danger, #ff7676)' : 'var(--income)', marginTop: 8 }}>
+          {msg}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

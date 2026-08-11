@@ -56,6 +56,8 @@ function rowToTransaction(r: any): Transaction {
     passthroughNotes: r.passthrough_notes ?? null,
     fundedByTransactionId: r.funded_by_transaction_id ?? null,
     customSourceTag: r.custom_source_tag ?? null,
+    needsIdentification: !!r.needs_identification,
+    identificationNote: r.identification_note ?? null,
     bookingDateMode: r.booking_date_mode ?? null,
     isRecurring: !!r.is_recurring,
     recurringFrequency: r.recurring_frequency ?? null,
@@ -429,6 +431,8 @@ export interface UpdateTxPatch {
   passthroughNotes?: string | null;
   fundedByTransactionId?: string | null;
   customSourceTag?: string | null;
+  needsIdentification?: boolean;
+  identificationNote?: string | null;
   bookingDateMode?: 'DAY' | 'MONTH' | null;
   isRecurring?: boolean;
   recurringFrequency?: string | null;
@@ -503,6 +507,8 @@ export function updateTransaction(id: string, patch: UpdateTxPatch): void {
   if (patch.passthroughNotes !== undefined) { fields.push('passthrough_notes = @passthrough_notes'); params.passthrough_notes = patch.passthroughNotes; }
   if (patch.fundedByTransactionId !== undefined) { fields.push('funded_by_transaction_id = @funded_by_transaction_id'); params.funded_by_transaction_id = patch.fundedByTransactionId; }
   if (patch.customSourceTag !== undefined) { fields.push('custom_source_tag = @custom_source_tag'); params.custom_source_tag = patch.customSourceTag; }
+  if (patch.needsIdentification !== undefined) { fields.push('needs_identification = @needs_identification'); params.needs_identification = patch.needsIdentification ? 1 : 0; }
+  if (patch.identificationNote !== undefined) { fields.push('identification_note = @identification_note'); params.identification_note = patch.identificationNote; }
   if (patch.bookingDateMode !== undefined) { fields.push('booking_date_mode = @booking_date_mode'); params.booking_date_mode = patch.bookingDateMode; }
   if (patch.isRecurring !== undefined) { fields.push('is_recurring = @is_recurring'); params.is_recurring = patch.isRecurring ? 1 : 0; }
   if (patch.recurringFrequency !== undefined) { fields.push('recurring_frequency = @recurring_frequency'); params.recurring_frequency = patch.recurringFrequency; }
@@ -669,6 +675,25 @@ export function clearAllTransactions(): {
     deletedSplits: before.splits,
     deletedBatches: before.batches,
   };
+}
+
+/** All transactions the owner flagged as 'I don't know whose this is'.
+ *  Rendered on /identify for cofounders to claim. */
+export function listUnclaimedTransactions(limit = 200): Transaction[] {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT * FROM transactions
+    WHERE needs_identification = 1
+    ORDER BY posting_date DESC, id ASC
+    LIMIT ?
+  `).all(limit);
+  return (rows as unknown[]).map((r) => rowToTransaction(r));
+}
+
+export function countUnclaimedTransactions(): number {
+  const db = getDb();
+  const r = db.prepare(`SELECT COUNT(*) c FROM transactions WHERE needs_identification = 1`).get() as { c: number };
+  return r.c;
 }
 
 /** List inflows on a given account that are candidates for the

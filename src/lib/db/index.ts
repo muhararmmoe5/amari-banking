@@ -457,6 +457,13 @@ export function getDb(): Database.Database {
     // might read 'Bytes AI SaaS — Client Acme, invoice #1234'. Distinct from
     // the enum-typed income_source so the user can write anything.
     `ALTER TABLE transactions ADD COLUMN custom_source_tag TEXT`,
+    // Flag for "I don't know who made this charge" — surfaces the row in the
+    // /identify queue so a cofounder can claim it as theirs. Set the
+    // individual field + clear the flag when someone claims it.
+    `ALTER TABLE transactions ADD COLUMN needs_identification INTEGER NOT NULL DEFAULT 0`,
+    // Optional free-text: the person who flagged left a note ('was this yours
+    // on the LA trip?'). Rendered next to the row on /identify.
+    `ALTER TABLE transactions ADD COLUMN identification_note TEXT`,
   ]) {
     try { db.exec(sql); } catch (_e) { /* column already present */ }
   }

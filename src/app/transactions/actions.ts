@@ -131,6 +131,58 @@ export async function bulkApplyReviewsAction(items: BulkApplyItem[]): Promise<{ 
   return { updated, skipped };
 }
 
+/**
+ * Flag / unflag a transaction as "I don't know whose this is". Puts it in
+ * the /identify queue for cofounders to review. Requires edit access
+ * (owner/editor) — the flagger is usually the owner reviewing statements.
+ */
+export async function flagForIdentificationAction(
+  id: string,
+  needsId: boolean,
+  note: string | null = null,
+): Promise<void> {
+  const user = requireUser();
+  if (!hasEditAccess(user)) throw new Error('read-only role cannot flag');
+  if (typeof id !== 'string' || id.length === 0 || id.length > 64) throw new Error('invalid id');
+  updateTransaction(id, {
+    needsIdentification: !!needsId,
+    identificationNote: needsId ? (note?.trim() || null) : null,
+  });
+  revalidatePath('/transactions');
+  revalidatePath('/identify');
+  revalidatePath('/');
+}
+
+/**
+ * Claim a flagged transaction as belonging to a specific person. Any
+ * signed-in user can claim (PARTNER/TEAM_MEMBER cofounders included) —
+ * that's the whole point of the queue. Sets `individual` to the given
+ * name and clears the needs_identification flag.
+ *
+ * If the caller is a PARTNER/TEAM_MEMBER we force `whose` to their own
+ * profile name so they can only claim rows for themselves, not for
+ * other people. Owners/editors can claim on behalf of anyone.
+ */
+export async function claimTransactionAction(
+  id: string,
+  whose: string,
+): Promise<void> {
+  const user = requireUser();
+  if (typeof id !== 'string' || id.length === 0 || id.length > 64) throw new Error('invalid id');
+  const clean = (whose || '').trim().slice(0, 120);
+  if (!clean) throw new Error('name required');
+  // Non-editors can only claim for themselves — no impersonation.
+  const finalName = hasEditAccess(user) ? clean : (user.name || user.email);
+  updateTransaction(id, {
+    individual: finalName,
+    needsIdentification: false,
+    identificationNote: null,
+  });
+  revalidatePath('/transactions');
+  revalidatePath('/identify');
+  revalidatePath('/');
+}
+
 /** Tiny setter for the inline tag editor on /flow — accepts one tx id and
  *  a new custom_source_tag value, saves, returns nothing. */
 export async function saveCustomSourceTagAction(id: string, tag: string | null): Promise<void> {
