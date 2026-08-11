@@ -46,7 +46,7 @@ function flagFor(score: number | null | undefined): FlagInfo {
 
 export default function TransactionDetailView({
   tx, account, fifoSource, sourceIsOverride, txOwnerLabel, downstream,
-  initialSplitCount, initialSplitSummary,
+  viewerIsEditor = true, initialSplitCount, initialSplitSummary,
 }: {
   tx: Transaction;
   account: AccountLite | null;
@@ -54,6 +54,8 @@ export default function TransactionDetailView({
   sourceIsOverride?: boolean;
   txOwnerLabel?: string | null;
   downstream?: DownstreamTrace | null;
+  /** Full editor privileges vs claimant-only view. Defaults to full. */
+  viewerIsEditor?: boolean;
   initialSplitCount: number;
   initialSplitSummary: SplitSummary[];
 }) {
@@ -169,7 +171,13 @@ export default function TransactionDetailView({
           borderBottom: '1px solid rgba(255,255,255,0.055)',
         }}
       >
-        <BackToTransactionsLink className="btn btn-ghost btn-sm" />
+        {viewerIsEditor ? (
+          <BackToTransactionsLink className="btn btn-ghost btn-sm" />
+        ) : (
+          <Link href="/identify" className="btn btn-ghost btn-sm">
+            <ArrowLeft size={12} /> Back to my queue
+          </Link>
+        )}
         <span style={{ flex: 1 }} />
         {/* Prev / Next were rendered permanently disabled with no wiring —
             removed until they have a real cursor-through-list handler. */}
@@ -352,7 +360,10 @@ export default function TransactionDetailView({
             <DownstreamUsageCard tx={tx} downstream={downstream} />
           ) : null}
 
-          {/* Split decision + summary */}
+          {/* Split decision + summary — editors only.
+              Claimants (cofounders) don't touch splits; the server rejects
+              their writes anyway (splitActions is hasEditAccess-gated). */}
+          {viewerIsEditor ? (
           <SectionEm
             title="Split transaction"
             emFirst="Split"
@@ -494,8 +505,10 @@ export default function TransactionDetailView({
               </div>
             ) : null}
           </SectionEm>
+          ) : null}
 
-          {/* Recurrence: one-time vs recurring + frequency */}
+          {/* Recurrence: one-time vs recurring + frequency — editors only. */}
+          {viewerIsEditor ? (
           <SectionEm
             title="Recurrence & forecast"
             emFirst="Recurrence"
@@ -611,6 +624,7 @@ export default function TransactionDetailView({
               </div>
             ) : null}
           </SectionEm>
+          ) : null}
 
           {/* Books to — hidden when split (each part carries its own) */}
           {!isSplit ? (
@@ -867,13 +881,16 @@ export default function TransactionDetailView({
             quick-edit drawer. Open the row again from the list to use the full editor.
           </div>
 
-          <IdentifyZone
-            txId={tx.id}
-            initialFlagged={!!tx.needsIdentification}
-            initialNote={tx.identificationNote || ''}
-          />
-
-          <DangerZone txId={tx.id} />
+          {viewerIsEditor ? (
+            <>
+              <IdentifyZone
+                txId={tx.id}
+                initialFlagged={!!tx.needsIdentification}
+                initialNote={tx.identificationNote || ''}
+              />
+              <DangerZone txId={tx.id} />
+            </>
+          ) : null}
         </div>
 
         {/* ── RIGHT ASIDE ──────────────────────────────────────── */}
@@ -1001,7 +1018,11 @@ export default function TransactionDetailView({
           <KbdHint k="R" label="Receipt" />
           <KbdHint k="⌘S" label="Save" />
         </div>
-        <BackToTransactionsLink className="btn btn-ghost btn-sm">Cancel</BackToTransactionsLink>
+        {viewerIsEditor ? (
+          <BackToTransactionsLink className="btn btn-ghost btn-sm">Cancel</BackToTransactionsLink>
+        ) : (
+          <Link href="/identify" className="btn btn-ghost btn-sm">Done — back to my queue</Link>
+        )}
         <button
           type="button"
           className="btn btn-primary"

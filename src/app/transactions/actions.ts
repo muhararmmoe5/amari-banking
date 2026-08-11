@@ -4,11 +4,13 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import {
   updateTransaction,
+  getTransaction,
   type UpdateTxPatch,
   createTransaction,
   deleteTransaction,
   type CreateTxInput,
 } from '@/lib/db/queries';
+import type { AuthUser } from '@/lib/auth';
 import { previewRecurringAllocation } from '@/lib/db/forecasts';
 import { requireUser, hasEditAccess } from '@/lib/auth';
 import type { EntityType, CategoryType } from '@/types';
@@ -45,11 +47,65 @@ function safeCategory(v: string | null | undefined): CategoryType | null {
   return VALID_CATEGORIES.has(v) ? (v as CategoryType) : null;
 }
 
+/**
+ * Non-editors (PARTNER / TEAM_MEMBER cofounders) can edit ONLY transactions
+ * they have claimed as their own. Internal helper — 'use server' files
+ * can only export async functions, so this stays module-local.
+ */
+function canEditThisTransaction(user: AuthUser, txId: string): boolean {
+  if (hasEditAccess(user)) return true;
+  const tx = getTransaction(txId);
+  if (!tx) return false;
+  const claimant = (tx.individual || '').trim().toLowerCase();
+  const me = (user.name || user.email || '').trim().toLowerCase();
+  return !!me && me === claimant;
+}
+
+/**
+ * The subset of UpdateTxPatch keys a claimant (non-editor) is allowed to
+ * change. Broadly: the row's own bookkeeping metadata. NOT: audit status,
+ * review state, funding source (financial linkage), needs_identification
+ * (would let them un-flag other people's charges), or the individual
+ * field (would let them re-assign the row to someone else and vanish it).
+ */
+const CLAIMANT_ALLOWED_KEYS: readonly (keyof UpdateTxPatch)[] = [
+  'confirmedCategory', 'businessPurpose', 'notes',
+  'subCategory1', 'subCategory2', 'individual',
+  'customSourceTag', 'receiptRef', 'taggedDate',
+  'sourceBusiness', 'sourceOfMoney', 'needToGetFrom',
+];
+function narrowPatchForClaimant(patch: UpdateTxPatch, ownName: string): UpdateTxPatch {
+  const out: UpdateTxPatch = {};
+  for (const key of CLAIMANT_ALLOWED_KEYS) {
+    if (patch[key] !== undefined) {
+      // Cast pattern needed because UpdateTxPatch is a union of nullable
+      // fields — TS can't narrow the key/value tuple in a plain loop.
+      (out as Record<string, unknown>)[key] = patch[key];
+    }
+  }
+  // If they try to reassign `individual` to someone else, snap it back.
+  if (out.individual !== undefined && out.individual) {
+    const target = out.individual.trim().toLowerCase();
+    if (target !== ownName.trim().toLowerCase()) {
+      out.individual = ownName;
+    }
+  }
+  return out;
+}
+
 export async function saveTransaction(id: string, patch: UpdateTxPatch) {
   const user = requireUser();
-  if (!hasEditAccess(user)) throw new Error('read-only role cannot edit transactions');
   if (typeof id !== 'string' || id.length === 0 || id.length > 64) throw new Error('invalid id');
-  updateTransaction(id, patch);
+  if (hasEditAccess(user)) {
+    updateTransaction(id, patch);
+  } else {
+    // Non-editors can only save if this row is claimed to them, and only
+    // to a narrowed set of fields — see narrowPatchForClaimant above.
+    if (!canEditThisTransaction(user, id)) {
+      throw new Error('you can only edit transactions claimed to you');
+    }
+    updateTransaction(id, narrowPatchForClaimant(patch, user.name || user.email));
+  }
   revalidatePath('/transactions');
   revalidatePath('/audit');
   revalidatePath('/');
@@ -187,8 +243,11 @@ export async function claimTransactionAction(
  *  a new custom_source_tag value, saves, returns nothing. */
 export async function saveCustomSourceTagAction(id: string, tag: string | null): Promise<void> {
   const user = requireUser();
-  if (!hasEditAccess(user)) throw new Error('read-only');
   if (typeof id !== 'string' || id.length > 64) throw new Error('bad id');
+  // Editors can tag any row; claimants only their own claimed rows.
+  if (!hasEditAccess(user) && !canEditThisTransaction(user, id)) {
+    throw new Error('you can only tag transactions claimed to you');
+  }
   const clean = tag && tag.trim() ? tag.trim().slice(0, 200) : null;
   updateTransaction(id, { customSourceTag: clean });
   revalidatePath('/flow');

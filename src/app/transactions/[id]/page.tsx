@@ -24,10 +24,20 @@ function ownerLabelFor(sourceTxId: string): string | null {
 
 export default function TransactionDetailPage({ params }: Props) {
   const user = requireUser();
-  if (!hasEditAccess(user)) redirect('/cap');
 
   const tx = getTransaction(params.id);
   if (!tx) notFound();
+
+  // Non-editors (cofounder PARTNER / TEAM_MEMBER) can view AND edit a
+  // transaction detail ONLY if it's claimed to them. This lets them fill
+  // in category, business purpose, notes, custom tag, etc. on their own
+  // charges without seeing everyone else's.
+  const isEditor = hasEditAccess(user);
+  const claimedByMe = !!tx.individual
+    && (user.name || user.email).trim().toLowerCase() === tx.individual.trim().toLowerCase();
+  if (!isEditor && !claimedByMe) {
+    redirect('/identify');
+  }
 
   const acct = ACCOUNTS.find((a) => a.id === tx.accountId) || null;
 
@@ -119,6 +129,7 @@ export default function TransactionDetailPage({ params }: Props) {
       sourceIsOverride={sourceIsOverride}
       txOwnerLabel={txOwnerLabel}
       downstream={downstream}
+      viewerIsEditor={isEditor}
       initialSplitCount={splits.length}
       initialSplitSummary={splits.map((s) => ({
         id: s.id,

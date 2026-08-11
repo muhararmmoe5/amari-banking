@@ -59,13 +59,19 @@ export default function IdentifyClient({
           currentUserName={currentUserName}
           canClaimForOthers={canClaimForOthers}
           isPending={isPending}
-          onClaim={(name) => {
+          onClaim={(name, andEdit) => {
             startTransition(async () => {
               try {
                 await claimTransactionAction(r.id, name);
                 setRows((prev) => prev.filter((x) => x.id !== r.id));
                 setMsg(`Claimed for ${name} — moved out of queue.`);
-                router.refresh();
+                if (andEdit) {
+                  // For "This was me → fill in details" we jump straight to
+                  // the detail page. The claimant can now edit their row.
+                  router.push(`/transactions/${r.id}`);
+                } else {
+                  router.refresh();
+                }
               } catch (e) {
                 setMsg(`Failed: ${e instanceof Error ? e.message : 'unknown'}`);
               }
@@ -96,7 +102,7 @@ function IdentifyRow({
   currentUserName: string;
   canClaimForOthers: boolean;
   isPending: boolean;
-  onClaim: (name: string) => void;
+  onClaim: (name: string, andEdit: boolean) => void;
   onUnflag: () => void;
 }) {
   const [otherName, setOtherName] = useState('');
@@ -142,12 +148,23 @@ function IdentifyRow({
       <div className="flex items-center flex-wrap" style={{ gap: 6, marginTop: 12 }}>
         <button
           type="button"
-          onClick={() => onClaim(currentUserName)}
+          onClick={() => onClaim(currentUserName, true)}
           disabled={isPending}
           className="btn btn-primary"
           style={{ fontSize: 12, padding: '6px 12px', opacity: isPending ? 0.5 : 1 }}
+          title="Claim as yours and jump to the detail page to fill in category, purpose, etc."
         >
-          <UserCheck size={13} /> This was me ({currentUserName})
+          <UserCheck size={13} /> This was me — fill in details
+        </button>
+        <button
+          type="button"
+          onClick={() => onClaim(currentUserName, false)}
+          disabled={isPending}
+          className="btn"
+          style={{ fontSize: 12, padding: '6px 12px', opacity: isPending ? 0.5 : 1 }}
+          title="Claim as yours without filling anything else in right now"
+        >
+          Just claim
         </button>
 
         {canClaimForOthers ? (
@@ -181,7 +198,7 @@ function IdentifyRow({
               />
               <button
                 type="button"
-                onClick={() => { if (otherName.trim()) onClaim(otherName.trim()); }}
+                onClick={() => { if (otherName.trim()) onClaim(otherName.trim(), false); }}
                 disabled={isPending || !otherName.trim()}
                 className="btn btn-primary"
                 style={{ fontSize: 12, padding: '6px 10px', opacity: (isPending || !otherName.trim()) ? 0.5 : 1 }}
