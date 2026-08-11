@@ -50,46 +50,57 @@ export default function TransactionDetailPage({ params }: Props) {
   else if (tx.individual) txOwnerLabel = tx.individual;
   else if (ownerEntityName) txOwnerLabel = ownerEntityName;
 
-  // Manual override wins over FIFO: if the user has explicitly linked this
-  // expense to a funding inflow, surface that. Otherwise run the FIFO trace.
-  let fifoSource: {
+  // An expense can be funded by MULTIPLE prior inflows — FIFO drains the
+  // queue in order and each inflow contributes its remaining balance
+  // until the expense is covered. We surface the full list so the user
+  // sees every source the money came from, not just the largest.
+  //
+  // Manual override still wins over FIFO: when fundedByTransactionId
+  // is set, we show that single linked inflow as the sole source. The
+  // manual-multi-source case uses expense_funding_splits (a separate
+  // table with a per-slice UI) — not shown here yet.
+  const totalExpense = Math.abs(tx.amount);
+  let fifoSources: Array<{
     txId: string; merchant: string; amount: number; accountId: string; date: string;
     isInternal: boolean; attributedAmount: number; ownerLabel: string | null;
-  } | null = null;
+  }> = [];
   let sourceIsOverride = false;
 
   if (tx.amount < 0 && tx.fundedByTransactionId) {
     const linked = getTransaction(tx.fundedByTransactionId);
     if (linked) {
-      fifoSource = {
+      fifoSources = [{
         txId: linked.id,
         merchant: linked.merchantName || linked.description.slice(0, 60),
         amount: linked.amount,
         accountId: linked.accountId,
         date: linked.postingDate,
         isInternal: !!linked.isInternal,
-        attributedAmount: Math.min(linked.amount, Math.abs(tx.amount)),
+        attributedAmount: Math.min(linked.amount, totalExpense),
         ownerLabel: ownerLabelFor(linked.id),
-      };
+      }];
       sourceIsOverride = true;
     }
   }
-  if (!fifoSource && tx.amount < 0) {
+  if (fifoSources.length === 0 && tx.amount < 0) {
     const trace = traceFundingSource(tx.id);
-    const topSource = trace?.sources?.[0] || null;
-    if (topSource) {
-      fifoSource = {
-        txId: topSource.txId,
-        merchant: topSource.merchant || topSource.description.slice(0, 60),
-        amount: topSource.amount,
-        accountId: topSource.accountId,
-        date: topSource.date,
-        isInternal: topSource.isInternal,
-        attributedAmount: topSource.amount,
-        ownerLabel: ownerLabelFor(topSource.txId),
-      };
+    if (trace?.sources?.length) {
+      fifoSources = trace.sources.map((s) => ({
+        txId: s.txId,
+        merchant: s.merchant || s.description.slice(0, 60),
+        amount: s.totalInflow ?? s.amount,
+        accountId: s.accountId,
+        date: s.date,
+        isInternal: s.isInternal,
+        // s.amount from traceFundingSource is already the attributed slice.
+        attributedAmount: s.amount,
+        ownerLabel: ownerLabelFor(s.txId),
+      }));
     }
   }
+  // Keep the single-source prop for backwards compatibility with the
+  // detail view's existing card — the primary (largest) source.
+  const fifoSource = fifoSources[0] || null;
 
   // For income transactions, trace forward to show which expenses this
   // inflow funded and how much is left.
@@ -126,6 +137,7 @@ export default function TransactionDetailPage({ params }: Props) {
       tx={tx}
       account={acct ? { id: acct.id, label: acct.label, entity: acct.entity, last4: acct.last4 } : null}
       fifoSource={fifoSource}
+      fifoSources={fifoSources}
       sourceIsOverride={sourceIsOverride}
       txOwnerLabel={txOwnerLabel}
       downstream={downstream}

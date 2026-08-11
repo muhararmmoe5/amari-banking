@@ -549,6 +549,19 @@ input[type="checkbox"], input[type="radio"] { @apply w-4 h-4; accent-color: var(
     grid-template-columns: 1fr !important;
     gap: 10px !important;
   }
+  /* Multi-source AI trace — inflows column | arrow | outflow: on phones
+     drop to a single column so the stacked sources fill full width and
+     the outflow slides below the arrow. */
+  .tx-source-multigrid {
+    grid-template-columns: 1fr !important;
+  }
+  .tx-source-multigrid > *:nth-child(2) {
+    /* arrow — rotate down on mobile instead of pointing right */
+    transform: rotate(90deg);
+    align-self: center !important;
+    justify-self: center;
+    padding: 4px 0;
+  }
 
   /* ---- Floating AI Chat launcher ---- */
   /* AIChat's floating pill defaults to bottom-right on desktop. On phones

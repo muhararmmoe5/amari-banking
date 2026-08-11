@@ -47,12 +47,18 @@ function flagFor(score: number | null | undefined): FlagInfo {
 }
 
 export default function TransactionDetailView({
-  tx, account, fifoSource, sourceIsOverride, txOwnerLabel, downstream,
+  tx, account, fifoSource, fifoSources = [], sourceIsOverride, txOwnerLabel, downstream,
   viewerIsEditor = true, initialSplitCount, initialSplitSummary,
 }: {
   tx: Transaction;
   account: AccountLite | null;
   fifoSource: FifoSource | null;
+  /** All prior inflows the FIFO trace attributes to this expense —
+   *  in FIFO consumption order. Can be more than one when the expense
+   *  drained multiple deposits. Empty when the FIFO trace found none
+   *  or when a manual override is in place (in which case fifoSource
+   *  holds the single override). */
+  fifoSources?: FifoSource[];
   sourceIsOverride?: boolean;
   txOwnerLabel?: string | null;
   downstream?: DownstreamTrace | null;
@@ -376,7 +382,12 @@ export default function TransactionDetailView({
               Team members are explicitly locked out of source-of-money
               editing — they only categorize/annotate their own row. */}
           {isExpense && viewerIsEditor ? (
-            <AiSourceTraceCard tx={tx} fifoSource={fifoSource} sourceIsOverride={!!sourceIsOverride} />
+            <AiSourceTraceCard
+              tx={tx}
+              fifoSource={fifoSource}
+              fifoSources={fifoSources}
+              sourceIsOverride={!!sourceIsOverride}
+            />
           ) : null}
 
           {/* Income usage bar + downstream trace — only for income transactions, admins only */}
@@ -1110,9 +1121,13 @@ interface InflowSearchResult {
   accountId: string;
 }
 
-function AiSourceTraceCard({ tx, fifoSource, sourceIsOverride }: {
+function AiSourceTraceCard({ tx, fifoSource, fifoSources = [], sourceIsOverride }: {
   tx: Transaction;
   fifoSource: FifoSource | null;
+  /** All inflows the FIFO trace attributes to this expense — one row
+   *  per source in consumption order. When empty we fall back to
+   *  fifoSource alone (single-source view). */
+  fifoSources?: FifoSource[];
   sourceIsOverride: boolean;
 }) {
   const router = useRouter();
@@ -1244,9 +1259,11 @@ function AiSourceTraceCard({ tx, fifoSource, sourceIsOverride }: {
             ) : (
               sourceIsOverride
                 ? 'You set this source manually · Retrace to switch back to the FIFO trace'
-                : has
-                  ? 'Funded 100% from a prior inflow · you can override'
-                  : 'No prior inflow detected on this account yet'
+                : fifoSources.length > 1
+                  ? `Funded from ${fifoSources.length} prior inflows · you can pin a single source to override`
+                  : has
+                    ? 'Funded 100% from a prior inflow · you can override'
+                    : 'No prior inflow detected on this account yet'
             )}
           </div>
         </div>
@@ -1313,29 +1330,139 @@ function AiSourceTraceCard({ tx, fifoSource, sourceIsOverride }: {
         </div>
       ) : null}
 
-      <div className="flex items-center">
-        <FlowNode
-          type="inflow"
-          eyebrow={has ? `INFLOW · ${fifoSource!.date}` : 'INFLOW · —'}
-          title={has ? fifoSource!.merchant.toUpperCase() : 'No prior inflow'}
-          meta={has ? `Wire +$${Math.abs(fifoSource!.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })} · ····${fifoSource!.accountId}` : 'Run AI trace from Source of Money in the drawer'}
-          owner={has ? fifoSource!.ownerLabel : null}
-          href={has ? `/transactions/${fifoSource!.txId}` : undefined}
-        />
-        <div style={{ padding: '0 10px', color: 'var(--ink-3)' }}>
-          <ArrowRight size={20} strokeWidth={1.4} />
-        </div>
-        <FlowNode
-          type="outflow"
-          eyebrow="OUTFLOW · NOW"
-          title={(tx.merchantName || tx.description.slice(0, 50)).toUpperCase()}
-          meta={`−$${Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })} · 100% of expense`}
-        />
-      </div>
+      {/* Sources chain. When we have multiple FIFO sources, render each
+          as a stacked inflow box with its attributed slice — showing the
+          full picture that one expense may have drained several deposits.
+          When only one source (or none), fall back to the single-row
+          layout to keep the desktop UX intact. */}
+      {(() => {
+        const sources = fifoSources.length > 0 ? fifoSources : (fifoSource ? [fifoSource] : []);
+        const total = Math.abs(tx.amount);
+        const attributed = sources.reduce((s, x) => s + x.attributedAmount, 0);
+        const uncovered = Math.max(0, total - attributed);
+
+        if (sources.length === 0) {
+          return (
+            <div className="flex items-center">
+              <FlowNode
+                type="inflow"
+                eyebrow="INFLOW · —"
+                title="No prior inflow"
+                meta="Run AI trace from Source of Money in the drawer"
+              />
+              <div style={{ padding: '0 10px', color: 'var(--ink-3)' }}>
+                <ArrowRight size={20} strokeWidth={1.4} />
+              </div>
+              <FlowNode
+                type="outflow"
+                eyebrow="OUTFLOW · NOW"
+                title={(tx.merchantName || tx.description.slice(0, 50)).toUpperCase()}
+                meta={`−${fmtMoney(-total)} · 100% of expense`}
+              />
+            </div>
+          );
+        }
+
+        if (sources.length === 1) {
+          const s = sources[0];
+          const pctOfExpense = total > 0 ? Math.min(100, (s.attributedAmount / total) * 100) : 0;
+          return (
+            <div className="flex items-center">
+              <FlowNode
+                type="inflow"
+                eyebrow={`INFLOW · ${s.date}`}
+                title={s.merchant.toUpperCase()}
+                meta={`+${fmtMoney(s.attributedAmount)} of ${fmtMoney(s.amount)} · ····${s.accountId}`}
+                owner={s.ownerLabel}
+                href={`/transactions/${s.txId}`}
+              />
+              <div style={{ padding: '0 10px', color: 'var(--ink-3)' }}>
+                <ArrowRight size={20} strokeWidth={1.4} />
+              </div>
+              <FlowNode
+                type="outflow"
+                eyebrow="OUTFLOW · NOW"
+                title={(tx.merchantName || tx.description.slice(0, 50)).toUpperCase()}
+                meta={`−${fmtMoney(-total)} · ${pctOfExpense.toFixed(0)}% covered`}
+              />
+            </div>
+          );
+        }
+
+        // Multi-source view: vertical stack of inflow boxes on the left,
+        // single outflow on the right. Each source shows its slice AND
+        // what % of the total expense it covered.
+        return (
+          <div className="grid tx-source-multigrid" style={{ gridTemplateColumns: '1fr auto 1fr', gap: 12, alignItems: 'stretch' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--income)', fontWeight: 600 }}>
+                {sources.length} inflows funded this
+              </div>
+              {sources.map((s) => {
+                const pct = total > 0 ? (s.attributedAmount / total) * 100 : 0;
+                return (
+                  <Link
+                    key={s.txId}
+                    href={`/transactions/${s.txId}`}
+                    style={{
+                      display: 'block',
+                      padding: '10px 12px',
+                      background: 'var(--bg-1, #111114)',
+                      border: '1px solid color-mix(in oklab, var(--income) 22%, rgba(255,255,255,0.055))',
+                      borderRadius: 8,
+                      textDecoration: 'none', color: 'inherit',
+                    }}
+                  >
+                    <div className="num" style={{ fontSize: 9.5, color: 'var(--income)', fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase' }}>
+                      {s.date} · ····{s.accountId}
+                    </div>
+                    <div className="truncate" style={{ fontSize: 12.5, color: 'var(--ink)', marginTop: 2 }}>
+                      {s.merchant.toUpperCase()}
+                    </div>
+                    <div className="flex items-baseline" style={{ marginTop: 4, gap: 8 }}>
+                      <span className="num" style={{ fontSize: 13, color: 'var(--income)', fontWeight: 500 }}>
+                        {fmtMoney(s.attributedAmount)}
+                      </span>
+                      <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>
+                        {pct.toFixed(0)}% of this expense · of {fmtMoney(s.amount)} inflow
+                      </span>
+                    </div>
+                    {s.ownerLabel ? (
+                      <div className="truncate" style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 4, paddingTop: 4, borderTop: '0.5px dashed rgba(255,255,255,0.08)' }}>
+                        <span style={{ color: 'var(--ink-4, #44443f)' }}>Owner · </span>{s.ownerLabel}
+                      </div>
+                    ) : null}
+                  </Link>
+                );
+              })}
+              {uncovered > 0.01 ? (
+                <div style={{ fontSize: 10.5, color: 'var(--warn, #d4b16f)', padding: '6px 10px', border: '0.5px dashed color-mix(in oklab, var(--warn, #d4b16f) 30%, transparent)', borderRadius: 6 }}>
+                  {fmtMoney(uncovered)} uncovered — no prior inflow accounts for this slice
+                </div>
+              ) : null}
+            </div>
+            <div style={{ alignSelf: 'center', color: 'var(--ink-3)' }}>
+              <ArrowRight size={20} strokeWidth={1.4} />
+            </div>
+            <div style={{ alignSelf: 'stretch', display: 'flex' }}>
+              <FlowNode
+                type="outflow"
+                eyebrow="OUTFLOW · NOW"
+                title={(tx.merchantName || tx.description.slice(0, 50)).toUpperCase()}
+                meta={`−${fmtMoney(-total)} · ${sources.length}-source split`}
+              />
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="flex items-center" style={{ gap: 8, marginTop: 12, fontSize: 11, color: 'var(--ink-3)' }}>
         <Check size={11} style={{ color: 'var(--income)' }} />
-        {has ? 'Fully allocated · audit trail complete · CPA-ready' : 'No source linked — tag manually or run AI trace from the drawer'}
+        {has
+          ? (fifoSources.length > 1
+              ? `Funded across ${fifoSources.length} inflows · audit trail complete · CPA-ready`
+              : 'Fully allocated · audit trail complete · CPA-ready')
+          : 'No source linked — tag manually or run AI trace from the drawer'}
       </div>
     </div>
   );
